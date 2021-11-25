@@ -1,0 +1,14 @@
+FileVersion = 1
+Projects = {LuaTinker = {Path = "."}, KeraLua = "*", "LuaTinker.Tests" = {Path = "Tests"}}
+Unlocked = ["corlib"]
+ExtraPlatforms = ["Linux32", "Linux64"]
+
+[Workspace]
+StartupProject = "LuaTinker"
+
+[Configs.Release.Win64]
+Toolset = "LLVM"
+LTOType = "Thin"
+
+[Configs.Debug.Win64]
+AllocStackTraceDepth = 7

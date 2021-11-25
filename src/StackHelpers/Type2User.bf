@@ -1,0 +1,43 @@
+using System;
+using KeraLua;
+using LuaTinker.Wrappers;
+
+namespace LuaTinker.StackHelpers
+{
+	public struct Type2User
+	{
+		// value to lua
+		public static void Create<T>(Lua lua, T val) where T : struct
+		{
+			let alloc = LuaUserdataAllocator(lua);
+			let wrapper = new:alloc ValuePointerWrapper<T>();
+			wrapper.CreateUninitialized();
+			(*wrapper.ValuePointer) = val;
+		}
+
+		// class to lua
+		public static void Create<T>(Lua lua, T val) where T : class
+		{
+			let alloc = LuaUserdataAllocator(lua);
+			let wrapper = new:alloc ClassPointerWrapper<T>();
+			wrapper.ClassPointer = val;
+		}
+
+		// ref to lua
+		public static void Create<T>(Lua lua, ref T val) where T : var
+		{
+			let alloc = LuaUserdataAllocator(lua);
+			let wrapper = new:alloc RefPointerWrapper<T>();
+			//wrapper.Reference = ref val;
+			wrapper.[Friend]mPtr = &val; // TODO: Delete this when the code above is working.
+		}
+
+		// ptr to lua
+		public static void Create<T>(Lua lua, T* val) where T : var
+		{
+			let alloc = LuaUserdataAllocator(lua);
+			let wrapper = new:alloc PointerWrapper<T>();
+			wrapper.Ptr = val;
+		}
+	}
+}

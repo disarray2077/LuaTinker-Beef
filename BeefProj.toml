@@ -1,0 +1,31 @@
+FileVersion = 1
+Dependencies = {corlib = "*", KeraLua = "*"}
+
+[Project]
+Name = "LuaTinker"
+TargetType = "BeefLib"
+StartupObject = "LuaTinker.Program"
+
+[[ProjectFolder.Items]]
+Type = "AutoFolder"
+Name = "StackHelpers"
+
+[[ProjectFolder.Items.Items]]
+Type = "AutoFolder"
+Name = "Translators"
+
+[[ProjectFolder.Items.Items.Items]]
+Type = "IgnoreSource"
+Name = "Enumerables.bf"
+
+[[ProjectFolder.Items]]
+Type = "AutoFolder"
+Name = "Layers"
+
+[[ProjectFolder.Items.Items]]
+Type = "AutoFolder"
+Name = "MetaTable"
+
+[[ProjectFolder.Items.Items.Items]]
+Type = "IgnoreSource"
+Name = "MetaContainer.bf"
