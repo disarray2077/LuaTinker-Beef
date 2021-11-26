@@ -46,6 +46,18 @@ namespace LuaTinker.StackHelpers
 
 		[Inline]
 		public static void Push<T>(Lua lua, T val) where T : var, struct, Char8
+			=> PushChar<T>(val);
+
+		[Inline]
+		public static void Push<T>(Lua lua, T val) where T : var, struct, Char16
+			=> PushChar<T>(val);
+
+		[Inline]
+		public static void Push<T>(Lua lua, T val) where T : var, struct, Char32
+			=> PushChar<T>(val);
+
+		// TODO: Refactor this when (or if) ICharacter is implemented.
+		private static void PushChar<T>(Lua lua, T val) where T : var
 		{
 			lua.PushInteger((int64)val);
 		}
