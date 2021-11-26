@@ -185,8 +185,34 @@ namespace LuaTinker.StackHelpers
 
 		public static ref T PopRef<T>(Lua lua, int32 index) where T : var
 		{
-			EnsureValidMetaTable<T>(lua, index);
-			return ref User2Type.GetTypePtr<RefPointerWrapper<T>>(lua, index).Reference;
+			let result = EnsureValidMetaTable<T>(lua, index);
+
+			if (result == .OkIsBase)
+			{
+				let tinkerState = LuaTinkerState.Find(lua);
+				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				{
+					// This scope is just to make sure that the string is freed before calling lua.Error
+					lua.PushString($"can't convert argument {index} to 'ref {GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+				}
+				lua.Error();
+			}
+
+			let refWrapper = User2Type.UnsafeGetObject(lua, index) as RefPointerWrapper<T>;
+			if (refWrapper == null)
+			{
+				let tinkerState = LuaTinkerState.Find(lua);
+				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				{
+					// This scope is just to make sure that the string is freed before calling lua.Error
+					lua.PushString($"can't convert argument {index} to 'ref {GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+				}
+				lua.Error();
+			}
+
+			// TODO: Remove the #unwarn when the bug is fixed.
+#unwarn // COMPILER-BUG: Always unreachable warning.
+			return ref refWrapper.Reference;
 		}
 	}
 }
