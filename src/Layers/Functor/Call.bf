@@ -59,7 +59,7 @@ namespace LuaTinker.Layers
 				code.AppendF(
 					$"""
 					int extraArgsCount = lua.GetTop() - {invokeMethod.ParamCount - 1};
-					Object[] extraArgs = scope Object[extraArgsCount];
+					Object[] extraArgs = scope Object[extraArgsCount] (?);
 					for (int32 i = 0; i < extraArgsCount; i++)
 						extraArgs[i] = StackHelper.Pop!::<Object>(lua, i + {invokeMethod.ParamCount});\n
 					""");
