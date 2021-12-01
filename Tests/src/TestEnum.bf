@@ -22,12 +22,16 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
+			tinker.AddNamespace("System");
+			tinker.AddNamespaceEnum<StringSplitOptions>("System");
 			tinker.AddMethod("GetSSO", (function StringSplitOptions()) => GetSSO);
 			tinker.AddMethod("SetSSO", (function void(StringSplitOptions)) => SetSSO);
 
 			if (lua.DoString(
 				@"""
+				assert(GetSSO() == System.StringSplitOptions.RemoveEmptyEntries)
 				assert(GetSSO() == 1)
+				SetSSO(System.StringSplitOptions.None)
 				SetSSO(0)
 				"""
 				))

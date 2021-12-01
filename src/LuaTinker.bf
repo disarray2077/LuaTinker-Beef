@@ -43,6 +43,25 @@ namespace LuaTinker
 			mLua.SetGlobal("__onlygc_meta");
 		}
 
+		public void AddEnum<E>(String name = String.Empty)
+			where E : enum
+		{
+			var name;
+			if (name.IsEmpty)
+				name = typeof(E).GetName(.. scope:: String());
+
+			mLua.CreateTable(0, typeof(E).FieldCount);
+
+			for (let field in typeof(E).GetFields())
+			{
+				mLua.PushString(field.Name);
+				mLua.PushInteger(field.[Friend]mFieldData.[Friend]mData);
+				mLua.SetTable(-3);
+			}
+
+			mLua.SetGlobal(name);
+		}
+
 		// TODO: Unhack this code when the compiler bug is solved
 		private void hack<T>(T func) where T : var
 		{
@@ -396,6 +415,31 @@ namespace LuaTinker
 			}
 
 			return .Ok;
+		}
+
+		public void AddNamespaceEnum<E>(String namespaceName, String enumName = String.Empty)
+			where E : enum
+		{
+			if (FindNamespaceTable(namespaceName))
+			{
+				var enumName;
+				if (enumName.IsEmpty)
+					enumName = typeof(E).GetName(.. scope:: String());
+
+				mLua.PushString(enumName);
+				mLua.CreateTable(0, typeof(E).FieldCount);
+	
+				for (let field in typeof(E).GetFields())
+				{
+					mLua.PushString(field.Name);
+					mLua.PushInteger(field.[Friend]mFieldData.[Friend]mData);
+					mLua.SetTable(-3);
+				}
+
+				mLua.RawSet(-3);
+			}
+
+			mLua.Pop(1);
 		}
 
 		public void AddNamespaceMethod<F>(String namespaceName, String methodName, F func)
