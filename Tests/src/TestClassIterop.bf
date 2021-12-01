@@ -7,6 +7,11 @@ namespace LuaTinker.Tests
 {
 	static class TestClassIterop
 	{
+		public static String StrImpl(String self)
+		{
+			return self;
+		}
+
 		[Test]
 		public static void Test()
 		{
@@ -16,13 +21,12 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 
 			tinker.AddNamespace("System.IO.File");
-			tinker.AddNamespaceMethod("System.IO.File", "ReadAllText", (function Result<void, FileError>(StringView, String, bool)) => File.ReadAllText);
+			tinker.AddNamespaceMethod<function Result<void, FileError>(StringView, String, bool)>("System.IO.File", "ReadAllText", => File.ReadAllText);
 			
 			tinker.AddClass<String>("StringBuilder");
 			tinker.AddClassCtor<String>();
 			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Object[])>("AppendF", => String.AppendF);
-			String StrImpl(String self) => self;
-			tinker.AddClassMethod<String, function String(String)>("str", => StrImpl);
+			tinker.AddClassMethod<String, function String(String)>("str", => StrImpl); // This is necessary to convert from a String instance to a Lua String.
 
 			File.WriteAllText("test_tmp.txt", "All works!");
 			defer File.Delete("test_tmp.txt");

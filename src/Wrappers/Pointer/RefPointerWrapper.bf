@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace LuaTinker.Wrappers
 {
-	class RefPointerWrapper<T> : PointerWrapperBase
+	public sealed class RefPointerWrapper<T> : PointerWrapperBase
 		where T : var
 	{
 		public ref T Reference

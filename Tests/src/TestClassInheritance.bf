@@ -41,12 +41,14 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
-		public static void Test1()
+		public static void TestClass()
 		{
 			let lua = scope Lua(true);
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
+
+			// Parent depth: 1
 
 			tinker.AddClass<MyBaseTest>();
 			tinker.AddClassCtor<MyBaseTest>();
@@ -58,6 +60,8 @@ namespace LuaTinker.Tests
 			tinker.AddClassParent<MyTest, MyBaseTest>();
 			tinker.AddClassVar<MyTest, int>("b", offsetof(MyTest, b));
 			tinker.AddClassMethod<MyTest, function int(MyTest this)>("GetB", => MyTest.GetB);
+
+			// Parent depth: 2
 
 			tinker.AddClass<My2BaseBaseTest>();
 			tinker.AddClassCtor<My2BaseBaseTest>();
@@ -78,12 +82,6 @@ namespace LuaTinker.Tests
 
 			if (lua.DoString(
 				@"""
-				function assert(val)
-					if not val then
-						error("Assertion failed", 2)
-					end
-				end
-
 				test = MyTest()
 				assert(test.a == 15)
 				assert(test.b == 14)
@@ -105,6 +103,16 @@ namespace LuaTinker.Tests
 			{
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 			}
+
+			// Calling MyTest method with Base instance shouldn't be allowed.
+			Test.Assert(lua.DoString(
+				@"""
+				testBase = MyBaseTest()
+				test = MyTest()
+				assert(test.GetA(testBase) == test.a)
+				assert(test.GetB(testBase) == test.b)
+				"""
+			));
 		}
 
 		struct MyBaseTestStruct
@@ -122,7 +130,7 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
-		public static void Test2()
+		public static void TestStruct()
 		{
 			let lua = scope Lua(true);
 			lua.Encoding = System.Text.Encoding.UTF8;

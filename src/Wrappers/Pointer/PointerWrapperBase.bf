@@ -3,7 +3,7 @@ using System;
 
 namespace LuaTinker.Wrappers
 {
-	class PointerWrapperBase
+	public class PointerWrapperBase
 	{
 		public enum ToObjectResult
 		{

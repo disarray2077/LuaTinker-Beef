@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace LuaTinker.Wrappers
 {
-	class ClassPointerWrapper<T> : PointerWrapperBase
+	public sealed class ClassPointerWrapper<T> : PointerWrapperBase
 		where T : var, class
 	{
 		public bool OwnsPointer { get; private set; }

@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace LuaTinker.Wrappers
 {
-	class ValuePointerWrapper<T> : PointerWrapperBase
+	public sealed class ValuePointerWrapper<T> : PointerWrapperBase
 		where T : var, struct
 	{
 	    public ~this()
