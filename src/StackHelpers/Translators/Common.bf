@@ -96,13 +96,13 @@ namespace LuaTinker.StackHelpers
 			Type2User.Create(lua, val);
 
 			let tinkerState = LuaTinkerState.Find(lua);
-			if (!tinkerState.IsClassRegistered<T>())
+			if (!tinkerState.IsClassRegistered<RemovePtr<T>>())
 			{
 				NoRegType2User<T>(lua);
 			}
 			else
 			{
-				lua.GetGlobal(tinkerState.GetClassName<T>());
+				lua.GetGlobal(tinkerState.GetClassName<RemovePtr<T>>());
 				lua.SetMetaTable(-2);
 			}
 		}
@@ -112,13 +112,13 @@ namespace LuaTinker.StackHelpers
 			Type2User.Create<T>(lua, ref val);
 
 			let tinkerState = LuaTinkerState.Find(lua);
-			if (!tinkerState.IsClassRegistered<T>())
+			if (!tinkerState.IsClassRegistered<RemovePtr<T>>())
 			{
 				NoRegType2User<T>(lua);
 			}
 			else
 			{
-				lua.GetGlobal(tinkerState.GetClassName<T>());
+				lua.GetGlobal(tinkerState.GetClassName<RemovePtr<T>>());
 				lua.SetMetaTable(-2);
 			}
 		}
@@ -126,7 +126,21 @@ namespace LuaTinker.StackHelpers
 		[Inline]
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct*
 		{
-			return User2Type.GetTypePtr<PointerWrapper<RemovePtr<T>>>(lua, index).Ptr;
+			let stackObject = User2Type.GetObject(lua, index);
+			if (let ptrWrapper = stackObject as PointerWrapper<RemovePtr<T>>)
+				return ptrWrapper.Ptr;
+			else if (let refPtrWrapper = stackObject as RefPointerWrapper<RemovePtr<T>>)
+				return &refPtrWrapper.Reference;
+			else
+			{
+				let tinkerState = LuaTinkerState.Find(lua);
+				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				{
+					// This scope is just to make sure that the string is freed before calling lua.Error
+					lua.PushString($"can't convert argument {index} to 'ptr {GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+				}
+				lua.Error();
+			}
 		}
 
 		[Inline]
@@ -139,6 +153,15 @@ namespace LuaTinker.StackHelpers
 			{
 				// We are sure that this conversion is valid, so let's just do it unsafely.
 				let ptr = ((PointerWrapperBase)stackObject).Ptr;
+
+				// This is necessary only because PointerWrapper<T> can contain a null pointer.
+				if (ptr == null)
+				{
+					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+					lua.PushString("null pointer dereference");
+					lua.Error();
+				}
+
 				return ref *(T*)ptr;
 			}
 
@@ -146,12 +169,26 @@ namespace LuaTinker.StackHelpers
 				return ref *valueWrapper.ValuePointer;
 			else if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
 				return ref refPtrWrapper.Reference;
+			else if (let ptrWrapper = stackObject as PointerWrapper<T>)
+			{
+				if (ptrWrapper.Ptr == null)
+				{
+					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+					lua.PushString("null pointer dereference");
+					lua.Error();
+				}
+
+				return ref *ptrWrapper.Ptr;
+			}
 			else
 			{
-				// This should never happen.
+				// We want an unregistered class, the supplied value is also unregistered but it isn't a compatible wrapper.
+				let tinkerState = LuaTinkerState.Find(lua);
 				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				Debug.FatalError("No valid conversion found!");
-				lua.PushString("No valid conversion found!");
+				{
+					// This scope is just to make sure that the string is freed before calling lua.Error
+					lua.PushString($"can't convert argument {index} to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+				}
 				lua.Error();
 			}
 		}
@@ -166,6 +203,15 @@ namespace LuaTinker.StackHelpers
 			{
 				// We are sure that this conversion is valid, so let's just do it unsafely.
 				let ptr = ((PointerWrapperBase)stackObject).Ptr;
+
+				// This is necessary only because PointerWrapper<T> can contain a null pointer
+				if (ptr == null)
+				{
+					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+					lua.PushString("null pointer dereference");
+					lua.Error();
+				}
+
 				return (T)Internal.UnsafeCastToObject(ptr);
 			}
 
@@ -173,21 +219,47 @@ namespace LuaTinker.StackHelpers
 				return valueWrapper.ClassPointer;
 			else if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
 				return refPtrWrapper.Reference;
+			else if (let ptrWrapper = stackObject as PointerWrapper<T>)
+			{
+				if (ptrWrapper.Ptr == null)
+				{
+					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+					lua.PushString("null pointer dereference");
+					lua.Error();
+				}
+
+				return *ptrWrapper.Ptr;
+			}
 			else
 			{
-				// This should never happen.
+				// We want an unregistered class, the supplied value is also unregistered but it isn't a compatible wrapper.
+				let tinkerState = LuaTinkerState.Find(lua);
 				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				Debug.FatalError("No valid conversion found!");
-				lua.PushString("No valid conversion found!");
+				{
+					// This scope is just to make sure that the string is freed before calling lua.Error
+					lua.PushString($"can't convert argument {index} to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+				}
 				lua.Error();
 			}
 		}
 
 		public static ref T PopRef<T>(Lua lua, int32 index) where T : var
 		{
-			let result = EnsureValidMetaTable<T>(lua, index);
+			let stackObject = User2Type.GetObject(lua, index);
+			if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
+				return ref refPtrWrapper.Reference;
+			else if (let ptrWrapper = stackObject as PointerWrapper<T>)
+			{
+				if (ptrWrapper.Ptr == null)
+				{
+					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+					lua.PushString("null pointer dereference");
+					lua.Error();
+				}
 
-			if (result == .OkIsBase)
+				return ref *ptrWrapper.Ptr;
+			}
+			else
 			{
 				let tinkerState = LuaTinkerState.Find(lua);
 				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
@@ -197,22 +269,6 @@ namespace LuaTinker.StackHelpers
 				}
 				lua.Error();
 			}
-
-			let refWrapper = User2Type.UnsafeGetObject(lua, index) as RefPointerWrapper<T>;
-			if (refWrapper == null)
-			{
-				let tinkerState = LuaTinkerState.Find(lua);
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				{
-					// This scope is just to make sure that the string is freed before calling lua.Error
-					lua.PushString($"can't convert argument {index} to 'ref {GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
-				}
-				lua.Error();
-			}
-
-			// TODO: Remove the #unwarn when the bug is fixed.
-#unwarn // COMPILER-BUG: Always unreachable warning.
-			return ref refWrapper.Reference;
 		}
 	}
 }

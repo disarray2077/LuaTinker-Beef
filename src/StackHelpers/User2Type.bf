@@ -20,6 +20,18 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static Object GetObject(Lua lua, int32 index)
+		{
+			if (!lua.IsUserData(index))
+			{
+				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				lua.PushString($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				lua.Error();
+			}
+			return Internal.UnsafeCastToObject(lua.ToUserData(index));
+		}
+
+		[Inline]
 		public static Object UnsafeGetObject(Lua lua, int32 index)
 		{
 			return Internal.UnsafeCastToObject(lua.ToUserData(index));

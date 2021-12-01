@@ -75,6 +75,11 @@ namespace LuaTinker.Tests
 		public static TestClass sTest1;
 		public static TestClass sTest2;
 
+		public static TestClass GetTest1()
+		{
+			return sTest1;
+		}
+
 		public static ref TestClass GetTest1Ref()
 		{
 			return ref sTest1;
@@ -118,6 +123,14 @@ namespace LuaTinker.Tests
 			}
 
 			Test.Assert(sTest1.A == 2);
+
+			tinker.AddMethod<function TestClass()>("GetTest1", => GetTest1);
+
+			Test.Assert(lua.DoString(
+				@"""
+				SetTestRef(GetTest1(), GetTest2Ref())
+				"""
+			));
 		}
 	}
 }
