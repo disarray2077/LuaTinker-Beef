@@ -16,7 +16,7 @@ namespace LuaTinker.StackHelpers
 		public static mixin Pop<T>(Lua lua, int32 index)
 			where T : Object where Object : T
 		{
-			Object obj = ?;
+			Object obj = ?; // COMPILER-BUG: Without "= ?" I get "Use of unassigned variable", but it's clearly being assigned in all code paths.
 			if (lua.IsUserData(index))
 			{
 				let wrapper = User2Type.UnsafeGetTypePtr<PointerWrapperBase>(lua, index);
@@ -73,7 +73,10 @@ namespace LuaTinker.StackHelpers
 			}
 			else
 			{
-				str = scope:mixin String()..Reference(Pop<T>(lua, index));
+				if (let strView = Pop<T>(lua, index))
+					str = scope:mixin String()..Reference(strView);
+				else
+					str = null;
 			}
 			str
 		}

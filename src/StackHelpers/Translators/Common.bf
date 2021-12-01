@@ -126,6 +126,9 @@ namespace LuaTinker.StackHelpers
 		[Inline]
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct*
 		{
+			if (lua.IsNil(index))
+				return null;
+
 			let stackObject = User2Type.GetObject(lua, index);
 			if (let ptrWrapper = stackObject as PointerWrapper<RemovePtr<T>>)
 				return ptrWrapper.Ptr;
@@ -146,6 +149,17 @@ namespace LuaTinker.StackHelpers
 		[Inline]
 		public static ref T Pop<T>(Lua lua, int32 index) where T : var, struct
 		{
+			if (lua.IsNil(index))
+			{
+				let tinkerState = LuaTinkerState.Find(lua);
+				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				{
+					// This scope is just to make sure that the string is freed before calling lua.Error
+					lua.PushString($"can't convert argument {index} to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+				}
+				lua.Error();
+			}
+
 			let result = EnsureValidMetaTable<T>(lua, index);
 
 			let stackObject = User2Type.UnsafeGetObject(lua, index);
@@ -196,6 +210,9 @@ namespace LuaTinker.StackHelpers
 		[Inline]
 		public static T Pop<T>(Lua lua, int32 index) where T : var, class
 		{
+			if (lua.IsNil(index))
+				return null;
+
 			let result = EnsureValidMetaTable<T>(lua, index);
 
 			let stackObject = User2Type.UnsafeGetObject(lua, index);
