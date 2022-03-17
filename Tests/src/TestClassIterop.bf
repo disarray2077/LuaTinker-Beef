@@ -25,7 +25,7 @@ namespace LuaTinker.Tests
 			
 			tinker.AddClass<String>("StringBuilder");
 			tinker.AddClassCtor<String>();
-			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Object[])>("AppendF", => String.AppendF);
+			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Span<Object>)>("AppendF", => String.AppendF);
 			tinker.AddClassMethod<String, function String(String)>("str", => StrImpl); // This is necessary to convert from a String instance to a Lua String.
 
 			File.WriteAllText("test_tmp.txt", "All works!");

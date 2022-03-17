@@ -45,38 +45,13 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
-		public static void Push<T>(Lua lua, T val) where T : var, struct, Char8
-			=> PushChar<T>(val);
-
-		[Inline]
-		public static void Push<T>(Lua lua, T val) where T : var, struct, Char16
-			=> PushChar<T>(val);
-
-		[Inline]
-		public static void Push<T>(Lua lua, T val) where T : var, struct, Char32
-			=> PushChar<T>(val);
-
-		// TODO: Refactor this when (or if) ICharacter is implemented.
-		private static void PushChar<T>(Lua lua, T val) where T : var
+		public static void Push<T>(Lua lua, T val) where T : var, struct, ICharacter
 		{
 			lua.PushInteger((int64)val);
 		}
 
 		[Inline]
-		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, Char8
-			=> PopChar<T>(lua, index);
-
-		[Inline]
-		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, Char16
-			=> PopChar<T>(lua, index);
-
-		[Inline]
-		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, Char32
-			=> PopChar<T>(lua, index);
-
-		// TODO: Refactor this when (or if) ICharacter is implemented.
-		private static T PopChar<T>(Lua lua, int32 index)
-			where T : var
+		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, ICharacter
 		{
 			let value = lua.ToIntegerX(index);
 			if (!value.HasValue)

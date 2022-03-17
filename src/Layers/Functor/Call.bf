@@ -17,7 +17,7 @@ namespace LuaTinker.Layers
 
 			let invokeMethodResult = typeof(F).GetMethod("Invoke");
 			if (invokeMethodResult case .Err)
-				Runtime.FatalError("Type isn't invokable");
+				Runtime.FatalError(scope $"Type \"{typeof(F)}\" isn't invokable");
 
 			let invokeMethod = invokeMethodResult.Get();
 			var retType = invokeMethod.ReturnType;
@@ -43,6 +43,8 @@ namespace LuaTinker.Layers
 				// TODO: Proper way to check if parameter is "params"
 				let lastParameter = invokeMethod.GetParamType(invokeMethod.ParamCount - 1);
 				isParams = lastParameter.IsArray && lastParameter.IsObject;
+				if (let specializedType = lastParameter as SpecializedGenericType)
+					isParams |= specializedType.UnspecializedType == typeof(Span<>) && specializedType.GetGenericArg(0).IsObject;
 
 				code.AppendF(
 					$"""
@@ -139,7 +141,7 @@ namespace LuaTinker.Layers
 				code.Append("return 0;");
 			}
 
-			Compiler.Mixin(code);
+			Compiler.MixinRoot(code);
 		}
 
 		public static int32 CallLayer<F>(lua_State L)

@@ -20,7 +20,7 @@ namespace LuaTinker.Tests
 
 			tinker.AddClass<String>("StringBuilder");
 			tinker.AddClassCtor<String, String>();
-			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Object[])>("AppendF", => String.AppendF);
+			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Span<Object>)>("AppendF", => String.AppendF);
 			tinker.AddClassMethod<String, function String(String)>("str", => StrImpl);
 
 			if (lua.DoString(

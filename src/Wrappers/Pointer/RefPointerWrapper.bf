@@ -9,8 +9,7 @@ namespace LuaTinker.Wrappers
 		public ref T Reference
 		{
 			get => ref *(T*)Ptr;
-#unwarn // TODO: Remove this #unwarn when ref setters are available.
-			set => Ptr = &value;
+			set ref => Ptr = &value;
 		}
 
 		public override Type Type => typeof(T);

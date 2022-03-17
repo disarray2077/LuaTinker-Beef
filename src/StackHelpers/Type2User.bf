@@ -28,8 +28,7 @@ namespace LuaTinker.StackHelpers
 		{
 			let alloc = LuaUserdataAllocator(lua);
 			let wrapper = new:alloc RefPointerWrapper<T>();
-			//wrapper.Reference = ref val;
-			wrapper.[Friend]mPtr = &val; // TODO: Delete this when the code above is working.
+			wrapper.Reference = ref val;
 		}
 
 		// ptr to lua

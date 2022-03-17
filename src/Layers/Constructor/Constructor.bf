@@ -26,14 +26,12 @@ namespace LuaTinker.Layers
 		private static void EmitCreatorLayer<T, Args>()
 			where T : var
 		{
+			if (typeof(T).IsGenericParam)
+				return;
+
 			let type = typeof(Args);
 			let code = scope String();
 
-			// TODO: This commented code doesn't work as expected...
-			//if (type.IsStruct || type.IsPrimitive || type.IsValueType)
-			//	code.Append("let wrapper = new:alloc ValuePointerWrapper<T>();\n");
-			//else
-			//	code.Append("let wrapper = new:alloc ClassPointerWrapper<T>();\n");
 			EmitWrapperVar<T>(code);
 
 			code.Append("wrapper.Create(");
@@ -55,7 +53,7 @@ namespace LuaTinker.Layers
 
 			code.Append(");\n");
 
-			Compiler.Mixin(code);
+			Compiler.MixinRoot(code);
 		}
 
 		public static int32 CreatorLayer<T>(lua_State L)

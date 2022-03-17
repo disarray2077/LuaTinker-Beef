@@ -36,7 +36,7 @@ namespace LuaTinker.Tests
 			}
 
 			Test.Assert(tinker.Call<int>("TestRet1") == 1);
-			Test.Assert(tinker.Call<int, (int, int)>("TestRetPlus", (13, 22)) == 55);
+			Test.Assert(tinker.Call<int, (int, char32)>("TestRetPlus", (13, (.)22)) == 55);
 			Test.Assert(tinker.Call<int, (int, int, int, int, int, int, int, int, int, int)>("TestLotsOfArgs", (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)) == 55);
 		}
 	}

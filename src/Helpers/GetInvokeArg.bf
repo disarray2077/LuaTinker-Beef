@@ -8,7 +8,7 @@ namespace LuaTinker.Helpers
 		public struct GetInvokeArg<F, C>
 		    where C : const int
 		{
-		    public typealias Type = comptype(getInvokeArgumentType(typeof(F), getConst()));
+		    public typealias Type = comptype(getInvokeArgumentType(typeof(F), C));
 
 		    [Comptime]
 			private static Type getInvokeArgumentType(Type type, int index)
@@ -19,7 +19,7 @@ namespace LuaTinker.Helpers
 					if ((type as SpecializedGenericType) == null)
 						return typeof(void);
 					else
-						Runtime.FatalError("Type isn't invokable");
+						Runtime.FatalError(scope $"Type \"{type}\" isn't invokable");
 				}
 
 				let invokeMethod = invokeMethodResult.Get();
@@ -27,12 +27,6 @@ namespace LuaTinker.Helpers
 
 				return invokeMethod.GetParamType(index);
 			}
-
-		    [Comptime]
-		    private static int getConst()
-		    {
-		        return C;
-		    }
 		}
 	}
 }

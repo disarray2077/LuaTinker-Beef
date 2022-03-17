@@ -62,16 +62,9 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 
-		// TODO: Unhack this code when the compiler bug is solved
-		private void hack<T>(T func) where T : var
+		public void AddMethod<F>(String name, F func) where F : var
 		{
 			mLua.PushLightUserData(func);
-		}
-
-		public void AddMethod<F>(String name, F func)
-		{
-			// COMPILER-BUG: The commented out code doesn't work.
-			hack(func);//lua.PushLightUserData(func);
 			mLua.PushCClosure(=> CallLayer<F>, 1);
 			mLua.SetGlobal(name);
 		}
@@ -118,7 +111,7 @@ namespace LuaTinker
 				code.AppendF($"AddMethod(\"{method.Name}\", (function {retType.GetFullName(.. scope .())}({m})) => {type.GetFullName(.. scope .())}.{method.Name});\n");
 			}
 
-			Compiler.Mixin(code);
+			Compiler.MixinRoot(code);
 		}
 
 		public mixin AutoTinkClass<T>(var name = "")
@@ -198,14 +191,13 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddClassMethod<T, F>(String name, F func)
+		public void AddClassMethod<T, F>(String name, F func) where F : var
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
 				mLua.PushString(name);
-				// COMPILER-BUG: The commented out code doesn't work.
-				hack(func);//lua.PushLightUserData(func);
+				mLua.PushLightUserData(func);
 				mLua.PushCClosure(=> CallLayer<F>, 1);
 				mLua.RawSet(-3);
 			}
@@ -229,8 +221,6 @@ namespace LuaTinker
 			where TSet : class, delegate void(T, TVar)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
-			GC.Mark!(getter); // will be managed by lua
-			GC.Mark!(setter); // will be managed by lua
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
@@ -442,13 +432,12 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceMethod<F>(String namespaceName, String methodName, F func)
+		public void AddNamespaceMethod<F>(String namespaceName, String methodName, F func) where F : var
 		{
 			if (FindNamespaceTable(namespaceName))
 			{
 				mLua.PushString(methodName);
-				// COMPILER-BUG: The commented out code doesn't work.
-				hack(func);//lua.PushLightUserData(func);
+				mLua.PushLightUserData(func);
 				mLua.PushCClosure(=> CallLayer<F>, 1);
 				mLua.RawSet(-3);
 			}
@@ -486,7 +475,7 @@ namespace LuaTinker
 				code.Append("StackHelper.Push(mLua, args);\n");
 			}
 
-			Compiler.Mixin(code);
+			Compiler.MixinRoot(code);
 			return fieldCount;
 		}
 
