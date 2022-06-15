@@ -23,7 +23,7 @@ namespace LuaTinker.Helpers
 				}
 
 				let invokeMethod = invokeMethodResult.Get();
-				Compiler.Assert(invokeMethod.ParamCount > index);
+				Runtime.Assert(invokeMethod.ParamCount > index);
 
 				return invokeMethod.GetParamType(index);
 			}

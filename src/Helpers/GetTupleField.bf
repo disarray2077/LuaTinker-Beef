@@ -17,7 +17,7 @@ namespace LuaTinker.Helpers
 					return typeof(var);
 				if (!type.IsTuple)
 					Runtime.FatalError(scope $"Type \"{type}\" isn't tuple");
-				Compiler.Assert(type.FieldCount > index);
+				Runtime.Assert(type.FieldCount > index);
 				return type.GetField(index).Get().FieldType;
 			}
 		}
