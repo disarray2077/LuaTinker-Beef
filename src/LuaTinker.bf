@@ -239,16 +239,14 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddClassProperty<T, TVar, TGet, TSet>(String name, TGet getter, TSet setter)
-			where TGet : struct, function TVar(T this)
-			where TSet : struct, function void(T this, TVar)
+		public void AddClassProperty<T, TVar>(String name, function TVar(T this) getter, function void(T this, TVar) setter)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator FuncPropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
+				new:mUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);

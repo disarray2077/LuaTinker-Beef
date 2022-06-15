@@ -5,16 +5,14 @@ using LuaTinker.StackHelpers;
 
 namespace LuaTinker.Wrappers
 {
-	public sealed class FuncPropertyWrapper<T, TVar, TGet, TSet> : VariableWrapperBase
+	public sealed class FuncPropertyWrapper<T, TVar> : VariableWrapperBase
 		where T : var
 		where TVar : var
-		where TGet : struct, function TVar(T this)
-		where TSet : struct, function void(T this, TVar)
 	{
-		TGet mGetFunc;
-		TSet mSetFunc;
+		function TVar(T this) mGetFunc;
+		function void(T this, TVar) mSetFunc;
 
-		public this(TGet getFunc, TSet setFunc)
+		public this(function TVar(T this) getFunc, function void(T this, TVar) setFunc)
 		{
 			mGetFunc = getFunc;
 			mSetFunc = setFunc;

@@ -15,7 +15,7 @@ namespace LuaTinker.Tests
 			
 			tinker.AddClass<Type>("Type");
 			function int32(Type this) getSizeFunc = (.) (void*) ((function int32(Type)) (self) => self.Size);
-			tinker.AddClassProperty<Type, int32, function int32(Type this), function void(Type this, int32)>("Size", getSizeFunc, null);
+			tinker.AddClassProperty<Type, int32>("Size", getSizeFunc, null);
 
 			int magic = 0;
 			tinker.AddClassProperty<Type, int32, delegate int32(Type), delegate void(Type, int32)>("Magic",
@@ -52,7 +52,7 @@ namespace LuaTinker.Tests
 			
 			tinker.AddClass<Type>("Type");
 			function int32(Type this) getSizeFunc = (.) (void*) ((function int32(Type)) (self) => self.Size);
-			tinker.AddClassProperty<Type, int32, function int32(Type this), function void(Type this, int32)>("Size", getSizeFunc, null);
+			tinker.AddClassProperty<Type, int32>("Size", getSizeFunc, null);
 			tinker.AddClassProperty<Type, int32, delegate int32(Type), delegate void(Type, int32)>("Magic",
 				new (self) => {
 					return self.Size + (.)self.TypeId;
@@ -92,7 +92,7 @@ namespace LuaTinker.Tests
 			
 			tinker.AddClass<Type>("Type");
 			function void(Type this, int32) setSizeFunc = (.) (void*) ((function void(Type, int32)) => FakeSetSize);
-			tinker.AddClassProperty<Type, int32, function int32(Type this), function void(Type this, int32)>("Size", null, setSizeFunc);
+			tinker.AddClassProperty<Type, int32>("Size", null, setSizeFunc);
 
 			int magic = 0;
 			tinker.AddClassProperty<Type, int32, delegate int32(Type), delegate void(Type, int32)>("Magic",
@@ -132,7 +132,7 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 			
 			tinker.AddClass<Type>("Type");
-			tinker.AddClassProperty<Type, int32, function int32(Type this), function void(Type this, int32)>("Size", null, null);
+			tinker.AddClassProperty<Type, int32>("Size", null, null);
 		}
 		
 		[Test(ShouldFail=true)]
