@@ -15,6 +15,8 @@ namespace LuaTinker.Layers
 		{
 			let code = scope String();
 
+			//Debug.Break();
+
 			let invokeMethodResult = typeof(F).GetMethod("Invoke");
 			if (invokeMethodResult case .Err)
 				Runtime.FatalError(scope $"Type \"{typeof(F)}\" isn't invokable");
@@ -75,11 +77,11 @@ namespace LuaTinker.Layers
 			{
 				switch (retRefType.RefKind)
 				{
-				case .Mut, .Out:
-					Runtime.FatalError("Not implemented!");
 				case .Ref:
 					code.Append("ref ");
 					returnsRef = true;
+				default:
+					Runtime.FatalError("Not implemented!");
 				}
 			}
 
@@ -98,11 +100,11 @@ namespace LuaTinker.Layers
 				{
 					switch (retParamType.RefKind)
 					{
-					case .Mut, .Out:
-						Runtime.FatalError("Not implemented!");
 					case .Ref:
 						code.Append("ref ");
 						paramIsRef = true;
+					default:
+						Runtime.FatalError("Not implemented!");
 					}
 				}
 
