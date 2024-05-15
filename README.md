@@ -5,7 +5,7 @@ This is a library to bind BeefLang to Lua, inspired by [LuaTinker](https://githu
 ## Notes
 
 - This library is in no way in a final state and may change drastically in next updates, there are still many things to improve and contributions are very welcome.
-- This library (currently) makes no use of Reflection, everything is generated in compile-time.
+- This library makes no use of runtime Reflection, everything is generated in compile-time.
 - I strongly recommend the use of the latest Beef nightly release when using this library.
 
 ## Dependencies
@@ -28,8 +28,7 @@ tinker.AddNamespaceMethod("System.IO.File", "ReadAllText", (function Result<void
 tinker.AddClass<String>("StringBuilder");
 tinker.AddClassCtor<String>();
 tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Object[])>("AppendF", => String.AppendF);
-String StrImpl(String self) => self;
-tinker.AddClassMethod<String, function String(String)>("str", => StrImpl); // This is necessary to convert from the class instance to a Lua string.
+tinker.AddClassMethod<String, function String(String)>("str", (str) => str); // This is necessary to convert from the class instance to a Lua string.
 
 File.WriteAllText("test_tmp.txt", "All works!");
 defer File.Delete("test_tmp.txt");
