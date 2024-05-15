@@ -14,7 +14,7 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-
+			
 			tinker.AddNamespace("System.IO.File");
 			tinker.AddNamespaceMethod<function Result<void, FileError>(StringView, String, bool)>("System.IO.File", "ReadAllText", => File.ReadAllText);
 			
@@ -22,7 +22,7 @@ namespace LuaTinker.Tests
 			tinker.AddClassCtor<String>();
 			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Span<Object>)>("AppendF", => String.AppendF);
 			tinker.AddClassMethod<String, function String(String)>("str", (str) => str); // This is necessary to convert from a String instance to a Lua String.
-
+			
 			File.WriteAllText("test_tmp.txt", "All works!");
 			defer File.Delete("test_tmp.txt");
 

@@ -22,13 +22,8 @@ lua.Encoding = System.Text.Encoding.UTF8;
 
 LuaTinker tinker = scope .(lua);
 
-tinker.AddNamespace("System.IO.File");
-tinker.AddNamespaceMethod("System.IO.File", "ReadAllText", (function Result<void, FileError>(StringView, String, bool)) => File.ReadAllText);
-
-tinker.AddClass<String>("StringBuilder");
-tinker.AddClassCtor<String>();
-tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Object[])>("AppendF", => String.AppendF);
-tinker.AddClassMethod<String, function String(String)>("str", (str) => str); // This is necessary to convert from the class instance to a Lua string.
+tinker.AutoTinkClass<System.IO.File>();
+tinker.AutoTinkClass<System.String, const "StringBuilder">();
 
 File.WriteAllText("test_tmp.txt", "All works!");
 defer File.Delete("test_tmp.txt");
@@ -41,9 +36,11 @@ lua.DoString(
     string = StringBuilder()
     string:AppendF("Test '{}'", outString)
     
-    print(string:str()) -- outputs: Test 'All works!'
+    print(string:self()) -- outputs: Test 'All works!'
     """
 );
+
+Console.Read();
 ```
 
 For more examples I encourage you to look at the `LuaTinker.Tests` project.

@@ -169,28 +169,42 @@ namespace LuaTinker.Layers
 
 				LuaType luaType = BeefTypeToLuaType(type);
 
-				if (luaType == .UserData)
+				if (type != typeof(Object))
 				{
-					code.AppendF($"{depthCode}if (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
-				}
-				else if (luaType == .String)
-				{
-					if (flags.HasFlag(.This))
+					if (luaType == .UserData)
 					{
-						code.AppendF($"{depthCode}if (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+						if (flags.HasFlag(.This))
+						{
+							code.AppendF($"{depthCode}if (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+						}
+						else
+						{
+							code.AppendF($"{depthCode}if (lua.IsNil({depth}) || (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()}))))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+						}
+					}
+					else if (luaType == .String)
+					{
+						if (flags.HasFlag(.This))
+						{
+							code.AppendF($"{depthCode}if (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+						}
+						else
+						{
+							code.AppendF($"{depthCode}if (lua.IsString({depth}) || lua.IsNil({depth}) || (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()}))))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+						}
+					}
+					else if (luaType == .Number)
+					{
+						code.AppendF($"{depthCode}if (lua.IsNumber({depth}) && !lua.IsString({depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 					}
 					else
 					{
-						code.AppendF($"{depthCode}if (lua.IsString({depth}) || (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()}))))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+						code.AppendF($"{depthCode}if (lua.Is{luaType}({depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 					}
-				}
-				else if (luaType == .Number)
-				{
-					code.AppendF($"{depthCode}if (lua.IsNumber({depth}) && !lua.IsString({depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 				}
 				else
 				{
-					code.AppendF($"{depthCode}if (lua.Is{luaType}({depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+					code.AppendF($"{depthCode}// {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 				}
 				code.AppendF($"{depthCode}{{\n");
 
