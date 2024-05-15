@@ -13,6 +13,14 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static void Push<T>(Lua lua, T? val) where T : var, struct, INumeric
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				lua.PushInteger((int64)val);
+		}
+
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, INumeric
 		{
 			let value = lua.ToIntegerX(index);
@@ -32,6 +40,14 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static void Push<T>(Lua lua, T? val) where T : var, struct, IFloating
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				lua.PushNumber((double)val);
+		}
+
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, IFloating
 		{
 			let value = lua.ToNumberX(index);
@@ -51,6 +67,14 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static void Push<T>(Lua lua, T? val) where T : var, struct, ICharacter
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				lua.PushInteger((int64)val);
+		}
+
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, ICharacter
 		{
 			let value = lua.ToIntegerX(index);
@@ -70,6 +94,14 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static void Push<T>(Lua lua, T? val) where T : var, struct, Boolean
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				lua.PushBoolean((bool)val);
+		}
+
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, Boolean
 		{
 			if (!lua.IsBoolean(index))

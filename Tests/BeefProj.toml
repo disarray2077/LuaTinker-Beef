@@ -5,7 +5,3 @@ Dependencies = {corlib = "*", KeraLua = "*", LuaTinker = "*"}
 Name = "LuaTinker.Tests"
 TargetType = "BeefTest"
 StartupObject = "LuaTinker.Tests.Program"
-
-[[ProjectFolder.Items]]
-Type = "IgnoreSource"
-Name = "TestAutoTink.bf"

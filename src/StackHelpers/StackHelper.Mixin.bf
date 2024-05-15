@@ -16,16 +16,20 @@ namespace LuaTinker.StackHelpers
 		public static mixin Pop<T>(Lua lua, int32 index)
 			where T : Object where Object : T
 		{
-			Object obj = ?; // COMPILER-BUG: Without "= ?" I get "Use of unassigned variable", but it's clearly being assigned in all code paths.
+			SingleAllocator alloc = scope:mixin .(88);
+			_PopAlloc<T>(lua, index, alloc)
+		}
+
+		private static Object _PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
+			where T : Object
+		{
 			if (lua.IsUserData(index))
 			{
 				let wrapper = User2Type.UnsafeGetTypePtr<PointerWrapperBase>(lua, index);
-				switch (wrapper.ToObject(out obj))
+				switch (wrapper.ToObject(alloc, let obj))
 				{
-				case .Object:
-					// no need to do anything
-				case .NewObject:
-					defer:mixin delete obj;
+				case .Object, .NewObject:
+					return obj;
 				case .Error:
 					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
 					lua.PushString($"can't convert argument {index} to 'System.Object'");
@@ -38,9 +42,9 @@ namespace LuaTinker.StackHelpers
 				{
 				case .Number:
 					if (let i = lua.ToIntegerX(index))
-						obj = scope:mixin box i;
+						return new:alloc box i;
 					else if (let n = lua.ToNumberX(index))
-						obj = scope:mixin box n;
+						return new:alloc box n;
 					else
 					{
 						// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
@@ -48,37 +52,41 @@ namespace LuaTinker.StackHelpers
 						lua.Error();
 					}
 				case .Boolean:
-					obj = scope:mixin box Pop<bool>(lua, index);
+					return new:alloc box Pop<bool>(lua, index);
 				case .String:
-					obj = scope:mixin box Pop<StringView>(lua, index);
+					return new:alloc box Pop<StringView>(lua, index);
 				case .Nil:
-					obj = null;
+					return null;
 				default:
 					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
 					lua.PushString($"can't convert argument {index} to 'System.Object'");
 					lua.Error();
 				}
 			}
-			obj
 		}
 
 		public static mixin Pop<T>(Lua lua, int32 index)
 			where T : String
 		{
-			String str;
+			SingleAllocator alloc = scope:mixin .(96);
+			_PopAlloc<T>(lua, index, alloc)
+		}
+
+		private static String _PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
+			where T : String
+		{
 			if (lua.IsUserData(index))
 			{
-				let wrapper = User2Type.GetTypePtr<ClassPointerWrapper<T>>(lua, index);
-				str = (String)Internal.UnsafeCastToObject(wrapper.[Friend]mPtr);
+				let wrapper = User2Type.GetTypePtr<ClassInstanceWrapper<T>>(lua, index);
+				return (String)Internal.UnsafeCastToObject(wrapper.[Friend]mPtr);
 			}
 			else
 			{
 				if (let strView = Pop<T>(lua, index))
-					str = scope:mixin String()..Reference(strView);
+					return new:alloc String()..Reference(strView);
 				else
-					str = null;
+					return null;
 			}
-			str
 		}
 	}
 }

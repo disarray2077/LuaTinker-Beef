@@ -18,6 +18,12 @@ namespace LuaTinker.Wrappers
 			mSetFunc = setFunc;
 		}
 
+		public this(function TVar(T) getFunc, function void(T, TVar) setFunc)
+		{
+			mGetFunc = (.)(void*)getFunc;
+			mSetFunc = (.)(void*)setFunc;
+		}
+
 		public override void Get(Lua lua)
 		{
 			if (mGetFunc == null)

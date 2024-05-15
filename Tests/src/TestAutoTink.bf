@@ -12,11 +12,16 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-			tinker.AutoTinkClass!<System.String>();
+			tinker.AutoTinkClass<System.String, const "StringBuilder">();
+			tinker.AutoTinkClass<System.Console>();
 
 			if (lua.DoString(
 				@"""
-				
+				str = StringBuilder()
+				str:Append("1")
+				str:Append("2", "2.1")
+				str:Append("3")
+				System.Console.WriteLine(str)
 				"""
 				))
 			{

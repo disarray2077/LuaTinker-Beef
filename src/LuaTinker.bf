@@ -19,6 +19,9 @@ namespace LuaTinker
 		private LuaUserdataAllocator mUserdataAllocator;
 		private LuaTinkerState mTinkerState;
 
+		// This exists only to make GC happy.
+		internal static List<Object> sAliveObjects = new .() ~ delete _;
+
 		public this(Lua lua)
 		{
 			mLua = lua;
@@ -38,7 +41,7 @@ namespace LuaTinker
 			// Add GC Mate
 			mLua.CreateTable(0, 1);
 			mLua.PushString("__gc");
-			mLua.PushCClosure(=> PointerDestroyerLayer, 0);
+			mLua.PushCClosure(=> PointerDestructorLayer, 0);
 			mLua.RawSet(-3);
 			mLua.SetGlobal("__onlygc_meta");
 		}
@@ -62,10 +65,27 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 
-		public void AddMethod<F>(String name, F func) where F : var
+		public void AddMethod<F>(String name, F func) where F : var, struct
 		{
 			mLua.PushLightUserData(func);
 			mLua.PushCClosure(=> CallLayer<F>, 1);
+			mLua.SetGlobal(name);
+		}
+
+		public void AddMethod<F>(String name, F func) where F : var, class
+		{
+			sAliveObjects.Add(func);
+
+			new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
+			// register destructor
+			{
+			    mLua.CreateTable(0, 1);
+			    mLua.PushString("__gc");
+			    mLua.PushCClosure(=> PointerDestructorLayer, 0);
+			    mLua.RawSet(-3);
+			    mLua.SetMetaTable(-2);
+			}
+			mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
 			mLua.SetGlobal(name);
 		}
 
@@ -77,49 +97,148 @@ namespace LuaTinker
 			StackHelper.Push(mLua, value);
 			mLua.SetGlobal(name);
 		}
-		
-		[Comptime]
-		private static void EmitAutoTinkClass<T>(String name = String.Empty)
+
+		public void SetValue<TVar>(String name, ref TVar value)
+			where TVar : var
 		{
-			let code = scope String();
-			let type = typeof(T);
-			
-			for (let method in type.GetMethods(.Public | .Static))
-			{
-				if (method.IsConstructor || method.IsDestructor)
-					continue;
-
-				if (method.Name.StartsWith("get__") ||
-					method.Name.StartsWith("set__"))
-					continue;
-
-				if (method.ReturnType == typeof(Windows.Handle) || method.ReturnType == typeof(Windows.IntBool))
-					continue;
-
-				String m = scope .();
-				for (int i < method.ParamCount)
-				{
-					let paramType = method.GetParamType(i);
-					m.Append(paramType.GetFullName(.. scope .()));
-
-					if (i != method.ParamCount - 1)
-						m.Append(", ");
-				}
-
-				let retType = method.ReturnType;
-
-				code.AppendF($"AddMethod(\"{method.Name}\", (function {retType.GetFullName(.. scope .())}({m})) => {type.GetFullName(.. scope .())}.{method.Name});\n");
-			}
-
-			Compiler.MixinRoot(code);
+			StackHelper.Push(mLua, ref value);
+			mLua.SetGlobal(name);
+		}
+		
+		[Inline]
+		public void AutoTinkClass<T>()
+		{
+			AutoTinkClass<T, const "">();
 		}
 
-		public mixin AutoTinkClass<T>(var name = "")
+		public void AutoTinkClass<T, Name>()
+			where Name : const String
 		{
-			// CRASH
-			//AddMethod("CheckLiterals", (function void(System.String*)) => System.String.CheckLiterals);
-			// TODO
-			//EmitAutoTinkClass<T>(name);
+			[Comptime]
+			static void EmitAutoTinkClass<T, Name>()
+				where Name : const String
+			{
+				let code = scope String();
+				let type = typeof(T);
+
+				if (type.IsGenericParam)
+					return;
+				
+				if (!type.IsStatic)
+				{
+					code.AppendF($"AddClass<T>(\"{Name}\");\n");
+					code.Append("AddClassCtor<T>();\n");
+					code.Append("AddClassMethod<T, function T(T)>(\"self\", (self) => self);\n");
+				}
+
+				code.AppendF($"AddNamespace(\"{type.GetFullName(.. scope .())}\");\n");
+
+				Dictionary<StringView, int> overloads = scope .();
+				for (let method in type.GetMethods(.Public))
+				{
+					if (overloads.TryAdd(method.Name, let keyPtr, let valuePtr))
+						*valuePtr = 1;
+					else
+						*valuePtr += 1;
+				}
+
+				for (let (methodName, overloadCount) in overloads)
+				{
+					if (overloadCount <= 1)
+						@methodName.Remove();
+				}
+				
+				methodLoop: for (let method in type.GetMethods(.Public))
+				{
+					if (method.IsConstructor || method.IsDestructor || method.Name.Contains("$") || method.IsMixin || !method.IsPublic)
+						continue;
+
+					// Ignore generics
+					if (method.GenericArgCount > 0)
+						continue;
+
+					// Ignore comptime/intrinsics.
+					if (method.HasCustomAttribute<ComptimeAttribute>() || method.HasCustomAttribute<IntrinsicAttribute>())
+						continue;
+
+					// Ignore unchecked methods.
+					if (method.HasCustomAttribute<UncheckedAttribute>())
+						continue;
+
+					// Ignore methods from base classes.
+					if (method.DeclaringType != type)
+						continue;
+
+					// Ignore operators.
+					if (method.Name.Length == 0)
+						continue;
+
+					// TODO: Support for properties...
+					if (method.Name.StartsWith("get__") ||
+						method.Name.StartsWith("set__"))
+						continue;
+
+					if (overloads.ContainsKey(method.Name))
+					{
+						if (overloads[method.Name] == -1)
+							continue;
+						overloads[method.Name] = -1;
+
+						if (method.IsStatic)
+							code.AppendF($"AddNamespaceMethod<T, const \"{method.Name}\">(\"{type.GetFullName(.. scope .())}\");\n");
+						else
+							code.AppendF($"AddClassMethod<T, const \"{method.Name}\">();\n");
+					}
+					else
+					{
+						String methodParams = scope .();
+
+						if (!method.IsStatic)
+							methodParams.AppendF($"T this");
+
+						for (int i < method.ParamCount)
+						{
+							if (!methodParams.IsEmpty)
+								methodParams.Append(", ");
+
+							if (method.GetParamFlags(i).HasFlag(.Params))
+								methodParams.AppendF("params ");
+
+							let paramType = method.GetParamType(i);
+
+							if (var retParamType = paramType as RefType)
+							{
+								switch (retParamType.RefKind)
+								{
+								case .Ref:
+									methodParams.Append("ref ");
+								case .Out:
+									// Let's just ignore this method for now...
+									// TODO: Maybe convert the Beef method with out parameter to a multi-return method in lua?
+									continue methodLoop;
+								default:
+									Runtime.FatalError(scope $"Not implemented {retParamType.RefKind}!");
+								}
+							}
+
+							methodParams.AppendF($"comptype({paramType.GetTypeId()})");
+						}
+
+						String retTypeCode = scope .();
+						retTypeCode.AppendF($"comptype({method.ReturnType.GetTypeId()})");
+
+						if (method.IsStatic)
+							code.AppendF($"AddNamespaceMethod<function {retTypeCode}({methodParams})>(\"{type.GetFullName(.. scope .())}\", \"{method.Name}\", => T.{method.Name});\n");
+						else
+							code.AppendF($"AddClassMethod<T, function {retTypeCode}({methodParams})>(\"{method.Name}\", => T.{method.Name});\n");
+					}
+				}
+
+				Compiler.MixinRoot(code);
+			}
+
+#unwarn
+			EmitAutoTinkClass<T, const Name>();
 		}
 
 		public void AddClass<T>(String name = String.Empty)
@@ -145,7 +264,7 @@ namespace LuaTinker
 			mLua.RawSet(-3);
 
 			mLua.PushString("__gc");
-			mLua.PushCClosure(=> PointerDestroyerLayer, 0);
+			mLua.PushCClosure(=> PointerDestructorLayer, 0);
 			mLua.RawSet(-3);
 
 			mLua.SetGlobal(name);
@@ -163,18 +282,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		[Inline]
 		public void AddClassCtor<T>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
-			{
-				mLua.CreateTable(0, 1);
-				mLua.PushString("__call");
-				mLua.PushCClosure(=> CreatorLayer<T>, 0);
-				mLua.RawSet(-3);
-				mLua.SetMetaTable(-2);
-			}
-			mLua.Pop(1);
+			AddClassCtor<T, void>();
 		}
 
 		public void AddClassCtor<T, Args>()
@@ -204,13 +315,48 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddClassVar<T, TVar>(String name, int memberOffset)
+		public void AddClassMethod<T, Name>(String name = "")
+			where Name : const String
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
-				mLua.PushString(name);
-				new:mUserdataAllocator ClassFieldWrapper<TVar>(memberOffset);
+				mLua.PushString(name.IsEmpty ? Name : name);
+				mLua.PushCClosure(=> CallLayer<T, const Name, false>, 0);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		public void AddClassVar<T, Name>(String name = "")
+			where Name : const String
+		{
+			[Comptime]
+			static void _Emit()
+			{
+				if (typeof(T).IsGenericParam)
+				{
+					Compiler.MixinRoot(
+						scope $"""
+						const int memberOffset = 0;
+						const int memberTypeId = {typeof(void).GetTypeId()};
+						""");
+					return;
+				}
+				let fieldType = typeof(T).GetField(Name).Get().FieldType;
+				Compiler.MixinRoot(
+					scope $"""
+					const int memberOffset = offsetof(T, {Name});
+					const int memberTypeId = {fieldType.GetTypeId()};
+					""");
+			}
+			_Emit();
+
+			mLua.GetGlobal(mTinkerState.GetClassName<T>());
+			if (mLua.IsTable(-1))
+			{
+				mLua.PushString(name.IsEmpty ? Name : name);
+				new:mUserdataAllocator ClassFieldWrapper<comptype(memberTypeId)>(memberOffset);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -221,6 +367,9 @@ namespace LuaTinker
 			where TSet : class, delegate void(T, TVar)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			sAliveObjects.Add(getter);
+			sAliveObjects.Add(setter);
+
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
@@ -230,10 +379,23 @@ namespace LuaTinker
 				{
 				    mLua.CreateTable(0, 1);
 				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> VariableDestroyerLayer, 0);
+				    mLua.PushCClosure(=> VariableDestructorLayer, 0);
 				    mLua.RawSet(-3);
 				    mLua.SetMetaTable(-2);
 				}
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		public void AddClassProperty<T, TVar>(String name, function TVar(T) getter, function void(T, TVar) setter)
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			mLua.GetGlobal(mTinkerState.GetClassName<T>());
+			if (mLua.IsTable(-1))
+			{
+				mLua.PushString(name);
+				new:mUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -442,6 +604,40 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		public void AddNamespaceMethod<F>(String namespaceName, String methodName, F func) where F : var, class
+		{
+			sAliveObjects.Add(func);
+
+			if (FindNamespaceTable(namespaceName))
+			{
+				mLua.PushString(methodName);
+				new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
+				// register destructor
+				{
+				    mLua.CreateTable(0, 1);
+				    mLua.PushString("__gc");
+				    mLua.PushCClosure(=> PointerDestructorLayer, 0);
+				    mLua.RawSet(-3);
+				    mLua.SetMetaTable(-2);
+				}
+				mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		public void AddNamespaceMethod<T, Name>(String namespaceName, String name = "")
+			where Name : const String
+		{
+			if (FindNamespaceTable(namespaceName))
+			{
+				mLua.PushString(name.IsEmpty ? Name : name);
+				mLua.PushCClosure(=> CallLayer<T, const Name, true>, 0);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
 		public void AddNamespaceVar<TVar>(String namespaceName, String varName, TVar value)
 			where TVar : var
 		{
@@ -454,29 +650,19 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		[Comptime]
-		private static int EmitCallPushes<Args>()
+		public void AddNamespaceVar<TVar>(String namespaceName, String varName, ref TVar value)
+			where TVar : var
 		{
-			let type = typeof(Args);
-			let code = scope String();
-
-			int fieldCount = 0;
-			if (type.IsTuple)
+			if (FindNamespaceTable(namespaceName))
 			{
-				fieldCount = type.FieldCount;
-				for (int i = 0; i < fieldCount; i++)
-					code.AppendF($"StackHelper.Push(mLua, args.{i});\n");
+				mLua.PushString(varName);
+				StackHelper.Push(mLua, ref value);
+				mLua.RawSet(-3);
 			}
-			else if (type != typeof(void))
-			{
-				fieldCount = 1;
-				code.Append("StackHelper.Push(mLua, args);\n");
-			}
-
-			Compiler.MixinRoot(code);
-			return fieldCount;
+			mLua.Pop(1);
 		}
-
+		
+		[Inline]
 		public Result<RVal> Call<RVal>(StringView name)
 			=> Call<RVal, void>(name, default);
 
@@ -484,6 +670,29 @@ namespace LuaTinker
 			where RVal : var
 			where Args : var
 		{
+			[Comptime]
+			static int EmitCallPushes<Args>()
+			{
+				let type = typeof(Args);
+				let code = scope String();
+
+				int fieldCount = 0;
+				if (type.IsTuple)
+				{
+					fieldCount = type.FieldCount;
+					for (int i = 0; i < fieldCount; i++)
+						code.AppendF($"StackHelper.Push(mLua, args.{i});\n");
+				}
+				else if (type != typeof(void))
+				{
+					fieldCount = 1;
+					code.Append("StackHelper.Push(mLua, args);\n");
+				}
+
+				Compiler.MixinRoot(code);
+				return fieldCount;
+			}
+
 			Debug.Assert(mLua.GetTop() == 0);
 			const int32 results = typeof(RVal) == typeof(void) ? 0 : 1;
 			

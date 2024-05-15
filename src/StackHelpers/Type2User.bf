@@ -19,8 +19,8 @@ namespace LuaTinker.StackHelpers
 		public static void Create<T>(Lua lua, T val) where T : class
 		{
 			let alloc = LuaUserdataAllocator(lua);
-			let wrapper = new:alloc ClassPointerWrapper<T>();
-			wrapper.ClassPointer = val;
+			let wrapper = new:alloc ClassInstanceWrapper<T>();
+			wrapper.ClassInstance = val;
 		}
 
 		// ref to lua

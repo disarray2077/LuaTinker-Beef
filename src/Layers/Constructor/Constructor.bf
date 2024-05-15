@@ -9,20 +9,6 @@ namespace LuaTinker.Layers
 	static
 	{
 		[Comptime]
-		private static void EmitWrapperVar<T>(String code)
-			where T : struct
-		{
-			code.Append("let wrapper = new:alloc ValuePointerWrapper<T>();\n");
-		}
-
-		[Comptime]
-		private static void EmitWrapperVar<T>(String code)
-			where T : class
-		{
-			code.Append("let wrapper = new:alloc ClassPointerWrapper<T>();\n");
-		}
-
-		[Comptime]
 		private static void EmitCreatorLayer<T, Args>()
 			where T : var
 		{
@@ -32,7 +18,10 @@ namespace LuaTinker.Layers
 			let type = typeof(Args);
 			let code = scope String();
 
-			EmitWrapperVar<T>(code);
+			if (typeof(T).IsObject)
+				code.Append("let wrapper = new:alloc ClassInstanceWrapper<T>();\n");
+			else
+				code.Append("let wrapper = new:alloc ValuePointerWrapper<T>();\n");
 
 			code.Append("wrapper.Create(");
 
@@ -41,7 +30,7 @@ namespace LuaTinker.Layers
 				int fieldCount = type.FieldCount;
 				for (int i = 0; i < fieldCount; i++)
 				{
-					code.AppendF($"StackHelper.Pop!<GetTupleField<Args, const {i}>.Type>(lua, {i + 2})");
+					code.AppendF($"StackHelper.Pop!<comptype({GetTupleFieldType<Args>(i).GetTypeId()})>(lua, {i + 2})");
 	
 					if (i != fieldCount - 1)
 						code.Append(", ");
@@ -54,20 +43,6 @@ namespace LuaTinker.Layers
 			code.Append(");\n");
 
 			Compiler.MixinRoot(code);
-		}
-
-		public static int32 CreatorLayer<T>(lua_State L)
-		{
-			let lua = Lua.FromIntPtr(L);
-#unwarn
-			let alloc = LuaUserdataAllocator(lua);
-			let tinkerState = LuaTinkerState.Find(lua);
-
-			EmitCreatorLayer<T, void>();
-			lua.GetGlobal(tinkerState.GetClassName<T>());
-			lua.SetMetaTable(-2);
-
-			return 1;
 		}
 
 		public static int32 CreatorLayer<T, Args>(lua_State L)

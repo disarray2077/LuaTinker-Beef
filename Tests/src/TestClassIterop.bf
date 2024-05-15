@@ -7,11 +7,6 @@ namespace LuaTinker.Tests
 {
 	static class TestClassIterop
 	{
-		public static String StrImpl(String self)
-		{
-			return self;
-		}
-
 		[Test]
 		public static void Test()
 		{
@@ -26,7 +21,7 @@ namespace LuaTinker.Tests
 			tinker.AddClass<String>("StringBuilder");
 			tinker.AddClassCtor<String>();
 			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Span<Object>)>("AppendF", => String.AppendF);
-			tinker.AddClassMethod<String, function String(String)>("str", => StrImpl); // This is necessary to convert from a String instance to a Lua String.
+			tinker.AddClassMethod<String, function String(String)>("str", (str) => str); // This is necessary to convert from a String instance to a Lua String.
 
 			File.WriteAllText("test_tmp.txt", "All works!");
 			defer File.Delete("test_tmp.txt");

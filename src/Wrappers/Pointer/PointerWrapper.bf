@@ -14,7 +14,7 @@ namespace LuaTinker.Wrappers
 
 		public override Type Type => typeof(T);
 
-		public override ToObjectResult ToObject(out Object obj)
+		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
 			obj = null;
 			return .Error;

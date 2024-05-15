@@ -1,14 +1,14 @@
 FileVersion = 1
-Projects = {LuaTinker = {Path = "."}, KeraLua = "*", "LuaTinker.Tests" = {Path = "Tests"}}
-Unlocked = ["corlib"]
+Projects = {LuaTinker = {Path = "."}, KeraLua = "*", "LuaTinker.Tests" = {Path = "Tests"}, KeraLua = {Path = "../KeraLua-Beef"}, "LuaTinker.Sample" = {Path = "Sample"}}
+Locked = ["KeraLua"]
 ExtraPlatforms = ["Linux32", "Linux64"]
 
 [Workspace]
-StartupProject = "LuaTinker"
-
-[Configs.Release.Win64]
-Toolset = "LLVM"
-LTOType = "Thin"
+StartupProject = "LuaTinker.Sample"
 
 [Configs.Debug.Win64]
 AllocStackTraceDepth = 7
+
+[Configs.Release_O0.Win64]
+LTOType = "None"
+ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Config = "Release"}, KeraLua = {Config = "Release"}, "LuaTinker.Sample" = {Config = "Release"}}

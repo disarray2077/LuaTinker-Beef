@@ -9,10 +9,15 @@ namespace LuaTinker.StackHelpers
 		[Inline]
 		public static void Push(Lua lua, String val)
 		{
-			lua.PushString(val);
+			if (val.HasExternalPtr)
+			{
+				lua.PushString(val);
+				return;
+			}
+
+			Push<String>(lua, val);
 		}
 
-		[Inline]
 		public static StringView? Pop<T>(Lua lua, int32 index)
 			where T : class, String where String : T
 		{

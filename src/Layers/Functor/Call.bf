@@ -25,6 +25,7 @@ namespace LuaTinker.Layers
 			var retType = invokeMethod.ReturnType;
 
 			var isParams = false;
+			Type paramsType = null;
 			if (invokeMethod.ParamCount == 0)
 				code.Append("Debug.Assert(lua.GetTop() == 0);\n");
 			else
@@ -42,11 +43,11 @@ namespace LuaTinker.Layers
 						""");
 				}
 
-				// TODO: Proper way to check if parameter is "params"
+				isParams = invokeMethod.GetParamFlags(invokeMethod.ParamCount - 1).HasFlag(.Params);
+
 				let lastParameter = invokeMethod.GetParamType(invokeMethod.ParamCount - 1);
-				isParams = lastParameter.IsArray && lastParameter.IsObject;
-				if (let specializedType = lastParameter as SpecializedGenericType)
-					isParams |= specializedType.UnspecializedType == typeof(Span<>) && specializedType.GetGenericArg(0).IsObject;
+				if (isParams && (let specializedType = lastParameter as SpecializedGenericType))
+					paramsType = specializedType.GetGenericArg(0);
 
 				code.AppendF(
 					$"""
@@ -60,12 +61,17 @@ namespace LuaTinker.Layers
 
 			if (isParams)
 			{
+				Debug.Assert(paramsType != null);
+
+				let paramsTypeCode = scope String();
+				paramsTypeCode.AppendF($"comptype({paramsType.GetTypeId()})");
+
 				code.AppendF(
 					$"""
 					int extraArgsCount = lua.GetTop() - {invokeMethod.ParamCount - 1};
-					Object[] extraArgs = scope Object[extraArgsCount] (?);
+					{paramsTypeCode}[] extraArgs = scope {paramsTypeCode}[extraArgsCount] (?);
 					for (int32 i = 0; i < extraArgsCount; i++)
-						extraArgs[i] = StackHelper.Pop!::<Object>(lua, i + {invokeMethod.ParamCount});\n
+						extraArgs[i] = StackHelper.Pop!::<{paramsTypeCode}>(lua, i + {invokeMethod.ParamCount});\n
 					""");
 			}
 			
@@ -81,7 +87,7 @@ namespace LuaTinker.Layers
 					code.Append("ref ");
 					returnsRef = true;
 				default:
-					Runtime.FatalError("Not implemented!");
+					Runtime.FatalError(scope $"Not implemented {retRefType.RefKind}!");
 				}
 			}
 
@@ -104,13 +110,13 @@ namespace LuaTinker.Layers
 						code.Append("ref ");
 						paramIsRef = true;
 					default:
-						Runtime.FatalError("Not implemented!");
+						Runtime.FatalError(scope $"Not implemented {retParamType.RefKind}!");
 					}
 				}
 
 				code.Append("StackHelper.Pop");
 				code.Append(paramIsRef ? "Ref" : "!");
-				code.AppendF($"<GetInvokeArg<F, const {i}>.Type>(lua, {i + 1})");
+				code.AppendF($"<comptype({GetInvokeArgType<F>(i).GetTypeId()})>(lua, {i + 1})");
 
 				if (i != invokeMethod.ParamCount - 1)
 					code.Append(", ");
@@ -123,7 +129,10 @@ namespace LuaTinker.Layers
 				{
 					var fieldCount = retType.FieldCount;
 					for (int i = 0; i < fieldCount; i++)
-						code.AppendF($"StackHelper.Push(lua, {(returnsRef ? "ref " : "")}ret.{i});\n");
+					{
+						let fieldInfo = retType.GetField(i).Get();
+						code.AppendF($"StackHelper.Push(lua, {(returnsRef ? "ref " : "")}ret.{fieldInfo.Name});\n");
+					}
 					// TODO: Remove the #unwarn when the compiler bug is solved.
 					// TODO: Report this bug when the code is released in github.
 #unwarn // COMPILER-BUG: Incorrect "params" warning
@@ -151,7 +160,7 @@ namespace LuaTinker.Layers
 		{
 			let lua = Lua.FromIntPtr(L);
 #unwarn
-			let func = ref User2Type.GetTypeDirect<F>(lua, Lua.UpValueIndex(1));
+			let func = User2Type.GetTypeDirect<F>(lua, Lua.UpValueIndex(1));
 
 			EmitCallLayer<F>();
 

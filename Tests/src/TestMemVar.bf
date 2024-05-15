@@ -35,11 +35,10 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 			tinker.AddClass<Vector2>("Vector2");
 			tinker.AddClassCtor<Vector2, (int, int)>();
-			tinker.AddClassVar<Vector2, int>("x", offsetof(Vector2, x));
-			tinker.AddClassVar<Vector2, int>("y", offsetof(Vector2, y));
+			tinker.AddClassVar<Vector2, const "x">();
+			tinker.AddClassVar<Vector2, const "y">();
 
-			tinker.AddMethod("Vec", (function ref Vector2())
-				() => { return ref mVec; });
+			tinker.AddMethod<function ref Vector2()>("Vec", () => ref mVec);
 			
 			tinker.AddClass<Actor>("Actor");
 			tinker.AddClassCtor<Actor>();

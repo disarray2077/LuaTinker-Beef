@@ -40,7 +40,7 @@ namespace LuaTinker.Tests
 			tinker.AddNamespaceMethod("LuaTinker.Tests", "TestCall", (function void(int8)) => TestCall);
 			tinker.AddNamespaceVar("LuaTinker", "Version", Environment.OSVersion.Version);
 
-			tinker.AddMethod("GetVersion", (function Version()) () => { return Environment.OSVersion.Version; });
+			tinker.AddMethod<function Version()>("GetVersion", () => Environment.OSVersion.Version);
 
 			if (lua.DoString(
 				@"""

@@ -5,11 +5,6 @@ namespace LuaTinker.Tests
 {
 	class TestClassCtor
 	{
-		public static String StrImpl(String self)
-		{
-			return self;
-		}
-
 		[Test]
 		public static void Test()
 		{
@@ -21,7 +16,7 @@ namespace LuaTinker.Tests
 			tinker.AddClass<String>("StringBuilder");
 			tinker.AddClassCtor<String, String>();
 			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Span<Object>)>("AppendF", => String.AppendF);
-			tinker.AddClassMethod<String, function String(String)>("str", => StrImpl);
+			tinker.AddClassMethod<String, function String(String)>("str", (str) => str);
 
 			if (lua.DoString(
 				@"""

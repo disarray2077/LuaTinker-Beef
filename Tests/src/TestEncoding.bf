@@ -12,7 +12,8 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-			tinker.AddMethod("test", (function String(String))
+			tinker.AddMethod<function String(String)>(
+				"test",
 				(str) =>
 				{
 					Test.Assert(str == "s̶̡̨̜͙̟͙͚̹̜̭͖̘͗̀̍̾p̶̢̧̛͕̬͈͚͖̹̯̰̫͎̥̌͌̏̋̔͐̌̋̾͘ͅo̶̤̹̟̭͚̬̿ǫ̵̨̢̻̤͇̝̬̤͚̋̃͊́̎̐͒̈́̅͌̕k̴͕̫͒͂̈͋̾̾͛̽̈̐̃̚͝y̷̡̛̘͍̜̟͉̳̗̽̄̊̉̅̓͒͑̕͘͘̚"

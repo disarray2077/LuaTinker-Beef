@@ -13,6 +13,14 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static void Push(Lua lua, StringView? val)
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				lua.PushString(val.Value);
+		}
+
 		public static T Pop<T>(Lua lua, int32 index)
 			where T : struct, StringView where StringView : T
 		{

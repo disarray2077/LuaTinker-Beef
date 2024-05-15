@@ -1,13 +1,13 @@
 using System;
 using KeraLua;
 using System.Diagnostics;
+using LuaTinker.Wrappers;
 
 namespace LuaTinker.StackHelpers
 {
 	public struct User2Type
 	{
-		[Inline]
-		public static ref T GetTypeDirect<T>(Lua lua, int32 index)
+		public static T GetTypeDirect<T>(Lua lua, int32 index)
 		{
 			if (!lua.IsUserData(index))
 			{
@@ -16,10 +16,9 @@ namespace LuaTinker.StackHelpers
 				lua.Error();
 			}
 			var ptr = lua.ToUserData(index);
-			return ref *((T*)&ptr);
+			return *((T*)&ptr);
 		}
 
-		[Inline]
 		public static Object GetObject(Lua lua, int32 index)
 		{
 			if (!lua.IsUserData(index))
@@ -29,6 +28,20 @@ namespace LuaTinker.StackHelpers
 				lua.Error();
 			}
 			return Internal.UnsafeCastToObject(lua.ToUserData(index));
+		}
+
+		public static Type GetObjectType(Lua lua, int32 index)
+		{
+			if (!lua.IsUserData(index))
+			{
+				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				lua.PushString($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				lua.Error();
+			}
+			Object object = Internal.UnsafeCastToObject(lua.ToUserData(index));
+			if (let wrapper = object as PointerWrapperBase)
+				return wrapper.Type;
+			return object.GetType();
 		}
 
 		[Inline]
@@ -49,7 +62,6 @@ namespace LuaTinker.StackHelpers
 			return (T)Internal.UnsafeCastToObject(ptr);
 		}
 
-		[Inline]
 		public static T GetTypePtr<T>(Lua lua, int32 index) where T : var
 		{
 			if (!lua.IsUserData(index))

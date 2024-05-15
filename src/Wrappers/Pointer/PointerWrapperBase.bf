@@ -28,7 +28,7 @@ namespace LuaTinker.Wrappers
 
 		public virtual Type Type => null;
 
-		public virtual ToObjectResult ToObject(out Object obj)
+		public virtual ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
 			obj = null;
 			return .Error;

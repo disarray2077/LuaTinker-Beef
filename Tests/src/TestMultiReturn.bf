@@ -18,7 +18,7 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 			
 			LuaTinker tinker = scope .(lua);
-			tinker.AddMethod("GetTuple", (function (int, StringView)()) => GetTuple);
+			tinker.AddMethod<function (int, StringView)()>("GetTuple", => GetTuple);
 
 			if (lua.DoString(
 				@"""

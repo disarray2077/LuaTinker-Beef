@@ -18,7 +18,7 @@ namespace LuaTinker.Wrappers
 	extension RefPointerWrapper<T>
 		where T : class
 	{
-		public new override ToObjectResult ToObject(out Object obj)
+		public new override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
 			obj = Internal.UnsafeCastToObject(Ptr);
 			return .Object;
@@ -28,9 +28,9 @@ namespace LuaTinker.Wrappers
 	extension RefPointerWrapper<T>
 		where T : struct
 	{
-		public new override ToObjectResult ToObject(out Object obj)
+		public new override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
-			obj = new box Reference;
+			obj = new:allocator box Reference;
 			return .NewObject;
 		}
 	}

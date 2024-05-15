@@ -52,32 +52,32 @@ namespace LuaTinker.Tests
 
 			tinker.AddClass<MyBaseTest>();
 			tinker.AddClassCtor<MyBaseTest>();
-			tinker.AddClassVar<MyBaseTest, int>("a", offsetof(MyBaseTest, a));
+			tinker.AddClassVar<MyBaseTest, const "a">();
 			tinker.AddClassMethod<MyBaseTest, function int(MyBaseTest this)>("GetA", => MyBaseTest.GetA);
 
 			tinker.AddClass<MyTest>();
 			tinker.AddClassCtor<MyTest>();
 			tinker.AddClassParent<MyTest, MyBaseTest>();
-			tinker.AddClassVar<MyTest, int>("b", offsetof(MyTest, b));
+			tinker.AddClassVar<MyTest, const "b">();
 			tinker.AddClassMethod<MyTest, function int(MyTest this)>("GetB", => MyTest.GetB);
 
 			// Parent depth: 2
 
 			tinker.AddClass<My2BaseBaseTest>();
 			tinker.AddClassCtor<My2BaseBaseTest>();
-			tinker.AddClassVar<My2BaseBaseTest, int>("a", offsetof(My2BaseBaseTest, a));
+			tinker.AddClassVar<My2BaseBaseTest, const "a">();
 			tinker.AddClassMethod<My2BaseBaseTest, function int(My2BaseBaseTest this)>("GetA", => My2BaseBaseTest.GetA);
 
 			tinker.AddClass<My2BaseTest>();
 			tinker.AddClassCtor<My2BaseTest>();
 			tinker.AddClassParent<My2BaseTest, My2BaseBaseTest>();
-			tinker.AddClassVar<My2BaseTest, int>("b", offsetof(My2BaseTest, b));
+			tinker.AddClassVar<My2BaseTest, const "b">();
 			tinker.AddClassMethod<My2BaseTest, function int(My2BaseTest this)>("GetB", => My2BaseTest.GetB);
 
 			tinker.AddClass<My2Test>();
 			tinker.AddClassCtor<My2Test>();
 			tinker.AddClassParent<My2Test, My2BaseTest>();
-			tinker.AddClassVar<My2Test, int>("c", offsetof(My2Test, c));
+			tinker.AddClassVar<My2Test, const "c">();
 			tinker.AddClassMethod<My2Test, function int(My2Test this)>("GetC", => My2Test.GetC);
 
 			if (lua.DoString(
@@ -139,13 +139,13 @@ namespace LuaTinker.Tests
 
 			tinker.AddClass<MyBaseTestStruct>("MyBaseTest");
 			tinker.AddClassCtor<MyBaseTestStruct>();
-			tinker.AddClassVar<MyBaseTestStruct, int>("a", offsetof(MyBaseTestStruct, a));
+			tinker.AddClassVar<MyBaseTestStruct, const "a">();
 			tinker.AddClassMethod<MyBaseTestStruct, function int(MyBaseTestStruct this)>("GetA", => MyBaseTestStruct.GetA);
 
 			tinker.AddClass<MyTestStruct>("MyTest");
 			tinker.AddClassCtor<MyTestStruct>();
 			tinker.AddClassParent<MyTestStruct, MyBaseTestStruct>();
-			tinker.AddClassVar<MyTestStruct, int>("b", offsetof(MyTestStruct, b));
+			tinker.AddClassVar<MyTestStruct, const "b">();
 			tinker.AddClassMethod<MyTestStruct, function int(MyTestStruct this)>("GetB", => MyTestStruct.GetB);
 
 			if (lua.DoString(

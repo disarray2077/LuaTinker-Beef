@@ -69,6 +69,7 @@ namespace LuaTinker.StackHelpers
 			lua.SetMetaTable(-2);
 		}*/
 
+		[Inline]
 		private static void NoRegType2User<T>(Lua lua)
 			where T : struct
 		{
@@ -89,6 +90,14 @@ namespace LuaTinker.StackHelpers
 		private static void NoRegType2User<T>(Lua lua)
 		{
 			// nothing
+		}
+
+		public static void Push<T>(Lua lua, T? val) where T : var
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				Push<T>(lua, val.Value);
 		}
 
 		public static void Push<T>(Lua lua, T val) where T : var
@@ -123,7 +132,6 @@ namespace LuaTinker.StackHelpers
 			}
 		}
 
-		[Inline]
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct*
 		{
 			if (lua.IsNil(index))
@@ -146,7 +154,6 @@ namespace LuaTinker.StackHelpers
 			}
 		}
 
-		[Inline]
 		public static ref T Pop<T>(Lua lua, int32 index) where T : var, struct
 		{
 			if (lua.IsNil(index))
@@ -207,7 +214,6 @@ namespace LuaTinker.StackHelpers
 			}
 		}
 
-		[Inline]
 		public static T Pop<T>(Lua lua, int32 index) where T : var, class
 		{
 			if (lua.IsNil(index))
@@ -232,8 +238,8 @@ namespace LuaTinker.StackHelpers
 				return (T)Internal.UnsafeCastToObject(ptr);
 			}
 
-			if (let valueWrapper = stackObject as ClassPointerWrapper<T>)
-				return valueWrapper.ClassPointer;
+			if (let valueWrapper = stackObject as ClassInstanceWrapper<T>)
+				return valueWrapper.ClassInstance;
 			else if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
 				return refPtrWrapper.Reference;
 			else if (let ptrWrapper = stackObject as PointerWrapper<T>)

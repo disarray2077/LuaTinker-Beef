@@ -51,6 +51,8 @@ namespace LuaTinker.Tests
 			tinker.AddMethod("GetNumPtr", (function int*()) => GetNumPtr);
 			tinker.AddMethod("GetNumRef", (function ref int()) => GetNumRef);
 
+			tinker.SetValue("NumRef", ref mNum);
+
 			if (lua.DoString(
 				@"""
 				AddNum(2)
@@ -61,13 +63,15 @@ namespace LuaTinker.Tests
 
 				AddNumPtr(GetNumPtr())
 				assert(GetNum() == 8)
+				
+				AddNumRef(NumRef)
 				"""
 				))
 			{
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 			}
 
-			Test.Assert(GetNum() == 8);
+			Test.Assert(GetNum() == 16);
 		}
 
 		public class TestClass : this(int A);
