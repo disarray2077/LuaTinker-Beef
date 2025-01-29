@@ -117,7 +117,7 @@ namespace LuaTinker.Layers
 					else
 					{
 						paramType = method.GetParamType(i);
-						if (method.GetParamFlags(i) == .Params)
+						if (method.GetParamFlags(i).HasFlag(.Params))
 							paramFlags = .Params;
 					}
 
@@ -501,7 +501,7 @@ namespace LuaTinker.Layers
 			// TODO: BEEF BUG
 			if (false)
 			{
-				function StringSplitEnumerator(String this, char8[]) func2 = => String.Split;
+				function StringSplitEnumerator(String this, Span<char8>) func2 = => String.Split;
 				char8[] x = default;
 				func2(default, x);
 	
