@@ -266,7 +266,10 @@ namespace LuaTinker.Layers
 			where IsStatic : const bool
 		{
 			if (typeof(T).IsGenericParam)
+			{
+				Compiler.MixinRoot("return 1;");
 				return;
+			}
 
 			let code = scope String();
 
@@ -512,9 +515,6 @@ namespace LuaTinker.Layers
 			// TODO: BEEF BUG
 
 			EmitCallLayer<T, const Name, const IsStatic>();
-
-			// This is necessary to avoid the "Method must return" error
-			Runtime.FatalError("Not reached");
 		}
 	}
 }
