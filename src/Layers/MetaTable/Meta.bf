@@ -57,11 +57,22 @@ namespace LuaTinker.Layers
 				}
 				else if (lua.IsNil(-1))
 				{
-				    lua.PushString("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
-				 	lua.Error();
+					lua.Remove(-1);
+					lua.PushString("__bfindexer");
+					lua.RawGet(-2);
+					if (lua.IsUserData(-1))
+					{
+						User2Type.GetTypePtr<IndexerWrapperBase>(lua, -1).Get(lua);
+						lua.Remove(-2);
+					}
+					else
+					{
+					    lua.PushString("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
+					 	lua.Error();
+					}
 				}
 			}
-
+			
 			lua.Remove(-2);
 		    return 1;
 		}
@@ -88,8 +99,18 @@ namespace LuaTinker.Layers
 				}
 				else if (lua.IsNil(-1))
 				{
-				    lua.PushString("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
-				 	lua.Error();
+					lua.Remove(-1);
+					lua.PushString("__bfindexer");
+					lua.RawGet(-2);
+					if (lua.IsUserData(-1))
+					{
+						User2Type.GetTypePtr<IndexerWrapperBase>(lua, -1).Set(lua);
+					}
+					else
+					{
+					    lua.PushString("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
+					 	lua.Error();
+					}
 				}
 			}
 

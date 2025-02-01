@@ -302,6 +302,18 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		public void AddClassIndexer<T, TKey>()
+		{
+			mLua.GetGlobal(mTinkerState.GetClassName<T>());
+			if (mLua.IsTable(-1))
+			{
+				mLua.PushString("__bfindexer");
+				new:mUserdataAllocator IndexerWrapper<T, TKey>();
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
 		public void AddClassMethod<T, F>(String name, F func) where F : var
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
@@ -661,6 +673,10 @@ namespace LuaTinker
 			}
 			mLua.Pop(1);
 		}
+		
+		[Inline]
+		public Result<void> Call(StringView name)
+			=> Call<void, void>(name, default);
 		
 		[Inline]
 		public Result<RVal> Call<RVal>(StringView name)

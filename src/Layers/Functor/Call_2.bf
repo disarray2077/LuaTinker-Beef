@@ -276,6 +276,9 @@ namespace LuaTinker.Layers
 			List<MethodInfo> methods = scope .();
 			GetMethods<T, const Name, const IsStatic>(methods);
 
+			if (methods.IsEmpty)
+				Runtime.FatalError(scope $"No methods found matching \"{typeof(T)}.{Name}\"");
+
 			Trie<MethodParam> paramsTrie = scope .();
 			MakeParamsTrie(paramsTrie, methods);
 
@@ -500,19 +503,6 @@ namespace LuaTinker.Layers
 		{
 #unwarn
 			let lua = Lua.FromIntPtr(L);
-
-			// TODO: BEEF BUG
-			if (false)
-			{
-				function StringSplitEnumerator(String this, Span<char8>) func2 = => String.Split;
-				char8[] x = default;
-				func2(default, x);
-	
-				function StringStringSplitEnumerator(String this, StringView[]) func = => String.Split;
-				StringView[] x2 = default;
-				func(default, x2);
-			}
-			// TODO: BEEF BUG
 
 			EmitCallLayer<T, const Name, const IsStatic>();
 		}
