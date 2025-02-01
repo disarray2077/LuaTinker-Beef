@@ -66,7 +66,7 @@ namespace LuaTinker.StackHelpers
 		}
 
 		public static mixin Pop<T>(Lua lua, int32 index)
-			where T : String
+			where T : String, class
 		{
 			SingleAllocator alloc = scope:mixin .(96);
 			_PopAlloc<T>(lua, index, alloc)

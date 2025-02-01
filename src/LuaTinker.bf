@@ -173,7 +173,7 @@ namespace LuaTinker
 					if (method.Name.Length == 0)
 						continue;
 
-					// TODO: Support for properties...
+					// Properties/Indexers are handled later.
 					if (method.Name.StartsWith("get__") ||
 						method.Name.StartsWith("set__"))
 						continue;
@@ -369,6 +369,19 @@ namespace LuaTinker
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
 				new:mUserdataAllocator ClassFieldWrapper<comptype(memberTypeId)>(memberOffset);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		public void AddClassProperty<T, Name>(String name = "")
+			where Name : const String
+		{
+			mLua.GetGlobal(mTinkerState.GetClassName<T>());
+			if (mLua.IsTable(-1))
+			{
+				mLua.PushString(name.IsEmpty ? Name : name);
+				new:mUserdataAllocator ClassPropertyWrapper<T, Name>();
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
