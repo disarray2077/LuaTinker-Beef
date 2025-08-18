@@ -11,7 +11,7 @@ namespace LuaTinker.Layers
 	static
 	{
 		[Comptime]
-		private static void EmitCallLayer<F>()
+		private static void EmitDelegateCallLayer<F>()
 			where F : var
 		{
 			let code = scope String();
@@ -163,7 +163,7 @@ namespace LuaTinker.Layers
 #unwarn
 			let func = User2Type.GetTypePtr<ClassInstanceWrapper<F>>(lua, Lua.UpValueIndex(1)).ClassInstance;
 
-			EmitCallLayer<F>();
+			EmitDelegateCallLayer<F>();
 
 			// This is necessary to avoid the "Method must return" error
 			Runtime.FatalError("Not reached");
