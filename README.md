@@ -10,7 +10,7 @@ This is a library to bind BeefLang to Lua, inspired by [LuaTinker](https://githu
 
 ## Dependencies
 
-The only dependency of this library is [KeraLua-Beef](https://github.com/disarray2077/KeraLua-Beef)
+This library has only one dependency: [KeraLua-Beef](https://github.com/disarray2077/KeraLua-Beef) (or [KeraLua51-Beef](https://github.com/disarray2077/KeraLua51-Beef) for use with Lua 5.1 or LuaJIT).
 
 ## Example
 
