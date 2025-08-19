@@ -1,6 +1,5 @@
 FileVersion = 1
-Projects = {LuaTinker = {Path = "."}, KeraLua = "*", "LuaTinker.Tests" = {Path = "Tests"}, KeraLua = {Path = "../KeraLua-Beef"}, "LuaTinker.Sample" = {Path = "Sample"}}
-Locked = ["KeraLua"]
+Projects = {LuaTinker = {Path = "."}, "LuaTinker.Tests" = {Path = "Tests"}, "LuaTinker.Sample" = {Path = "Sample"}, KeraLua-Beef = {Git = "https://github.com/disarray2077/KeraLua-Beef"}}
 ExtraPlatforms = ["Linux32", "Linux64"]
 
 [Workspace]
@@ -11,4 +10,4 @@ AllocStackTraceDepth = 7
 
 [Configs.Release_O0.Win64]
 LTOType = "None"
-ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Config = "Release"}, KeraLua = {Config = "Release"}, "LuaTinker.Sample" = {Config = "Release"}}
+ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Config = "Release"}, "LuaTinker.Sample" = {Config = "Release"}}

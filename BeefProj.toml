@@ -1,5 +1,5 @@
 FileVersion = 1
-Dependencies = {corlib = "*", KeraLua = "*"}
+Dependencies = {corlib = "*", KeraLua-Beef = {Git = "https://github.com/disarray2077/KeraLua-Beef"}}
 
 [Project]
 Name = "LuaTinker"
@@ -29,7 +29,3 @@ Name = "MetaTable"
 [[ProjectFolder.Items.Items.Items]]
 Type = "IgnoreSource"
 Name = "MetaContainer.bf"
-
-[[ProjectFolder.Items.Items]]
-Type = "AutoFolder"
-Name = "Functor"

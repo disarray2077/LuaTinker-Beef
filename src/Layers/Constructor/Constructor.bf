@@ -4,6 +4,8 @@ using LuaTinker.Wrappers;
 using LuaTinker.StackHelpers;
 using LuaTinker.Helpers;
 
+using internal KeraLua;
+
 namespace LuaTinker.Layers
 {
 	static
@@ -50,7 +52,7 @@ namespace LuaTinker.Layers
 			let lua = Lua.FromIntPtr(L);
 #unwarn
 			let alloc = LuaUserdataAllocator(lua);
-			let tinkerState = LuaTinkerState.Find(lua);
+			let tinkerState = lua.TinkerState;
 
 			EmitCreatorLayer<T, Args>();
 			lua.GetGlobal(tinkerState.GetClassName<T>());

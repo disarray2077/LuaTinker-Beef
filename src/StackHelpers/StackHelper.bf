@@ -3,6 +3,8 @@ using KeraLua;
 using System.Diagnostics;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker.StackHelpers
 {
 	public static class StackHelper
@@ -17,6 +19,78 @@ namespace LuaTinker.StackHelpers
 		public static T Pop<T>(Lua lua, int32 index)
 		{
 			Runtime.NotImplemented();
+		}
+
+		[Inline]
+		public static void TryThrowError(Lua lua)
+		{
+			TryThrowError(lua, lua.TinkerState);
+		}
+
+		public static void TryThrowError(Lua lua, LuaTinkerState tinkerState)
+		{
+			if (tinkerState.IsPCall)
+			{
+				lua.PushString(tinkerState.GetLastError());
+				lua.Error();
+			}
+		}
+		
+		[Inline]
+		public static void TryThrowError(Lua lua, StringView errStr)
+		{
+			TryThrowError(lua, lua.TinkerState, errStr);
+		}
+
+		public static void TryThrowError(Lua lua, LuaTinkerState tinkerState, StringView errStr)
+		{
+			tinkerState.SetLastError(errStr);
+
+			if (tinkerState.IsPCall)
+			{
+				lua.PushString(tinkerState.GetLastError());
+				lua.Error();
+			}
+		}
+		
+		[Inline]
+		public static void TryThrowError<F>(Lua lua, F errFunc)
+			where F : delegate void(delegate void(String))
+		{
+			TryThrowError<F>(lua, lua.TinkerState, errFunc);
+		}
+
+		public static void TryThrowError<F>(Lua lua, LuaTinkerState tinkerState, F errFunc)
+			where F : delegate void(delegate void(String))
+		{
+			delegate void(String) setError = scope (errStr) => { tinkerState.SetLastError(errStr); };
+			//errFunc(setError);
+
+			if (tinkerState.IsPCall)
+			{
+				lua.PushString(tinkerState.GetLastError());
+				lua.Error();
+			}
+		}
+
+		[Inline]
+		public static void TryThrowErrorF<F>(Lua lua, F errFunc)
+			where F : delegate void(delegate void(String, params Span<Object>))
+		{
+			TryThrowErrorF<F>(lua, lua.TinkerState, errFunc);
+		}
+
+		public static void TryThrowErrorF<F>(Lua lua, LuaTinkerState tinkerState, F errFunc)
+			where F: delegate void(delegate void(String, params Span<Object>))
+		{
+			delegate void(String, params Span<Object>) setError = scope (errStr, args) => { tinkerState.SetLastError(scope String()..AppendF(errStr, params args)); };
+			errFunc(setError);
+
+			if (tinkerState.IsPCall)
+			{
+				lua.PushString(tinkerState.GetLastError());
+				lua.Error();
+			}
 		}
 
 		public static void EnumStack(Lua lua, String outString)
@@ -178,7 +252,7 @@ namespace LuaTinker.StackHelpers
 
 		public static bool CheckMetaTableValidity<T>(Lua lua, int32 index)
 		{
-			let tinkerState = LuaTinkerState.Find(lua);
+			let tinkerState = lua.TinkerState;
 			if (lua.GetMetaTable(index))
 			{
 				var validArgument = tinkerState != null && tinkerState.IsClassRegistered<T>();
@@ -212,7 +286,7 @@ namespace LuaTinker.StackHelpers
 		public static EVMTResult EnsureValidMetaTable<T>(Lua lua, int32 index)
 		{
 			EVMTResult result = .Ok;
-			let tinkerState = LuaTinkerState.Find(lua);
+			let tinkerState = lua.TinkerState;
 
 			if (lua.GetMetaTable(index))
 			{

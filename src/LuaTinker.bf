@@ -11,6 +11,8 @@ using LuaTinker.StackHelpers;
 
 using KeraLua;
 
+using internal KeraLua;
+
 namespace LuaTinker
 {
 	public class LuaTinker
@@ -18,6 +20,7 @@ namespace LuaTinker
 		private Lua mLua;
 		private LuaUserdataAllocator mUserdataAllocator;
 		private LuaTinkerState mTinkerState;
+		private String mLastError = new .() ~ delete _;
 
 		// This exists only to make GC happy.
 		internal static List<Object> sAliveObjects = new .() ~ delete _;
@@ -28,12 +31,12 @@ namespace LuaTinker
 			mUserdataAllocator = .(lua);
 			Init();
 
-			mTinkerState = LuaTinkerState.GetOrAdd(mLua);
+			mTinkerState = lua.TinkerState;
 		}
 
 		public ~this()
 		{
-			LuaTinkerState.Remove(mLua);
+			Debug.Assert(mLua.TinkerState == mTinkerState);
 		}
 
 		private void Init()
@@ -688,14 +691,14 @@ namespace LuaTinker
 		}
 		
 		[Inline]
-		public Result<void> Call(StringView name)
+		public Result<void, StringView> Call(StringView name)
 			=> Call<void, void>(name, default);
 		
 		[Inline]
-		public Result<RVal> Call<RVal>(StringView name)
+		public Result<RVal, StringView> Call<RVal>(StringView name)
 			=> Call<RVal, void>(name, default);
 
-		public Result<RVal> Call<RVal, Args>(StringView name, Args args)
+		public Result<RVal, StringView> Call<RVal, Args>(StringView name, Args args)
 			where RVal : var
 			where Args : var
 		{
@@ -729,13 +732,16 @@ namespace LuaTinker
 			if (mLua.IsFunction(-1))
 			{
 				int argc = EmitCallPushes<Args>();
-				mLua.Call((.)argc, results);
+				if (mLua.PCall((.)argc, results, 0) != .OK)
+				{
+					mLastError.Set(StackHelper.Pop!<StringView>(mLua, -1));
+					return .Err(mLastError);
+				}
 			}
 			else
 			{
-				//mLua.PushString("attempt to call global '{}' (not a function)", name);
-				//mLua.Error();
-				return .Err; // TODO: More informative errors
+				mLastError.Set(scope $"attempt to call global '{name}' (not a function)");
+				return .Err(mLastError);
 			}
 
 			if (results == 1)
