@@ -65,5 +65,11 @@ namespace LuaTinker.Wrappers
 
 			mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
 		}
+
+		public override void OnRemoveFromLua(LuaTinkerState tinkerState)
+		{
+			tinkerState.DeregisterAliveObject(mGetFunc);
+			tinkerState.DeregisterAliveObject(mSetFunc);
+		}
 	}
 }

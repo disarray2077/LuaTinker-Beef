@@ -133,6 +133,13 @@ namespace LuaTinker.Wrappers
 			obj = ClassInstance;
 			return .Object;
 		}
+		
+
+		public override void OnRemoveFromLua(LuaTinkerState tinkerState)
+		{
+			if (OwnsPointer)
+				tinkerState.DeregisterAliveObject(ClassInstance);
+		}
 	}
 
 	extension ClassInstanceWrapper<T>

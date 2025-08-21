@@ -6,7 +6,7 @@ namespace KeraLua
 {
 	extension Lua
 	{
-		internal readonly LuaTinkerState TinkerState = new .() ~ delete _;
+		internal LuaTinkerState TinkerState = new .() ~ DeleteAndNullify!(_);
 
         public new LuaStatus PCall(int32 arguments, int32 results, int32 errorFunctionIndex)
         {

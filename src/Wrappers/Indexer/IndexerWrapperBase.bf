@@ -3,12 +3,13 @@ using System;
 
 namespace LuaTinker.Wrappers
 {
-	public abstract class IndexerWrapperBase
+	public abstract class IndexerWrapperBase : ILuaOwnedObject
 	{
 		public virtual Type KeyType => null;
 		public abstract void Get(Lua lua);
 		public abstract void Set(Lua lua);
 
 		public abstract IndexerWrapperBase CreateNew();
+		public virtual void OnRemoveFromLua(LuaTinkerState tinkerState) {}
 	}
 }

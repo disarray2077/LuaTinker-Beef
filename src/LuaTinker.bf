@@ -21,9 +21,6 @@ namespace LuaTinker
 		private LuaUserdataAllocator mUserdataAllocator;
 		private LuaTinkerState mTinkerState;
 
-		// This exists only to make GC happy.
-		internal static List<Object> sAliveObjects = new .() ~ delete _;
-
 		public this(Lua lua)
 		{
 			mLua = lua;
@@ -86,7 +83,7 @@ namespace LuaTinker
 
 		public void AddMethod<F>(String name, F func) where F : var, class
 		{
-			sAliveObjects.Add(func);
+			mTinkerState.RegisterAliveObject(func);
 
 			new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
 			// register destructor
@@ -399,7 +396,7 @@ namespace LuaTinker
 			else if (var aggregator = existingIndexer as IndexerAggregatorWrapper)
 			{
 				let indexer = new IndexerWrapper<T, TKey>();
-				sAliveObjects.Add(indexer);
+				mTinkerState.RegisterAliveObject(indexer);
 				aggregator.AddIndexer(typeof(TKey), indexer);
 			}
 			else
@@ -408,8 +405,8 @@ namespace LuaTinker
 
 				let existingIndexerClone = existingIndexer.CreateNew();
 				let newIndexer = new IndexerWrapper<T, TKey>();
-				sAliveObjects.Add(existingIndexerClone);
-				sAliveObjects.Add(newIndexer);
+				mTinkerState.RegisterAliveObject(existingIndexerClone);
+				mTinkerState.RegisterAliveObject(newIndexer);
 
 				newAggregator.AddIndexer(existingIndexer.KeyType, existingIndexerClone);
 				newAggregator.AddIndexer(typeof(TKey), newIndexer);
@@ -510,8 +507,8 @@ namespace LuaTinker
 			where TSet : class, delegate void(T, TVar)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
-			sAliveObjects.Add(getter);
-			sAliveObjects.Add(setter);
+			mTinkerState.RegisterAliveObject(getter);
+			mTinkerState.RegisterAliveObject(setter);
 
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
@@ -752,7 +749,7 @@ namespace LuaTinker
 
 		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
 		{
-			sAliveObjects.Add(func);
+			mTinkerState.RegisterAliveObject(func);
 
 			if (FindNamespaceTable(namespacePath))
 			{

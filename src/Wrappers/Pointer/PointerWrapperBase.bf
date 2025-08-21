@@ -3,7 +3,7 @@ using System;
 
 namespace LuaTinker.Wrappers
 {
-	public class PointerWrapperBase
+	public class PointerWrapperBase : ILuaOwnedObject
 	{
 		public enum ToObjectResult
 		{
@@ -33,6 +33,8 @@ namespace LuaTinker.Wrappers
 			obj = null;
 			return .Error;
 		}
+
+		public virtual void OnRemoveFromLua(LuaTinkerState tinkerState) {}
 
 	    private void* mPtr;
 	}

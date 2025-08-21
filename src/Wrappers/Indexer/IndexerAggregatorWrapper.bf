@@ -3,6 +3,7 @@ using System.Collections;
 using KeraLua;
 using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
+using LuaTinker.Wrappers;
 
 using internal KeraLua;
 
@@ -116,6 +117,12 @@ namespace LuaTinker.Wrappers
 		public override IndexerWrapperBase CreateNew()
 		{
 			Runtime.NotImplemented();
+		}
+
+		public override void OnRemoveFromLua(LuaTinkerState tinkerState)
+		{
+			for (let indexer in mIndexers)
+				tinkerState.DeregisterAliveObject(indexer.Instance);
 		}
 	}
 }

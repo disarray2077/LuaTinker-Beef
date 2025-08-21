@@ -3,20 +3,40 @@ using System.Diagnostics;
 using System.Collections;
 using System.Reflection;
 using KeraLua;
+using LuaTinker.Wrappers;
 
 namespace LuaTinker
 {
 	public class LuaTinkerState
 	{
-		private int mRefCount = 0;
 		private Dictionary<TypeId, String> mClassNames = new .() ~ DeleteDictionaryAndValues!(_);
-		private Dictionary<String, Type> mClassTypes = new .() ~ DeleteDictionaryAndKeys!(_);
 		private String mLastError = new .() ~ delete _;
+
 		public bool IsPCall { get; private set; }
 		public bool HasError => !mLastError.IsEmpty;
 
+		// This exists only to make GC happy.
+		internal List<Object> mAliveObjects = new .() ~ delete _;
+
 		public this()
 		{
+		}
+
+		public void RegisterAliveObject(Object obj)
+		{
+			mAliveObjects.Add(obj);
+		}
+
+		public void DeregisterAliveObject<T>(T obj)
+			where T : class, ILuaOwnedObject
+		{
+			obj.OnRemoveFromLua(this);
+			mAliveObjects.Remove(obj);
+		}
+
+		public void DeregisterAliveObject(Object obj)
+		{
+			mAliveObjects.Remove(obj);
 		}
 
 		public void ClearError()
@@ -65,13 +85,6 @@ namespace LuaTinker
 				nameStr.Set(name);
 				nameStr.EnsureNullTerminator();
 			}
-		}
-
-		public Result<Type> GetClassType(StringView name)
-		{
-			if (mClassTypes.TryGetValueAlt(name, let type))
-				return .Ok(type);
-			return .Err;
 		}
 	}
 }
