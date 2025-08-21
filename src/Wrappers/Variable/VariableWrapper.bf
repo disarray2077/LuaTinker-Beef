@@ -16,8 +16,10 @@ namespace LuaTinker.Wrappers
 
 		public override void Get(Lua lua)
 		{
-			// TODO: ref support
-			StackHelper.Push(lua, *mPtr);
+			if (!typeof(T).IsPrimitive && typeof(T).IsStruct)
+				StackHelper.Push(lua, ref *mPtr);
+			else
+				StackHelper.Push(lua, *mPtr);
 		}
 
 		public override void Set(Lua lua)

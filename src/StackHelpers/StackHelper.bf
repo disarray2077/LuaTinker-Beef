@@ -3,6 +3,8 @@ using KeraLua;
 using System.Diagnostics;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker.StackHelpers
 {
 	public static class StackHelper
@@ -18,6 +20,75 @@ namespace LuaTinker.StackHelpers
 		{
 			Runtime.NotImplemented();
 		}
+
+		[Inline]
+		public static void TryThrowError(Lua lua)
+		{
+			TryThrowError(lua, lua.TinkerState);
+		}
+
+		public static void TryThrowError(Lua lua, LuaTinkerState tinkerState)
+		{
+			if (tinkerState.IsPCall)
+			{
+				lua.Where(1);
+				lua.PushString(tinkerState.GetLastError());
+				lua.Concat(2);
+				tinkerState.SetLastError(lua.ToStringView(-1));
+#if DEBUG || TEST
+				//Debug.WriteLine(StackHelper.EnumStack(lua, .. scope .()));
+				//Debug.FatalError(lua.ToString(-1, .. scope .()));
+#endif
+				lua.Error();
+			}
+		}
+
+		[NoReturn]
+		public static void ThrowError(Lua lua, LuaTinkerState tinkerState)
+		{
+			if (tinkerState.IsPCall)
+			{
+				lua.Where(1);
+				lua.PushString(tinkerState.GetLastError());
+				lua.Concat(2);
+				tinkerState.SetLastError(lua.ToStringView(-1));
+			}
+			else
+			{
+				lua.PushString(tinkerState.GetLastError());
+			}
+#if DEBUG || TEST
+			//Debug.WriteLine(StackHelper.EnumStack(lua, .. scope .()));
+			//Debug.FatalError(lua.ToString(-1, .. scope .()));
+#endif
+			lua.Error();
+		}
+
+		/*
+		[Inline]
+		public static void TryThrowError<F>(Lua lua, F errFunc)
+			where F : delegate void(delegate void(String))
+		{
+			TryThrowError<F>(lua, lua.TinkerState, errFunc);
+		}
+
+		public static void TryThrowError<F>(Lua lua, LuaTinkerState tinkerState, F errFunc)
+			where F : delegate void(delegate void(String))
+		{
+			{
+				// NOTE:
+				// We do this because we need to make sure the String's destructor is called before the `lua.Error` call!
+				delegate void(String) setError = scope (errStr) => { tinkerState.SetLastError(errStr); };
+				errFunc(setError);
+			}
+
+			if (tinkerState.IsPCall)
+			{
+				lua.PushString(tinkerState.GetLastError());
+				lua.Error();
+			}
+		}
+		*/
 
 		public static void EnumStack(Lua lua, String outString)
 		{
@@ -178,7 +249,7 @@ namespace LuaTinker.StackHelpers
 
 		public static bool CheckMetaTableValidity<T>(Lua lua, int32 index)
 		{
-			let tinkerState = LuaTinkerState.Find(lua);
+			let tinkerState = lua.TinkerState;
 			if (lua.GetMetaTable(index))
 			{
 				var validArgument = tinkerState != null && tinkerState.IsClassRegistered<T>();
@@ -212,9 +283,9 @@ namespace LuaTinker.StackHelpers
 		public static EVMTResult EnsureValidMetaTable<T>(Lua lua, int32 index)
 		{
 			EVMTResult result = .Ok;
-			let tinkerState = LuaTinkerState.Find(lua);
+			let tinkerState = lua.TinkerState;
 
-			if (lua.GetMetaTable(index))
+			if (lua.IsUserData(index) && lua.GetMetaTable(index))
 			{
 				var validArgument = tinkerState != null && tinkerState.IsClassRegistered<T>();
 
@@ -259,24 +330,26 @@ namespace LuaTinker.StackHelpers
 
 				if (!validArgument)
 				{
-					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+					let luaTinker = lua.TinkerState;
 					{
-						// This scope is just to make sure that the string is freed before calling lua.Error
-						lua.PushString($"can't convert argument {index} to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+						// Set error in a different scope to make sure the temporary strings destructors run before throwing the error.
+						luaTinker.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
 					}
-					lua.Error();
+					TryThrowError(lua, luaTinker);
+					return default;
 				}
 
 				lua.Pop(2);
 			}
 			else if (tinkerState.IsClassRegistered<T>())
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
+				let luaTinker = lua.TinkerState;
 				{
-					// This scope is just to make sure that the string is freed before calling lua.Error
-					lua.PushString($"can't convert argument {index} to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+					// Set error in a different scope to make sure the temporary strings destructors run before throwing the error.
+					luaTinker.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
 				}
-				lua.Error();
+				TryThrowError(lua, luaTinker);
+				return default;
 			}
 			else
 			{

@@ -30,15 +30,16 @@ namespace LuaTinker.Layers
 				code.Append("Debug.Assert(lua.GetTop() == 0);\n");
 			else
 			{
-				if (invokeMethod.GetParamName(0) == "this")
+				bool isInstanceCall = invokeMethod.GetParamName(0) == "this";
+				if (isInstanceCall)
 				{
 					// TODO: When error deferring is done, we will not need this here.
 					code.Append(
 						"""
 						if (!lua.IsUserData(1))
 						{
-							lua.PushString("no class at first argument. (forgot ':' expression ?)");
-							lua.Error();
+							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+							StackHelper.ThrowError(lua, lua.TinkerState);
 						}\n
 						""");
 				}
@@ -51,10 +52,10 @@ namespace LuaTinker.Layers
 
 				code.AppendF(
 					$"""
-					if (lua.GetTop() < {invokeMethod.ParamCount})
+					if (lua.GetTop() {isParams ? "<" : "!="} {invokeMethod.ParamCount})
 					{{
-						lua.PushString($"expected '{invokeMethod.ParamCount}' arguments but got '{{lua.GetTop()}}'");
-						lua.Error();
+						lua.TinkerState.SetLastError($"expected '{invokeMethod.ParamCount - (isInstanceCall ? 1 : 0)}' arguments but got '{{lua.GetTop() - {isInstanceCall ? 1 : 0}}}'");
+						StackHelper.ThrowError(lua, lua.TinkerState);
 					}}\n
 					""");
 			}
@@ -64,7 +65,7 @@ namespace LuaTinker.Layers
 				Debug.Assert(paramsType != null);
 
 				let paramsTypeCode = scope String();
-				paramsTypeCode.AppendF($"comptype({paramsType.GetTypeId()})");
+				paramsTypeCode.AppendF($"comptype({paramsType.GetTypeId()})/*{paramsType}*/");
 
 				code.AppendF(
 					$"""
@@ -76,7 +77,7 @@ namespace LuaTinker.Layers
 			}
 			
 			if (retType != typeof(void))
-				code.Append("var ret = ");
+				code.AppendF($"var/*{retType}*/ ret = ");
 			
 			var returnsRef = false;
 			if (var retRefType = retType as RefType)
@@ -116,7 +117,7 @@ namespace LuaTinker.Layers
 
 				code.Append("StackHelper.Pop");
 				code.Append(paramIsRef ? "Ref" : "!");
-				code.AppendF($"<comptype({GetInvokeArgType<F>(i).GetTypeId()})>(lua, {i + 1})");
+				code.AppendF($"<comptype({GetInvokeArgType<F>(i).GetTypeId()})/*{GetInvokeArgType<F>(i)}*/>(lua, {i + 1})");
 
 				if (i != invokeMethod.ParamCount - 1)
 					code.Append(", ");

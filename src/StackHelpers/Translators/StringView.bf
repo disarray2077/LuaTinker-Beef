@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using KeraLua;
 
+using internal KeraLua;
+
 namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
@@ -26,9 +28,10 @@ namespace LuaTinker.StackHelpers
 		{
 			if (!lua.IsStringOrNumber(index))
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"expected 'String' but got '{lua.TypeName(index)}'");
-				lua.Error();
+				let tinkerState = lua.TinkerState;
+				tinkerState.SetLastError($"expected 'String' but got '{lua.TypeName(index)}'");
+				TryThrowError(lua, tinkerState);
+				return default;
 			}
 			return lua.ToStringView(index);
 		}

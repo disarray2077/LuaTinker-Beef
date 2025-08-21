@@ -31,15 +31,16 @@ namespace LuaTinker.Layers
 				code.Append("Debug.Assert(lua.GetTop() == 0);\n");
 			else
 			{
-				if (invokeMethod.GetParamName(0) == "this")
+				bool isInstanceCall = invokeMethod.GetParamName(0) == "this";
+				if (isInstanceCall)
 				{
 					// TODO: When error deferring is done, we will not need this here.
 					code.Append(
 						"""
 						if (!lua.IsUserData(1))
 						{
-							lua.PushString("no class at first argument. (forgot ':' expression ?)");
-							lua.Error();
+							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+							StackHelper.ThrowError(lua, lua.TinkerState);
 						}\n
 						""");
 				}
@@ -52,10 +53,10 @@ namespace LuaTinker.Layers
 
 				code.AppendF(
 					$"""
-					if (lua.GetTop() < {invokeMethod.ParamCount})
+					if (lua.GetTop() {isParams ? "<" : "!="} {invokeMethod.ParamCount})
 					{{
-						lua.PushString($"expected '{invokeMethod.ParamCount}' arguments but got '{{lua.GetTop()}}'");
-						lua.Error();
+						lua.TinkerState.SetLastError($"expected '{invokeMethod.ParamCount - (isInstanceCall ? 1 : 0)}' arguments but got '{{lua.GetTop() - {isInstanceCall ? 1 : 0}}}'");
+						StackHelper.ThrowError(lua, lua.TinkerState);
 					}}\n
 					""");
 			}

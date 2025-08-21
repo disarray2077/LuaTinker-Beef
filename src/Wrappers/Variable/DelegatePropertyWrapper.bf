@@ -3,6 +3,8 @@ using System.Diagnostics;
 using KeraLua;
 using LuaTinker.StackHelpers;
 
+using internal KeraLua;
+
 namespace LuaTinker.Wrappers
 {
 	public sealed class DelegatePropertyWrapper<T, TVar, TGet, TSet> : VariableWrapperBase
@@ -30,14 +32,16 @@ namespace LuaTinker.Wrappers
 		{
 			if (mGetFunc == null)
 			{
-				lua.PushString("this property is write-only");
-				lua.Error();
+				let tinkerState = lua.TinkerState;
+				tinkerState.SetLastError("this property is write-only");
+				StackHelper.ThrowError(lua, tinkerState);
 			}
 
 			if (!lua.IsUserData(1))
 			{
-				lua.PushString("no class at first argument. (forgot ':' expression ?)");
-				lua.Error();
+				let tinkerState = lua.TinkerState;
+				tinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+				StackHelper.ThrowError(lua, tinkerState);
 			}
 
 			StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));
@@ -47,14 +51,16 @@ namespace LuaTinker.Wrappers
 		{
 			if (mSetFunc == null)
 			{
-				lua.PushString("this property is read-only");
-				lua.Error();
+				let tinkerState = lua.TinkerState;
+				tinkerState.SetLastError("this property is read-only");
+				StackHelper.ThrowError(lua, tinkerState);
 			}
 
 			if (!lua.IsUserData(1))
 			{
-				lua.PushString("no class at first argument. (forgot ':' expression ?)");
-				lua.Error();
+				let tinkerState = lua.TinkerState;
+				tinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+				StackHelper.ThrowError(lua, tinkerState);
 			}
 
 			mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));

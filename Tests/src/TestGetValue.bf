@@ -20,6 +20,7 @@ namespace LuaTinker.Tests
 				e = 5e+20
 				f = true
 				g = "hello"
+				h = nil
 				"""
 				))
 			{
@@ -35,8 +36,10 @@ namespace LuaTinker.Tests
 			Test.Assert((tinker.GetValue<double>("e") case .Ok(let e)) && e == 5e+20);
 			Test.Assert((tinker.GetValue<bool>("f") case .Ok(let f)) && f == true);
 			Test.Assert((tinker.GetValue<StringView>("g") case .Ok(let g1)) && g1 == "hello");
-			Test.Assert(tinker.GetString("g", .. scope .()) == "hello");
-			Test.Assert(tinker.GetValue<int32>("h") case .Err);
+			Test.Assert(tinker.GetValue<StringBuilder>("g") case .Err);
+			Test.Assert((tinker.GetValue<Object>("h") case .Ok(let h)) && h == null);
+			Test.Assert((tinker.GetValue<int32*>("h") case .Ok(let h2)) && h2 == null);
+			Test.Assert(tinker.GetValue<int32>("i") case .Err);
 		}
 	}
 }

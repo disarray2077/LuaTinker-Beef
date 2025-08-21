@@ -32,6 +32,7 @@ namespace LuaTinker.Helpers
 		{
 			public bool IsStatic;
 			public Type Type;
+			public Type DeclaringType;
 			public PropertyMethods Methods;
 		}
 	
@@ -54,12 +55,13 @@ namespace LuaTinker.Helpers
 					if (!lookupFlags.HasFlag(.Indexers) || !lookupFlags.HasFlag(.Gets))
 						continue;
 					let propType = (methodInfo.ReturnType as RefType)?.UnderlyingType ?? methodInfo.ReturnType;
-					let propertyName = ((int)propType.TypeId).ToString(.. scope .());
+					let propertyName = new $"indexer[{propType}]";
 					if (properties.TryAdd(propertyName, let keyPtr, let valuePtr))
 					{
 						let indexerProp = new IndexerProperty();
 						indexerProp.IsStatic = methodInfo.IsStatic;
 						indexerProp.Type = propType;
+						indexerProp.DeclaringType = methodInfo.DeclaringType;
 						indexerProp.Methods = .Get;
 						for (int i = 0; i < methodInfo.ParamCount; i++)
 							indexerProp.Parameters.Add((methodInfo.GetParamName(i), methodInfo.GetParamType(i)));
@@ -77,12 +79,13 @@ namespace LuaTinker.Helpers
 				{
 					if (!lookupFlags.HasFlag(.Indexers) || !lookupFlags.HasFlag(.Sets))
 						continue;
-					let propertyName = ((int)methodInfo.GetParamType(0).TypeId).ToString(.. scope .());
+					let propertyName = new $"indexer[{methodInfo.GetParamType(0)}]";
 					if (properties.TryAdd(propertyName, let keyPtr, let valuePtr))
 					{
 						let indexerProp = new IndexerProperty();
 						indexerProp.IsStatic = methodInfo.IsStatic;
 						indexerProp.Type = methodInfo.GetParamType(0);
+						indexerProp.DeclaringType = methodInfo.DeclaringType;
 						indexerProp.Methods = .Set;
 						for (int i = 1; i < methodInfo.ParamCount; i++)
 							indexerProp.Parameters.Add((methodInfo.GetParamName(i), methodInfo.GetParamType(i)));
@@ -106,6 +109,7 @@ namespace LuaTinker.Helpers
 						let prop = new NormalProperty();
 						prop.IsStatic = methodInfo.IsStatic;
 						prop.Type = methodInfo.ReturnType;
+						prop.DeclaringType = methodInfo.DeclaringType;
 						prop.Methods = .Get;
 						*valuePtr = prop;
 					}
@@ -127,6 +131,7 @@ namespace LuaTinker.Helpers
 						let prop = new NormalProperty();
 						prop.IsStatic = methodInfo.IsStatic;
 						prop.Type = methodInfo.GetParamType(0);
+						prop.DeclaringType = methodInfo.DeclaringType;
 						prop.Methods = .Set;
 						*valuePtr = prop;
 					}

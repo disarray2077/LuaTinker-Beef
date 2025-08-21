@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using KeraLua;
 
+using internal KeraLua;
+
 namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
@@ -23,14 +25,26 @@ namespace LuaTinker.StackHelpers
 
 		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, INumeric
 		{
-			let value = lua.ToIntegerX(index);
-			if (!value.HasValue)
+			let res = lua.ToIntegerX(index);
+			if (!res.HasValue)
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"can't convert '{lua.TypeName(index)}' to 'Number'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"can't convert '{lua.TypeName(index)}' to 'Number'");
+				TryThrowError(lua, luaTinker);
+				return default;
 			}
-			return (T)value.GetValueOrDefault();
+			let value = res.GetValueOrDefault();
+			if (value > (int64)(T)value)
+			{
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"number is out of range for the type '{typeof(T)}'");
+				TryThrowError(lua, luaTinker);
+				return default;
+			}
+			else
+			{
+				return (T)value;
+			}
 		}
 
 		[Inline]
@@ -53,9 +67,10 @@ namespace LuaTinker.StackHelpers
 			let value = lua.ToNumberX(index);
 			if (!value.HasValue)
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"can't convert '{lua.TypeName(index)}' to 'Number'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"can't convert '{lua.TypeName(index)}' to 'Number'");
+				TryThrowError(lua, luaTinker);
+				return default;
 			}
 			return (T)value.GetValueOrDefault();
 		}
@@ -80,9 +95,10 @@ namespace LuaTinker.StackHelpers
 			let value = lua.ToIntegerX(index);
 			if (!value.HasValue)
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"can't convert '{lua.TypeName(index)}' to 'Number'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"can't convert '{lua.TypeName(index)}' to 'Number'");
+				TryThrowError(lua, luaTinker);
+				return default;
 			}
 			return (T)value.GetValueOrDefault();
 		}
@@ -106,9 +122,10 @@ namespace LuaTinker.StackHelpers
 		{
 			if (!lua.IsBoolean(index))
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"expected 'Boolean' but got '{lua.TypeName(index)}'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"expected 'Boolean' but got '{lua.TypeName(index)}'");
+				TryThrowError(lua, luaTinker);
+				return default;
 			}
 			return (T)lua.ToBoolean(index);
 		}

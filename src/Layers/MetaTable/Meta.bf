@@ -3,6 +3,8 @@ using KeraLua;
 using LuaTinker.StackHelpers;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker.Layers
 {
 	static
@@ -28,8 +30,9 @@ namespace LuaTinker.Layers
 			}
 			else if (!lua.IsNil(-1))
 			{
-				lua.PushString("find '__parent' class variable. (nonsupport registering such class variable.)");
-				lua.Error();
+				let tinkerState = lua.TinkerState;
+				tinkerState.SetLastError("find '__parent' class variable. (nonsupport registering such class variable.)");
+				StackHelper.ThrowError(lua, tinkerState);
 			}
 		}
 
@@ -67,8 +70,9 @@ namespace LuaTinker.Layers
 					}
 					else
 					{
-					    lua.PushString("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
-					 	lua.Error();
+						let tinkerState = lua.TinkerState;
+					    tinkerState.SetLastError("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
+					 	StackHelper.ThrowError(lua, tinkerState);
 					}
 				}
 			}
@@ -108,8 +112,9 @@ namespace LuaTinker.Layers
 					}
 					else
 					{
-					    lua.PushString("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
-					 	lua.Error();
+						let tinkerState = lua.TinkerState;
+					    tinkerState.SetLastError("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
+					 	StackHelper.ThrowError(lua, tinkerState);
 					}
 				}
 			}

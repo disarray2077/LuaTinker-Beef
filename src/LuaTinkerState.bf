@@ -11,6 +11,34 @@ namespace LuaTinker
 		private int mRefCount = 0;
 		private Dictionary<TypeId, String> mClassNames = new .() ~ DeleteDictionaryAndValues!(_);
 		private Dictionary<String, Type> mClassTypes = new .() ~ DeleteDictionaryAndKeys!(_);
+		private String mLastError = new .() ~ delete _;
+		public bool IsPCall { get; private set; }
+		public bool HasError => !mLastError.IsEmpty;
+
+		public this()
+		{
+		}
+
+		public void ClearError()
+		{
+			mLastError.Clear();
+		}
+
+		public void SetLastError(StringView errStr)
+		{
+			mLastError.Set(errStr);
+		}
+
+		public void SetLastError(StringView errStr, params Span<Object> args)
+		{
+			mLastError.Clear();
+			mLastError.AppendF(errStr, params args);
+		}
+
+		public String GetLastError()
+		{
+			return mLastError;
+		}
 
 		public bool IsClassRegistered<T>()
 		{
@@ -44,35 +72,6 @@ namespace LuaTinker
 			if (mClassTypes.TryGetValueAlt(name, let type))
 				return .Ok(type);
 			return .Err;
-		}
-		
-		private static Dictionary<Lua, LuaTinkerState> Instances = new .() ~ DeleteDictionaryAndValues!(_);
-
-		// Get the LuaTinkerState associated with this LuaState
-		public static LuaTinkerState Find(Lua luaState)
-		{
-			return Instances.TryGetValue(luaState, .. let value);
-		}
-
-		public static LuaTinkerState GetOrAdd(Lua luaState)
-		{
-			if (Instances.TryAdd(luaState, let keyPtr, let valuePtr))
-			{
-				*valuePtr = new LuaTinkerState();
-			}
-
-			(*valuePtr).mRefCount++;
-			return *valuePtr;
-		}
-
-		public static void Remove(Lua luaState)
-		{
-			if (Instances.GetAndRemove(luaState) case .Ok(let kvPair))
-			{
-				kvPair.value.mRefCount--;
-				if (kvPair.value.mRefCount == 0)
-					delete kvPair.value;
-			}
 		}
 	}
 }

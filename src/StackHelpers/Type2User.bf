@@ -18,6 +18,11 @@ namespace LuaTinker.StackHelpers
 		// class to lua
 		public static void Create<T>(Lua lua, T val) where T : class
 		{
+			if (val == null)
+			{
+				lua.PushNil();
+				return;
+			}
 			let alloc = LuaUserdataAllocator(lua);
 			let wrapper = new:alloc ClassInstanceWrapper<T>();
 			wrapper.ClassInstance = val;
@@ -34,6 +39,11 @@ namespace LuaTinker.StackHelpers
 		// ptr to lua
 		public static void Create<T>(Lua lua, T* val) where T : var
 		{
+			if (val == null)
+			{
+				lua.PushNil();
+				return;
+			}
 			let alloc = LuaUserdataAllocator(lua);
 			let wrapper = new:alloc PointerWrapper<T>();
 			wrapper.Ptr = val;

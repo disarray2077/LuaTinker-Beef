@@ -2,6 +2,8 @@ using System;
 using KeraLua;
 using LuaTinker.StackHelpers;
 
+using internal KeraLua;
+
 namespace LuaTinker.Wrappers
 {
 	public sealed class ClassFieldWrapper<T> : VariableWrapperBase
@@ -24,21 +26,23 @@ namespace LuaTinker.Wrappers
 		{
 			if (!lua.IsUserData(1))
 			{
-				lua.PushString("no class at first argument. (forgot ':' expression ?)");
-				lua.Error();
+				lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
 
-			// TODO: ref support
 			let wrapper = User2Type.GetTypePtr<PointerWrapperBase>(lua, 1);
-			StackHelper.Push(lua, GetValueRef((.)wrapper.Ptr));
+			if (!typeof(T).IsPrimitive && typeof(T).IsStruct)
+				StackHelper.Push(lua, ref GetValueRef((.)wrapper.Ptr));
+			else
+				StackHelper.Push(lua, GetValueRef((.)wrapper.Ptr));
 		}
 
 		public override void Set(Lua lua)
 		{
 			if (!lua.IsUserData(1))
 			{
-				lua.PushString("no class at first argument. (forgot ':' expression ?)");
-				lua.Error();
+				lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
 
 			let wrapper = User2Type.GetTypePtr<PointerWrapperBase>(lua, 1);

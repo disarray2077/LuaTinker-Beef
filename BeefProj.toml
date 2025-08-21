@@ -29,7 +29,3 @@ Name = "MetaTable"
 [[ProjectFolder.Items.Items.Items]]
 Type = "IgnoreSource"
 Name = "MetaContainer.bf"
-
-[[ProjectFolder.Items.Items]]
-Type = "AutoFolder"
-Name = "Functor"

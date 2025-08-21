@@ -2,6 +2,8 @@ using System;
 using KeraLua;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
@@ -31,9 +33,10 @@ namespace LuaTinker.StackHelpers
 				case .Object, .NewObject:
 					return obj;
 				case .Error:
-					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-					lua.PushString($"can't convert argument {index} to 'System.Object'");
-					lua.Error();
+					let luaTinker = lua.TinkerState;
+					luaTinker.SetLastError($"can't convert argument {index} to 'System.Object'");
+					TryThrowError(lua, luaTinker);
+					return default;
 				}
 			}
 			else
@@ -47,9 +50,10 @@ namespace LuaTinker.StackHelpers
 						return new:alloc box n;
 					else
 					{
-						// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-						lua.PushString($"can't convert argument {index} to 'System.Object'");
-						lua.Error();
+						let luaTinker = lua.TinkerState;
+						luaTinker.SetLastError($"can't convert argument {index} to 'System.Object'");
+						TryThrowError(lua, luaTinker);
+						return default;
 					}
 				case .Boolean:
 					return new:alloc box Pop<bool>(lua, index);
@@ -58,26 +62,27 @@ namespace LuaTinker.StackHelpers
 				case .Nil:
 					return null;
 				default:
-					// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-					lua.PushString($"can't convert argument {index} to 'System.Object'");
-					lua.Error();
+					let luaTinker = lua.TinkerState;
+					luaTinker.SetLastError($"can't convert argument {index} to 'System.Object'");
+					TryThrowError(lua, luaTinker);
+					return default;
 				}
 			}
 		}
 
 		public static mixin Pop<T>(Lua lua, int32 index)
-			where T : String, class
+			where T : String, class where String : T
 		{
 			SingleAllocator alloc = scope:mixin .(96);
 			_PopAlloc<T>(lua, index, alloc)
 		}
 
 		private static String _PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
-			where T : String
+			where T : String where String : T
 		{
 			if (lua.IsUserData(index))
 			{
-				let wrapper = User2Type.GetTypePtr<ClassInstanceWrapper<T>>(lua, index);
+				let wrapper = User2Type.GetTypePtr<PointerWrapperBase>(lua, index);
 				return (String)Internal.UnsafeCastToObject(wrapper.[Friend]mPtr);
 			}
 			else

@@ -14,14 +14,17 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-			String str = scope .();
+			StringBuilder str = scope .();
 
-			tinker.AddClass<String>("StringBuilder");
-			tinker.AddClassCtor<String>();
+			tinker.AddClass<String>("String");
 			tinker.AddClassMethod<String, function Result<void>(String this, StringView, params Span<Object>)>("AppendF", => String.AppendF);
-			tinker.AddClassMethod<String, function String(String)>("str", (str) => str); // This is necessary to convert from a String instance to a Lua String.
 
-			tinker.AddMethod<delegate String()>("GetStringBuilder", new () => str);
+			tinker.AddClass<StringBuilder>("StringBuilder");
+			tinker.AddClassCtor<StringBuilder>();
+			tinker.AddClassParent<StringBuilder, String>();
+			tinker.AddClassMethod<StringBuilder, function String(StringBuilder)>("ToString", (str) => (String)str);
+
+			tinker.AddMethod<delegate StringBuilder()>("GetStringBuilder", new () => str);
 
 			if (lua.DoString(
 				@"""
@@ -33,7 +36,7 @@ namespace LuaTinker.Tests
 				e = none
 				f = false
 				sb4:AppendF("{} {} {} {} {} {}", a, b, c, d, e, f)
-				if sb4:str() ~= "1 9999999999 null null null False" then
+				if sb4:ToString() ~= "1 9999999999 null null null False" then
 					error("Text didn't match")
 				end
 				"""

@@ -138,15 +138,17 @@ namespace LuaTinker.Layers
 		{
 			if (type.[Friend]mTypeCode == .Boolean)
 				return .Boolean;
-			if (type.IsInteger || type.IsFloatingPoint)
+			if (type.IsInteger || type.IsFloatingPoint || type.IsEnum || (type.IsTypedPrimitive && (type.UnderlyingType.IsInteger || type.IsFloatingPoint || type.IsEnum)))
 				return .Number;
 			if (type == typeof(String) || type == typeof(StringView) || type == typeof(char8*))
 				return .String;
 			return .UserData;
 		}
-		
+
+		public delegate void CodeGenFunc<T>(MethodInfo invokeMethod, int codeDepth, String code);
+
 		[Comptime]
-		private static void IterateTrie<T, IsStatic>(int depth, int codeDepth, Trie<MethodParam> root, String code)
+		private static void IterateTrie<T, IsStatic>(int depth, int codeDepth, Trie<MethodParam> root, String code, CodeGenFunc<T> codeGenFunc = null)
 			where IsStatic : const bool
 		{
 			let depthCode = scope String('\t', codeDepth);
@@ -214,7 +216,7 @@ namespace LuaTinker.Layers
 					{
 						code.AppendF($"{depthCode}\tif (lua.GetTop() >= {depth + 1})\n");
 						code.AppendF($"{depthCode}\t{{\n");
-						IterateTrie<T, const IsStatic>(depth + 1, codeDepth + 2, node, code);
+						IterateTrie<T, const IsStatic>(depth + 1, codeDepth + 2, node, code, codeGenFunc);
 						code.AppendF($"{depthCode}\t}}\n");
 					}
 					else
@@ -234,8 +236,16 @@ namespace LuaTinker.Layers
 
 					ref MethodInfo invokeMethod = ref *(MethodInfo*)node.Tag;
 
-					code.AppendF($"{depthCode}\t\t// {invokeMethod.ToString(.. scope .())}\n");
-					MakeBeefCall<T>(invokeMethod, codeDepth + 2, code);
+					code.AppendF($"{depthCode}\t\t// {invokeMethod}\n");
+					code.AppendF($"{depthCode}\t\t// [{typeof(T).TypeId}] {typeof(T)}\n");
+					code.AppendF($"{depthCode}\t\t// [{invokeMethod.ReturnType.TypeId}] {invokeMethod.ReturnType}\n");
+					for (int i < invokeMethod.ParamCount)
+						code.AppendF($"{depthCode}\t\t// [{invokeMethod.GetParamType(i).TypeId}] {invokeMethod.GetParamType(i)} (Flags: {invokeMethod.GetParamFlags(i)})\n");
+
+					if (codeGenFunc != null)
+						codeGenFunc(invokeMethod, codeDepth + 2, code);
+					else
+						MakeBeefCall<T>(invokeMethod, codeDepth + 2, code);
 
 					if (!flags.HasFlag(.Params))
 						code.AppendF($"{depthCode}\t}}\n");
@@ -252,8 +262,8 @@ namespace LuaTinker.Layers
 						$"""
 						{depthCode}else
 						{depthCode}{{
-						{depthCode}\tlua.PushString("no class at first argument. (forgot ':' expression ?)");
-						{depthCode}\tlua.Error();
+						{depthCode}\tlua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+						{depthCode}\tStackHelper.ThrowError(lua, lua.TinkerState);
 						{depthCode}}}\n
 						""");
 				}
@@ -261,7 +271,7 @@ namespace LuaTinker.Layers
 		}
 
 		[Comptime]
-		private static void EmitCallLayer<T, Name, IsStatic>()
+		private static void EmitDynamicCallLayer<T, Name, IsStatic>()
 			where Name : const String
 			where IsStatic : const bool
 		{
@@ -287,6 +297,7 @@ namespace LuaTinker.Layers
 			IterateTrie<T, const IsStatic>(1, 1, paramsTrie, code);
 			code.Append("}\n");
 
+			// Handle the case for a call with no arguments (e.g., DoSomething())
 			if (paramsTrie.IsEnd)
 			{
 				code.Append("else\n");
@@ -294,7 +305,11 @@ namespace LuaTinker.Layers
 
 				ref MethodInfo invokeMethod = ref *(MethodInfo*)paramsTrie.Tag;
 
-				code.AppendF($"\t// {invokeMethod.ToString(.. scope .())}\n");
+				code.AppendF($"\t// {invokeMethod}\n");
+				code.AppendF($"\t// [{typeof(T).TypeId}] {typeof(T)}\n");
+				code.AppendF($"\t// [{invokeMethod.ReturnType.TypeId}] {invokeMethod.ReturnType}\n");
+				for (int i < invokeMethod.ParamCount)
+					code.AppendF($"\t// [{invokeMethod.GetParamType(i).TypeId}] {invokeMethod.GetParamType(i)} (Flags: {invokeMethod.GetParamFlags(i)})\n");
 				MakeBeefCall<T>(invokeMethod, 1, code);
 
 				code.Append("}\n");
@@ -307,8 +322,8 @@ namespace LuaTinker.Layers
 					"""
 					else
 					{
-					\tlua.PushString("no class at first argument. (forgot ':' expression ?)");
-					\tlua.Error();
+					\tlua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+					\tStackHelper.ThrowError(lua, lua.TinkerState);
 					}\n
 					""");
 			}
@@ -323,8 +338,8 @@ namespace LuaTinker.Layers
 
 			code.AppendF(
 				$"""
-				lua.PushString($"expected '{nextEndDepth}' arguments but got '{{lua.GetTop()}}'");
-				lua.Error();\n
+				lua.TinkerState.SetLastError($"expected '{nextEndDepth}' arguments but got '{{lua.GetTop()}}'");
+				StackHelper.ThrowError(lua, lua.TinkerState);\n
 				""");
 			
 
@@ -364,7 +379,7 @@ namespace LuaTinker.Layers
 					}
 				}
 
-				methodParams.AppendF($"comptype({paramType.GetTypeId()})");
+				methodParams.AppendF($"comptype({paramType.GetTypeId()})/*{paramType}*/");
 			}
 
 			code.AppendF($"{depthCode}function comptype({retType.GetTypeId()})({methodParams}) func = => T.{invokeMethod.Name};\n");
@@ -460,7 +475,7 @@ namespace LuaTinker.Layers
 				code.Append("StackHelper.Pop");
 				code.Append(paramIsRef ? "Ref" : "!");
 
-				code.AppendF($"<comptype({paramType.GetTypeId()})>(lua, {i + (!invokeMethod.IsStatic ? 2 : 1)})");
+				code.AppendF($"<comptype({paramType.GetTypeId()})/*{paramType}*/>(lua, {i + (!invokeMethod.IsStatic ? 2 : 1)})");
 
 				if (i != invokeMethod.ParamCount - 1)
 					code.Append(", ");
@@ -497,14 +512,14 @@ namespace LuaTinker.Layers
 			}
 		}
 
-		public static int32 CallLayer<T, Name, IsStatic>(lua_State L)
+		public static int32 DynamicCallLayer<T, Name, IsStatic>(lua_State L)
 			where Name : const String
 			where IsStatic : const bool
 		{
 #unwarn
 			let lua = Lua.FromIntPtr(L);
 
-			EmitCallLayer<T, const Name, const IsStatic>();
+			EmitDynamicCallLayer<T, const Name, const IsStatic>();
 		}
 	}
 }

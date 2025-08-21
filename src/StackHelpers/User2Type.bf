@@ -3,6 +3,8 @@ using KeraLua;
 using System.Diagnostics;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker.StackHelpers
 {
 	public struct User2Type
@@ -11,9 +13,10 @@ namespace LuaTinker.StackHelpers
 		{
 			if (!lua.IsUserData(index))
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"expected 'UserData' but got '{lua.TypeName(index)}'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				StackHelper.TryThrowError(lua, luaTinker);
+				return default;
 			}
 			var ptr = lua.ToUserData(index);
 			return *((T*)&ptr);
@@ -23,9 +26,10 @@ namespace LuaTinker.StackHelpers
 		{
 			if (!lua.IsUserData(index))
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"expected 'UserData' but got '{lua.TypeName(index)}'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				StackHelper.TryThrowError(lua, luaTinker);
+				return default;
 			}
 			return Internal.UnsafeCastToObject(lua.ToUserData(index));
 		}
@@ -34,9 +38,10 @@ namespace LuaTinker.StackHelpers
 		{
 			if (!lua.IsUserData(index))
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"expected 'UserData' but got '{lua.TypeName(index)}'");
-				lua.Error();
+				/*let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				StackHelper.TryThrowError(lua, luaTinker);*/
+				return default;
 			}
 			Object object = Internal.UnsafeCastToObject(lua.ToUserData(index));
 			if (let wrapper = object as PointerWrapperBase)
@@ -51,32 +56,44 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
-		private static T* GetTypePtr<T>(void* ptr) where T : struct*
+		private static T* GetTypePtr<T>(Lua lua, void* ptr) where T : struct*
 		{
 			return (T*)ptr;
 		}
 
 		[Inline]
-		private static T GetTypePtr<T>(void* ptr) where T : class
+		private static T GetTypePtr<T>(Lua lua, void* ptr) where T : class
 		{
+#if DEBUG || BF_DYNAMIC_CAST_CHECK
+			let obj = Internal.UnsafeCastToObject(ptr);
+			if (let res = obj as T)
+				return res;
+#unwarn
+			let luaTinker = lua.TinkerState;
+			luaTinker.SetLastError($"expected '{typeof(T)}' but got '{obj.GetType()}'");
+			StackHelper.TryThrowError(lua, luaTinker);
+			return default;
+#else
 			return (T)Internal.UnsafeCastToObject(ptr);
+#endif
 		}
 
 		public static T GetTypePtr<T>(Lua lua, int32 index) where T : var
 		{
 			if (!lua.IsUserData(index))
 			{
-				// TODO: Defer the error handling to the original caller (Example: CallLayer or GetValue)
-				lua.PushString($"expected 'UserData' but got '{lua.TypeName(index)}'");
-				lua.Error();
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				StackHelper.TryThrowError(lua, luaTinker);
+				return default;
 			}
-			return GetTypePtr<T>(lua.ToUserData(index));
+			return GetTypePtr<T>(lua, lua.ToUserData(index));
 		}
 
 		[Inline]
 		public static T UnsafeGetTypePtr<T>(Lua lua, int32 index) where T : var
 		{
-			return GetTypePtr<T>(lua.ToUserData(index));
+			return GetTypePtr<T>(lua, lua.ToUserData(index));
 		}
 	}
 }

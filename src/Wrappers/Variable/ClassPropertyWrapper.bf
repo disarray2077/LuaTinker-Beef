@@ -37,8 +37,8 @@ namespace LuaTinker.Wrappers
 				{
 					Compiler.MixinRoot(
 						"""
-						lua.PushString("this property is write-only");
-						lua.Error();
+						lua.TinkerState.SetLastError("this property is write-only");
+						StackHelper.ThrowError(lua, lua.TinkerState);
 						""");
 				}
 				else
@@ -47,8 +47,8 @@ namespace LuaTinker.Wrappers
 						scope $$"""
 						if (!lua.IsUserData(1))
 						{
-							lua.PushString("no class at first argument. (forgot ':' expression ?)");
-							lua.Error();
+							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+							StackHelper.ThrowError(lua, lua.TinkerState);
 						}
 						
 						let instance = StackHelper.Pop!<T>(lua, 1);
@@ -72,8 +72,8 @@ namespace LuaTinker.Wrappers
 				{
 					Compiler.MixinRoot(
 						"""
-						lua.PushString("this property is read-only");
-						lua.Error();
+						lua.TinkerState.SetLastError("this property is read-only");
+						StackHelper.ThrowError(lua, lua.TinkerState);
 						""");
 				}
 				else
@@ -82,8 +82,8 @@ namespace LuaTinker.Wrappers
 						scope $$"""
 						if (!lua.IsUserData(1))
 						{
-							lua.PushString("no class at first argument. (forgot ':' expression ?)");
-							lua.Error();
+							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+							StackHelper.ThrowError(lua, lua.TinkerState);
 						}
 						
 						let instance = StackHelper.Pop!<T>(lua, 1);

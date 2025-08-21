@@ -11,6 +11,8 @@ using LuaTinker.StackHelpers;
 
 using KeraLua;
 
+using internal KeraLua;
+
 namespace LuaTinker
 {
 	public class LuaTinker
@@ -28,12 +30,22 @@ namespace LuaTinker
 			mUserdataAllocator = .(lua);
 			Init();
 
-			mTinkerState = LuaTinkerState.GetOrAdd(mLua);
+			mTinkerState = lua.TinkerState;
 		}
 
 		public ~this()
 		{
-			LuaTinkerState.Remove(mLua);
+			Debug.Assert(mLua.TinkerState == mTinkerState);
+			//Debug.Assert(mLua.GetTop() == 0);
+		}
+
+		[NoShow]
+#if !DEBUG
+		[SkipCall]
+#endif
+		public void DebugEnumStack()
+		{
+			Debug.WriteLine(StackHelper.EnumStack(mLua, .. scope .()));
 		}
 
 		private void Init()
@@ -88,28 +100,10 @@ namespace LuaTinker
 			mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
 			mLua.SetGlobal(name);
 		}
-
-		public void SetValue<TVar>(String name, TVar value)
-			where TVar : var
-		{
-			// COMPILER-BUG: Wrong method gets called! (with corrupted value)
-			//StackHelper.Push<TVar>(mLua, value);
-			StackHelper.Push(mLua, value);
-			mLua.SetGlobal(name);
-		}
-
-		public void SetValue<TVar>(String name, ref TVar value)
-			where TVar : var
-		{
-			StackHelper.Push(mLua, ref value);
-			mLua.SetGlobal(name);
-		}
 		
 		[Inline]
 		public void AutoTinkClass<T>()
-		{
-			AutoTinkClass<T, const "">();
-		}
+			=> AutoTinkClass<T, const "">();
 
 		public void AutoTinkClass<T, Name>()
 			where Name : const String
@@ -123,11 +117,13 @@ namespace LuaTinker
 
 				if (type.IsGenericParam)
 					return;
-				
+
+				bool isConstructorEmitted = false;
+
 				if (!type.IsStatic)
 				{
 					code.AppendF($"AddClass<T>(\"{Name}\");\n");
-					code.Append("AddClassCtor<T>();\n");
+					//code.Append("AddClassCtor<T>();\n");
 					code.Append("AddClassMethod<T, function T(T)>(\"self\", (self) => self);\n");
 				}
 
@@ -148,9 +144,9 @@ namespace LuaTinker
 						@methodName.Remove();
 				}
 				
-				methodLoop: for (let method in type.GetMethods(.Public))
+				methodLoop: for (let method in type.GetMethods())
 				{
-					if (method.IsConstructor || method.IsDestructor || method.Name.Contains("$") || method.IsMixin || !method.IsPublic)
+					if (method.IsDestructor || method.Name.Contains("$") || method.IsMixin || !method.IsPublic)
 						continue;
 
 					// Ignore generics
@@ -177,6 +173,19 @@ namespace LuaTinker
 					if (method.Name.StartsWith("get__") ||
 						method.Name.StartsWith("set__"))
 						continue;
+					
+					if (method.IsConstructor)
+					{
+						if (method.IsStatic)
+							continue;
+
+						if (isConstructorEmitted)
+							continue;
+
+						code.Append("AddClassCtor<T>();\n");
+						isConstructorEmitted = true;
+						continue;
+					}
 
 					if (overloads.ContainsKey(method.Name))
 					{
@@ -234,6 +243,54 @@ namespace LuaTinker
 					}
 				}
 
+				fieldLoop: for (let field in type.GetFields())
+				{
+					if (field.Name.Contains("$") || !field.IsPublic)
+						continue;
+
+					// Ignore fields from base classes.
+					if (field.DeclaringType != type)
+						continue;
+
+					if (field.IsStatic)
+						NOP!();//code.AppendF($"AddNamespaceVar(\"{type.GetFullName(.. scope .())}\");\n");
+					else
+						code.AppendF($"AddClassVar<T, const \"{field.Name}\">();\n");
+				}
+
+				Dictionary<StringView, PropertyBase> properties = scope .();
+				GetTypeProperties(type, properties);
+
+				for (let (name, info) in properties)
+				{
+					if (info.DeclaringType != type)
+						continue;
+
+					if (let indexerInfo = info as IndexerProperty)
+					{
+						if (indexerInfo.Parameters.IsEmpty || indexerInfo.Parameters.Count > 1)
+							continue;
+						code.AppendF($"AddClassIndexer<T, comptype({indexerInfo.Parameters[0].type.GetTypeId()})>();\n");
+					}
+					else if (let propertyInfo = info as NormalProperty)
+					{
+						// TODO: Static
+						if (propertyInfo.IsStatic)
+							continue;
+						switch (propertyInfo.Methods)
+						{
+						case .GetSet:
+							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, (self, value) => self.{name} = value);\n");
+						case .Get:
+							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, null);\n");
+						case .Set:
+							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", null, (self, value) => self.{name} = value);\n");
+						default:
+							Runtime.FatalError("Unexpected state");
+						}
+					}
+				}
+
 				Compiler.MixinRoot(code);
 			}
 
@@ -245,7 +302,14 @@ namespace LuaTinker
 		{
 			var name;
 			if (name.IsEmpty)
+			{
 				name = typeof(T).GetName(.. scope:: String());
+				if (let specializedType = typeof(T) as SpecializedGenericType)
+				{
+					for (int i < specializedType.GenericParamCount)
+						name.Append(specializedType.GetGenericArg(i).GetName(.. scope:: String()));
+				}
+			}
 
 			mTinkerState.SetClassName<T>(name);
 
@@ -285,7 +349,16 @@ namespace LuaTinker
 		[Inline]
 		public void AddClassCtor<T>()
 		{
-			AddClassCtor<T, void>();
+			mLua.GetGlobal(mTinkerState.GetClassName<T>());
+			if (mLua.IsTable(-1))
+			{
+				mLua.CreateTable(0, 1);
+				mLua.PushString("__call");
+				mLua.PushCClosure(=> DynamicCreatorLayer<T>, 0);
+				mLua.RawSet(-3);
+				mLua.SetMetaTable(-2);
+			}
+			mLua.Pop(1);
 		}
 
 		public void AddClassCtor<T, Args>()
@@ -305,12 +378,57 @@ namespace LuaTinker
 		public void AddClassIndexer<T, TKey>()
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!mLua.IsTable(-1))
+			{
+				mLua.Pop(1);
+				return;
+			}
+
+			mLua.PushString("__bfindexer");
+			mLua.RawGet(-2);
+
+			let existingIndexer = User2Type.GetTypePtr<IndexerWrapperBase>(mLua, -1);
+			mLua.Pop(1);
+
+			if (existingIndexer == null)
 			{
 				mLua.PushString("__bfindexer");
 				new:mUserdataAllocator IndexerWrapper<T, TKey>();
 				mLua.RawSet(-3);
 			}
+			else if (var aggregator = existingIndexer as IndexerAggregatorWrapper)
+			{
+				let indexer = new IndexerWrapper<T, TKey>();
+				sAliveObjects.Add(indexer);
+				aggregator.AddIndexer(typeof(TKey), indexer);
+			}
+			else
+			{
+				var newAggregator = new:mUserdataAllocator IndexerAggregatorWrapper();
+
+				let existingIndexerClone = existingIndexer.CreateNew();
+				let newIndexer = new IndexerWrapper<T, TKey>();
+				sAliveObjects.Add(existingIndexerClone);
+				sAliveObjects.Add(newIndexer);
+
+				newAggregator.AddIndexer(existingIndexer.KeyType, existingIndexerClone);
+				newAggregator.AddIndexer(typeof(TKey), newIndexer);
+
+				mLua.PushString("__bfindexer");
+				mLua.PushValue(-2);
+				// register destructor
+				{
+				    mLua.CreateTable(0, 1);
+				    mLua.PushString("__gc");
+				    mLua.PushCClosure(=> IndexerDestructorLayer, 0);
+				    mLua.RawSet(-3);
+				    mLua.SetMetaTable(-2);
+				}
+				mLua.RawSet(-4);
+
+				mLua.Pop(1);
+			}
+			
 			mLua.Pop(1);
 		}
 
@@ -334,7 +452,7 @@ namespace LuaTinker
 			if (mLua.IsTable(-1))
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				mLua.PushCClosure(=> CallLayer<T, const Name, false>, 0);
+				mLua.PushCClosure(=> DynamicCallLayer<T, const Name, false>, 0);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -439,11 +557,11 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		private Result<bool> FindNamespaceTable(String name)
+		private Result<bool> FindNamespaceTable(String path)
 		{
 			bool parentExists = false;
 
-			for (var ns in name.Split('.'))
+			for (var ns in path.Split('.'))
 			{
 				if (@ns.MatchIndex > 0)
 				{
@@ -485,17 +603,17 @@ namespace LuaTinker
 
 			// This will only happen if the name is empty, but this isn't legal
 			// so we just return an error.
-			Debug.Assert(name.IsEmpty);
+			Debug.Assert(path.IsEmpty);
 			return .Err;
 		}
 
-		public Result<void> AddNamespace(String name)
+		public Result<void> AddNamespace(String path)
 		{
 			bool parentExists = false;
 			bool first = true;
 			bool globalSet = false;
 
-			for (var ns in name.Split('.'))
+			for (var ns in path.Split('.'))
 			{
 				if (@ns.MatchIndex > 0)
 				{
@@ -561,7 +679,7 @@ namespace LuaTinker
 						// SetGlobal already pops the value from the stack.
 						globalSet = true;
 						defer:: {
-							mLua.SetGlobal(name.Substring(0, name.IndexOf('.')));
+							mLua.SetGlobal(path.Substring(0, path.IndexOf('.')));
 						}
 					}
 					else
@@ -592,10 +710,13 @@ namespace LuaTinker
 			return .Ok;
 		}
 
-		public void AddNamespaceEnum<E>(String namespaceName, String enumName = String.Empty)
+		public void NewTable(String path)
+			=> AddNamespace(path);
+
+		public void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty)
 			where E : enum
 		{
-			if (FindNamespaceTable(namespaceName))
+			if (FindNamespaceTable(namespacePath))
 			{
 				var enumName;
 				if (enumName.IsEmpty)
@@ -617,9 +738,9 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceMethod<F>(String namespaceName, String methodName, F func) where F : var
+		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var
 		{
-			if (FindNamespaceTable(namespaceName))
+			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(methodName);
 				mLua.PushLightUserData(func);
@@ -629,11 +750,11 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceMethod<F>(String namespaceName, String methodName, F func) where F : var, class
+		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
 		{
 			sAliveObjects.Add(func);
 
-			if (FindNamespaceTable(namespaceName))
+			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(methodName);
 				new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
@@ -651,22 +772,22 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceMethod<T, Name>(String namespaceName, String name = "")
+		public void AddNamespaceMethod<T, Name>(String namespacePath, String name = "")
 			where Name : const String
 		{
-			if (FindNamespaceTable(namespaceName))
+			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				mLua.PushCClosure(=> CallLayer<T, const Name, true>, 0);
+				mLua.PushCClosure(=> DynamicCallLayer<T, const Name, true>, 0);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceVar<TVar>(String namespaceName, String varName, TVar value)
+		public void AddNamespaceVar<TVar>(String namespacePath, String varName, TVar value)
 			where TVar : var
 		{
-			if (FindNamespaceTable(namespaceName))
+			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(varName);
 				StackHelper.Push(mLua, value);
@@ -675,10 +796,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceVar<TVar>(String namespaceName, String varName, ref TVar value)
+		public void AddNamespaceVar<TVar>(String namespacePath, String varName, ref TVar value)
 			where TVar : var
 		{
-			if (FindNamespaceTable(namespaceName))
+			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(varName);
 				StackHelper.Push(mLua, ref value);
@@ -686,16 +807,23 @@ namespace LuaTinker
 			}
 			mLua.Pop(1);
 		}
+
+		private mixin TryTinker(var val)
+		{
+			if (mTinkerState.HasError)
+				return .Err(mTinkerState.GetLastError());
+			val
+		}
 		
 		[Inline]
-		public Result<void> Call(StringView name)
+		public Result<void, StringView> Call(StringView name)
 			=> Call<void, void>(name, default);
 		
 		[Inline]
-		public Result<RVal> Call<RVal>(StringView name)
+		public Result<RVal, StringView> Call<RVal>(StringView name)
 			=> Call<RVal, void>(name, default);
 
-		public Result<RVal> Call<RVal, Args>(StringView name, Args args)
+		public Result<RVal, StringView> Call<RVal, Args>(StringView name, Args args)
 			where RVal : var
 			where Args : var
 		{
@@ -724,24 +852,28 @@ namespace LuaTinker
 
 			Debug.Assert(mLua.GetTop() == 0);
 			const int32 results = typeof(RVal) == typeof(void) ? 0 : 1;
+			mTinkerState.ClearError();
 			
 			mLua.GetGlobal(name);
 			if (mLua.IsFunction(-1))
 			{
 				int argc = EmitCallPushes<Args>();
-				mLua.Call((.)argc, results);
+				if (mLua.PCall((.)argc, results, 0) != .OK)
+				{
+					mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
+					return .Err(mTinkerState.GetLastError());
+				}
 			}
 			else
 			{
-				//mLua.PushString("attempt to call global '{}' (not a function)", name);
-				//mLua.Error();
-				return .Err; // TODO: More informative errors
+				mTinkerState.SetLastError($"attempt to call global '{name}' (not a function)");
+				return .Err(mTinkerState.GetLastError());
 			}
 
 			if (results == 1)
 			{
 				defer mLua.Pop(1);
-				return .Ok(StackHelper.Pop<RVal>(mLua, -1));
+				return .Ok(TryTinker!(StackHelper.Pop<RVal>(mLua, -1)));
 			}
 
 			// TODO: Support for tuples
@@ -751,36 +883,151 @@ namespace LuaTinker
 			return .Ok(default);
 		}
 
-		// TODO: Return reference
-		public Result<T> GetValue<T>(StringView name) where T : var
+		private bool FindAndPushParentTable(StringView path, out StringView finalKey)
 		{
-			Debug.Assert(mLua.GetTop() == 0);
+			int lastDot = path.LastIndexOf('.');
+			if (lastDot == -1)
+			{
+				finalKey = path;
+				return true;
+			}
 
-			mLua.GetGlobal(name);
-			if (mLua.IsNil(-1) || !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
-				return .Err; // TODO: More informative errors
+			finalKey = path.Substring(lastDot + 1);
+			var tablePath = path.Substring(0, lastDot);
 
-			defer mLua.Pop(1);
-			return .Ok(StackHelper.Pop<T>(mLua, -1));
+			bool first = true;
+			for (var segment in tablePath.Split('.'))
+			{
+				if (first)
+				{
+					mLua.GetGlobal(segment);
+					first = false;
+				}
+				else
+				{
+					mLua.PushString(segment);
+					mLua.GetTable(-2);
+					mLua.Remove(-2);
+				}
+
+				if (!mLua.IsTable(-1))
+				{
+					mLua.Pop(1);
+					return false;
+				}
+			}
+
+			return true;
 		}
 
-		[Error("Use the \"GetString\" method instead, or get a StringView if you doesn't need a String instance")]
-		public Result<T> GetValue<T>(StringView name) where T : String
+		// TODO: Return reference
+		public Result<T, StringView> GetValue<T>(StringView name) where T : var
+		{
+			Debug.Assert(mLua.GetTop() == 0);
+			mTinkerState.ClearError();
+
+			mLua.GetGlobal(name);
+			defer mLua.Pop(1);
+
+			if (mLua.IsNil(-1) || !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			{
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				return .Err(mTinkerState.GetLastError());
+			}
+
+			return .Ok(TryTinker!(StackHelper.Pop<T>(mLua, -1)));
+		}
+
+		public Result<T, StringView> GetValue<T>(StringView name) where T : class
+		{
+			Debug.Assert(mLua.GetTop() == 0);
+			mTinkerState.ClearError();
+
+			mLua.GetGlobal(name);
+			defer mLua.Pop(1);
+
+			if (!mLua.IsNil(-1) && !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			{
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				return .Err(mTinkerState.GetLastError());
+			}
+
+			return .Ok(TryTinker!(StackHelper.Pop<T>(mLua, -1)));
+		}
+
+		public Result<T, StringView> GetValue<T>(StringView name) where T : struct*
+		{
+			Debug.Assert(mLua.GetTop() == 0);
+			mTinkerState.ClearError();
+
+			mLua.GetGlobal(name);
+			defer mLua.Pop(1);
+
+			if (!mLua.IsNil(-1) && !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			{
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				return .Err(mTinkerState.GetLastError());
+			}
+
+			return .Ok(TryTinker!(StackHelper.Pop<T>(mLua, -1)));
+		}
+
+		[Error("Use the \"GetString\" mixin instead, or get a StringView if you don't need a String instance")]
+		public Result<T, StringView> GetValue<T>(StringView name) where T : String where String : T
 		{
 			Runtime.NotImplemented();
 		}
 
-		public Result<void> GetString(StringView name, String outString)
+		public mixin GetString(StringView name)
 		{
 			Debug.Assert(mLua.GetTop() == 0);
+			mTinkerState.ClearError();
+			Result<String, StringView> result;
 
 			mLua.GetGlobal(name);
-			if (mLua.IsNil(-1))
-				return .Err; // TODO: More informative errors
+			defer mLua.Pop(1);
 
-			outString.Append(StackHelper.Pop<StringView>(mLua, -1));
-			mLua.Pop(1);
-			return .Ok;
+			if (mLua.IsNil(-1))
+			{
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to 'System.String'");
+				result = .Err(mTinkerState.GetLastError());
+			}
+			else
+			{
+				result = .Ok(StackHelper.Pop!:mixin<String>(mLua, -1));
+				if (mTinkerState.HasError)
+					result = .Err(mTinkerState.GetLastError());
+			}
+
+			result
 		}
+
+		[Inline]
+		public Result<double, StringView> GetNumber(StringView name)
+			=> GetValue<double>(name);
+
+		public void SetValue<TVar>(StringView name, TVar value)
+			where TVar : var
+		{
+			// COMPILER-BUG: Wrong method gets called! (with corrupted value)
+			//StackHelper.Push<TVar>(mLua, value);
+			StackHelper.Push(mLua, value);
+			mLua.SetGlobal(name);
+		}
+
+		public void SetValue<TVar>(StringView name, ref TVar value)
+			where TVar : var
+		{
+			StackHelper.Push(mLua, ref value);
+			mLua.SetGlobal(name);
+		}
+		
+		[Inline]
+		public void SetString(StringView name, String value)
+			=> SetValue<String>(name, value);
+
+		[Inline]
+		public void SetNumber(StringView name, double number)
+			=> SetValue(name, number);
 	}
 }

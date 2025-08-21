@@ -22,6 +22,8 @@ namespace LuaTinker.Wrappers
 			AssertValid();
 		}
 
+		public override Type KeyType => typeof(TKey);
+
 		public override void Get(Lua lua)
 		{
 			[Comptime]
@@ -50,8 +52,8 @@ namespace LuaTinker.Wrappers
 				{
 					Compiler.MixinRoot(
 						"""
-						lua.PushString("this indexer is write-only");
-						lua.Error();
+						lua.TinkerState.SetLastError("this indexer is write-only");
+						StackHelper.ThrowError(lua, lua.TinkerState);
 						""");
 				}
 				else
@@ -60,8 +62,8 @@ namespace LuaTinker.Wrappers
 						$$"""
 						if (!lua.IsUserData(1))
 						{
-							lua.PushString("no class at first argument. (forgot ':' expression ?)");
-							lua.Error();
+							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+							StackHelper.ThrowError(lua, lua.TinkerState);
 						}
 
 						let instance = User2Type.GetTypeDirect<ClassInstanceWrapper<T>>(lua, 1).ClassInstance;
@@ -102,8 +104,8 @@ namespace LuaTinker.Wrappers
 				{
 					Compiler.MixinRoot(
 						"""
-						lua.PushString("this indexer is read-only");
-						lua.Error();
+						lua.TinkerState.SetLastError("this indexer is read-only");
+						StackHelper.ThrowError(lua, lua.TinkerState);
 						""");
 				}
 				else
@@ -112,8 +114,8 @@ namespace LuaTinker.Wrappers
 						$$"""
 						if (!lua.IsUserData(1))
 						{
-							lua.PushString("no class at first argument. (forgot ':' expression ?)");
-							lua.Error();
+							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+							StackHelper.ThrowError(lua, lua.TinkerState);
 						}
 						
 						let instance = User2Type.GetTypeDirect<ClassInstanceWrapper<T>>(lua, 1).ClassInstance;
@@ -123,6 +125,11 @@ namespace LuaTinker.Wrappers
 			}
 	
 			Emit();
+		}
+
+		public override IndexerWrapperBase CreateNew()
+		{
+			return new IndexerWrapper<T, TKey>();
 		}
 	}
 }
