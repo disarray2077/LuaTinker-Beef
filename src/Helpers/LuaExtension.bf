@@ -9,6 +9,7 @@ namespace KeraLua
 		internal LuaTinkerState TinkerState = new .() ~ DeleteAndNullify!(_);
 		private static int __counter = 0;
 
+        /// Calls a function in protected mode.
         public new LuaStatus PCall(int32 arguments, int32 results, int32 errorFunctionIndex)
         {
 			TinkerState.ClearError();
@@ -24,6 +25,7 @@ namespace KeraLua
             return [NoExtension]PCall(arguments, results, errorFunctionIndex);
         }
 
+		/// This function behaves exactly like lua_pcall, but allows the called function to yield.
         public new LuaStatus PCallK(int32 arguments,
             int32 results,
             int32 errorFunctionIndex,
@@ -43,21 +45,25 @@ namespace KeraLua
             return [NoExtension]PCallK(arguments, results, errorFunctionIndex, context, k);
         }
 
+		/// Loads and runs the given file.
 		public new bool DoFile(StringView file)
 		{
 		    bool hasError = LoadFile(file) != LuaStatus.OK || PCall(0, -1, 0) != LuaStatus.OK;
 		    return hasError;
 		}
 
-		public new bool DoString(StringView file)
+		/// Loads and runs the given string.
+		public new bool DoString(StringView chunk)
 		{
-		    bool hasError = LoadString(file) != LuaStatus.OK || PCall(0, -1, 0) != LuaStatus.OK;
+		    bool hasError = LoadString(chunk) != LuaStatus.OK || PCall(0, -1, 0) != LuaStatus.OK;
 		    return hasError;
 		}
 
-		public bool DoString(StringView file, StringView name)
+		/// Loads and runs the given string.
+		/// @param name The chunk name used in error messages. 
+		public bool DoString(StringView chunk, StringView name)
 		{
-		    bool hasError = LoadString(file, name) != LuaStatus.OK || PCall(0, -1, 0) != LuaStatus.OK;
+		    bool hasError = LoadString(chunk, name) != LuaStatus.OK || PCall(0, -1, 0) != LuaStatus.OK;
 		    return hasError;
 		}
 

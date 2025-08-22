@@ -5,7 +5,9 @@ namespace KeraLua;
 
 extension Lua
 {
-	[Inline]
+	/// Similar to GetTable, but does a raw access (i.e., without metamethods).
+    /// @return Returns the type of the pushed value
+    [Inline]
 	public new LuaType RawGet(int32 index)
 	{
 		[Comptime]

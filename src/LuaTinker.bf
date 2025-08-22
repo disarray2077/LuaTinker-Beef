@@ -21,6 +21,8 @@ namespace LuaTinker
 		private LuaUserdataAllocator mUserdataAllocator;
 		private LuaTinkerState mTinkerState;
 
+		/// Initializes a new instance of the LuaTinker class.
+		/// @param lua The KeraLua state to wrap.
 		public this(Lua lua)
 		{
 			mLua = lua;
@@ -34,13 +36,15 @@ namespace LuaTinker
 		{
 			Debug.Assert(mLua.TinkerState == mTinkerState);
 			//Debug.Assert(mLua.GetTop() == 0);
+#if TEST
+			GC.Collect(false);
+#endif
 		}
 
-		[NoShow]
 #if !DEBUG
 		[SkipCall]
 #endif
-		public void DebugEnumStack()
+		internal void DebugEnumStack()
 		{
 			Debug.WriteLine(StackHelper.EnumStack(mLua, .. scope .()));
 		}
@@ -55,6 +59,9 @@ namespace LuaTinker
 			mLua.SetGlobal("__onlygc_meta");
 		}
 
+		/// Registers an enumeration type in the Lua global scope.
+		/// Creates a Lua table where keys are the enum member names and values are their integer equivalents.
+		/// @param name The name to use for the enum table in Lua. If empty, the type's name is used.
 		public void AddEnum<E>(String name = String.Empty)
 			where E : enum
 		{
@@ -74,6 +81,9 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 
+		/// Registers a function pointer as a global function in Lua.
+		/// @param name The name of the function in the Lua global scope.
+		/// @param func The function to register.
 		public void AddMethod<F>(String name, F func) where F : var, struct
 		{
 			mLua.PushLightUserData(func);
@@ -81,6 +91,9 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 
+		/// Registers a delegate as a global function in Lua.
+		/// @param name The name of the function in the Lua global scope.
+		/// @param func The delegate instance to register.
 		public void AddMethod<F>(String name, F func) where F : var, class
 		{
 			mTinkerState.RegisterAliveObject(func);
@@ -98,10 +111,14 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 		
+		/// Automatically binds a Beef class to Lua using its type name.
 		[Inline]
 		public void AutoTinkClass<T>()
 			=> AutoTinkClass<T, const "">();
 
+		/// Automatically binds a Beef class to Lua using compile-time reflection.
+		/// This function generates bindings for public constructors, methods, fields, properties, and indexers.
+		/// @where Name A compile-time string specifying the class name in Lua. If empty, the type's name is used.
 		public void AutoTinkClass<T, Name>()
 			where Name : const String
 		{
@@ -295,6 +312,9 @@ namespace LuaTinker
 			EmitAutoTinkClass<T, const Name>();
 		}
 
+		/// Registers a Beef class type in Lua.
+		/// This creates a global table that will serve as the metatable for instances of this class.
+		/// @param name The name to use for the class in Lua. If empty, the type's name is used.
 		public void AddClass<T>(String name = String.Empty)
 		{
 			var name;
@@ -331,6 +351,9 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 
+		/// Establishes an inheritance relationship between two registered classes in Lua.
+		/// @where T The child class type.
+		/// @where P The parent class type.
 		public void AddClassParent<T, P>()
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
@@ -343,7 +366,8 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		[Inline]
+		/// Binds the constructors of a class, making the class table callable in Lua to create new instances.
+		/// This version dynamically finds a matching constructor at runtime.
 		public void AddClassCtor<T>()
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
@@ -358,6 +382,8 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a specific constructor of a class, making the class table callable in Lua.
+		/// @where Args A single argument type or a tuple representing the constructor's argument types.
 		public void AddClassCtor<T, Args>()
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
@@ -372,6 +398,9 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds an indexer (e.g., `obj[key]`) for a class.
+		/// This allows accessing class indexers from Lua using standard table syntax.
+		/// @where TKey The key type of the indexer.
 		public void AddClassIndexer<T, TKey>()
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
@@ -429,7 +458,12 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddClassMethod<T, F>(String name, F func) where F : var
+		/// Binds a function pointer as a method on a registered class.
+		/// @where T The class type.
+		/// @where F The function's type.
+		/// @param name The name of the method in Lua.
+		/// @param func The function pointer to bind.
+		public void AddClassMethod<T, F>(String name, F func) where F : var, struct
 		{
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
@@ -442,6 +476,9 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a method by its name to a registered class.
+		/// This version dynamically resolves overloads at runtime.
+		/// @param name The name of the method in Lua.
 		public void AddClassMethod<T, Name>(String name = "")
 			where Name : const String
 		{
@@ -455,6 +492,8 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a field by its name to a registered class.
+		/// @param name The name of the field in Lua.
 		public void AddClassVar<T, Name>(String name = "")
 			where Name : const String
 		{
@@ -489,6 +528,8 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a property by its name to a registered class.
+		/// @param name The name of the property in Lua.
 		public void AddClassProperty<T, Name>(String name = "")
 			where Name : const String
 		{
@@ -502,11 +543,17 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 		
+		/// Binds a property to a class using explicit getter and setter delegates.
+		/// @param name The name of the property in Lua.
+		/// @param getter The getter delegate. Can be null for a write-only property.
+		/// @param setter The setter delegate. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar, TGet, TSet>(String name, TGet getter, TSet setter)
 			where TGet : class, delegate TVar(T)
 			where TSet : class, delegate void(T, TVar)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			Debug.AssertNotStack(getter);
+			Debug.AssertNotStack(setter);
 			mTinkerState.RegisterAliveObject(getter);
 			mTinkerState.RegisterAliveObject(setter);
 
@@ -528,6 +575,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a property to a class using explicit getter and setter function pointers.
+		// @param name The name of the property in Lua.
+		/// @param getter The getter function. Can be null for a write-only property.
+		/// @param setter The setter function. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar>(String name, function TVar(T) getter, function void(T, TVar) setter)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
@@ -541,6 +592,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a property to a class using explicit getter and setter function pointers (with 'this' syntax).
+		/// @param name The name of the property in Lua.
+		/// @param getter The getter function. Can be null for a write-only property.
+		/// @param setter The setter function. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar>(String name, function TVar(T this) getter, function void(T this, TVar) setter)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
@@ -554,6 +609,9 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Finds a Lua table corresponding to a namespace path and pushes it onto the stack.
+		/// @param path A dot-separated namespace path (e.g., "MyLib.Utils").
+		/// @return A result indicating whether the table was found and pushed successfully.
 		private Result<bool> FindNamespaceTable(String path)
 		{
 			bool parentExists = false;
@@ -604,7 +662,10 @@ namespace LuaTinker
 			return .Err;
 		}
 
-		public Result<void> AddNamespace(String path)
+		/// Ensures a namespace (a nested table structure) exists in Lua. Creates it if it doesn't.
+		/// @param path A dot-separated namespace path (e.g., "MyLib.Utils").
+		/// @return True if the table was created, otherwise false.
+		public bool AddNamespace(String path)
 		{
 			bool parentExists = false;
 			bool first = true;
@@ -637,7 +698,7 @@ namespace LuaTinker
 					{
 						// The namespace we want to add already exists.
 						mLua.Pop(1);
-						return .Ok;
+						return false;
 					}
 
 					parentExists = true;
@@ -647,7 +708,7 @@ namespace LuaTinker
 				{
 					// This value isn't a table and isn't nil, so there's nothing that we can do.
 					mLua.Pop(1);
-					return .Err;
+					return false;
 				}
 
 				mLua.Pop(1);
@@ -704,12 +765,17 @@ namespace LuaTinker
 				}
 			}
 
-			return .Ok;
+			return true;
 		}
 
+		/// Creates a new nested table in Lua.
+		/// @param path A dot-separated path for the table.
 		public void NewTable(String path)
 			=> AddNamespace(path);
 
+		/// Registers an enumeration type within a specified Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param enumName The name for the enum table in Lua. If empty, the type's name is used.
 		public void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty)
 			where E : enum
 		{
@@ -735,7 +801,11 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var
+		/// Binds a function pointer as a method within a specified Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param methodName The name of the function in the namespace.
+		/// @param func The function to bind.
+		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, struct
 		{
 			if (FindNamespaceTable(namespacePath))
 			{
@@ -747,6 +817,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a delegate as a method within a specified Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param methodName The name of the function in the namespace.
+		/// @param func The delegate to bind.
 		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
 		{
 			mTinkerState.RegisterAliveObject(func);
@@ -769,6 +843,9 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a static method by its name into a specified Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param name The name of the method in Lua.
 		public void AddNamespaceMethod<T, Name>(String namespacePath, String name = "")
 			where Name : const String
 		{
@@ -781,6 +858,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Adds a variable by value to a specified Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param varName The name of the variable.
+		/// @param value The value to set.
 		public void AddNamespaceVar<TVar>(String namespacePath, String varName, TVar value)
 			where TVar : var
 		{
@@ -793,6 +874,10 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Adds a variable by reference to a specified Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param varName The name of the variable.
+		/// @param value A reference to the value to set.
 		public void AddNamespaceVar<TVar>(String namespacePath, String varName, ref TVar value)
 			where TVar : var
 		{
@@ -805,6 +890,9 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// A mixin that checks for a LuaTinker error and propagates it.
+		/// @param val The value to return if there is no error.
+		/// @return An error result if an error exists, otherwise the input value.
 		private mixin TryTinker(var val)
 		{
 			if (mTinkerState.HasError)
@@ -812,14 +900,27 @@ namespace LuaTinker
 			val
 		}
 		
+		/// Calls a global Lua function with no arguments and expects no return value.
+		/// @param name The name of the global Lua function to call.
+		/// @return A result indicating success or an error message.
 		[Inline]
 		public Result<void, StringView> Call(StringView name)
 			=> Call<void, void>(name, default);
 		
+		/// Calls a global Lua function with no arguments and expects a single return value.
+		/// @where RVal The expected return type.
+		/// @param name The name of the global Lua function to call.
+		/// @return A result containing the return value or an error message.
 		[Inline]
 		public Result<RVal, StringView> Call<RVal>(StringView name)
 			=> Call<RVal, void>(name, default);
 
+		/// Calls a global Lua function with arguments and expects a return value.
+		/// @where RVal The expected return type. Use `void` for no return value.
+		/// @where Args The type of the arguments. Can be a single value or a tuple for multiple arguments.
+		/// @param name The name of the global Lua function to call.
+		/// @param args The arguments to pass to the Lua function. Can be a single value or a tuple for multiple arguments.
+		/// @return A result containing the return value or an error message.
 		public Result<RVal, StringView> Call<RVal, Args>(StringView name, Args args)
 			where RVal : var
 			where Args : var
@@ -880,6 +981,10 @@ namespace LuaTinker
 			return .Ok(default);
 		}
 
+		/// Finds and pushes the parent table of a dot-separated path onto the Lua stack.
+		/// @param path The full path to the variable.
+		/// @param finalKey An out parameter that will contain the final key in the path.
+		/// @return True if the parent table was found and pushed, false otherwise.
 		private bool FindAndPushParentTable(StringView path, out StringView finalKey)
 		{
 			int lastDot = path.LastIndexOf('.');
@@ -917,7 +1022,9 @@ namespace LuaTinker
 			return true;
 		}
 
-		// TODO: Return reference
+		/// Gets the value of a global Lua variable.
+		/// @param name The name of the global variable.
+		/// @return A result containing the value or an error message.
 		public Result<T, StringView> GetValue<T>(StringView name) where T : var
 		{
 			Debug.Assert(mLua.GetTop() == 0);
@@ -935,6 +1042,9 @@ namespace LuaTinker
 			return .Ok(TryTinker!(StackHelper.Pop<T>(mLua, -1)));
 		}
 
+		/// Gets the value of a global Lua variable.
+		/// @param name The name of the global variable.
+		/// @return A result containing the value or an error message.
 		public Result<T, StringView> GetValue<T>(StringView name) where T : class
 		{
 			Debug.Assert(mLua.GetTop() == 0);
@@ -952,6 +1062,9 @@ namespace LuaTinker
 			return .Ok(TryTinker!(StackHelper.Pop<T>(mLua, -1)));
 		}
 
+		/// Gets the value of a global Lua variable.
+		/// @param name The name of the global variable.
+		/// @return A result containing the value or an error message.
 		public Result<T, StringView> GetValue<T>(StringView name) where T : struct*
 		{
 			Debug.Assert(mLua.GetTop() == 0);
@@ -975,6 +1088,9 @@ namespace LuaTinker
 			Runtime.NotImplemented();
 		}
 
+		/// Gets the value of a global Lua variable as a String.
+		/// This mixin will allocate a String in the stack if necessary, and returns a `Result<String, StringView>`.
+		/// @param name The name of the global variable.
 		public mixin GetString(StringView name)
 		{
 			Debug.Assert(mLua.GetTop() == 0);
@@ -999,10 +1115,16 @@ namespace LuaTinker
 			result
 		}
 
+		/// Gets the value of a global Lua variable as a number (double).
+		/// @param name The name of the global variable.
+		/// @return A result containing the double value or an error message.
 		[Inline]
 		public Result<double, StringView> GetNumber(StringView name)
 			=> GetValue<double>(name);
 
+		/// Sets the value of a global Lua variable.
+		/// @param name The name of the global variable.
+		/// @param value The value to set.
 		public void SetValue<TVar>(StringView name, TVar value)
 			where TVar : var
 		{
@@ -1012,6 +1134,9 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 
+		/// Sets the value of a global Lua variable by reference.
+		/// @param name The name of the global variable.
+		/// @param value A reference to the value to set.
 		public void SetValue<TVar>(StringView name, ref TVar value)
 			where TVar : var
 		{
@@ -1019,10 +1144,16 @@ namespace LuaTinker
 			mLua.SetGlobal(name);
 		}
 		
+		/// Sets the value of a global Lua variable to a string.
+		/// @param name The name of the global variable.
+		/// @param value The string value to set.
 		[Inline]
 		public void SetString(StringView name, String value)
 			=> SetValue<String>(name, value);
 
+		/// Sets the value of a global Lua variable to a number.
+		/// @param name The name of the global variable.
+		/// @param number The double value to set.
 		[Inline]
 		public void SetNumber(StringView name, double number)
 			=> SetValue(name, number);
