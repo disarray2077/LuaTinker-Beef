@@ -38,6 +38,11 @@ namespace LuaTinker.Wrappers
 			obj = new:allocator box *ValuePointer;
 			return .NewObject;
 		}
+
+		public override void ToString(String strBuffer)
+		{
+			ValuePointer.ToString(strBuffer);
+		}
 	}
 
 	extension ValuePointerWrapper<T>

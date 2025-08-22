@@ -19,5 +19,10 @@ namespace LuaTinker.Wrappers
 			obj = null;
 			return .Error;
 		}
+
+		public override void ToString(String strBuffer)
+		{
+			Ptr.ToString(strBuffer);
+		}
 	}
 }

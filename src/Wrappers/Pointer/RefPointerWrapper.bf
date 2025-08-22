@@ -13,6 +13,11 @@ namespace LuaTinker.Wrappers
 		}
 
 		public override Type Type => typeof(T);
+
+		public override void ToString(String strBuffer)
+		{
+			Reference.ToString(strBuffer);
+		}
 	}
 
 	extension RefPointerWrapper<T>

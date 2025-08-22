@@ -76,7 +76,7 @@ namespace LuaTinker.StackHelpers
 			where T : struct
 		{
 			// register destructor
-			lua.GetGlobal("__onlygc_meta");
+			lua.GetGlobal("__noreg_meta");
 			Debug.Assert(lua.Type(-1) == .Table, "UserData GC isn't registered!");
 			lua.SetMetaTable(-2);
 		}

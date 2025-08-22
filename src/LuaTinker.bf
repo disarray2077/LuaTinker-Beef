@@ -52,11 +52,14 @@ namespace LuaTinker
 		private void Init()
 		{
 			// Add GC Mate
-			mLua.CreateTable(0, 1);
+			mLua.CreateTable(0, 2);
 			mLua.PushString("__gc");
 			mLua.PushCClosure(=> PointerDestructorLayer, 0);
 			mLua.RawSet(-3);
-			mLua.SetGlobal("__onlygc_meta");
+			mLua.PushString("__tostring");
+			mLua.PushCClosure(=> PointerToStringLayer, 0);
+			mLua.RawSet(-3);
+			mLua.SetGlobal("__noreg_meta");
 		}
 
 		/// Registers an enumeration type in the Lua global scope.
@@ -96,15 +99,19 @@ namespace LuaTinker
 		/// @param func The delegate instance to register.
 		public void AddMethod<F>(String name, F func) where F : var, class
 		{
+			Debug.AssertNotStack(func);
 			mTinkerState.RegisterAliveObject(func);
 
 			new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
 			// register destructor
 			{
-			    mLua.CreateTable(0, 1);
+			    mLua.CreateTable(0, 2);
 			    mLua.PushString("__gc");
 			    mLua.PushCClosure(=> PointerDestructorLayer, 0);
 			    mLua.RawSet(-3);
+				mLua.PushString("__tostring");
+				mLua.PushCClosure(=> PointerToStringLayer, 0);
+				mLua.RawSet(-3);
 			    mLua.SetMetaTable(-2);
 			}
 			mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
@@ -126,18 +133,17 @@ namespace LuaTinker
 			static void EmitAutoTinkClass<T, Name>()
 				where Name : const String
 			{
-				let code = scope String();
 				let type = typeof(T);
-
 				if (type.IsGenericParam)
 					return;
+
+				let code = scope String();
 
 				bool isConstructorEmitted = false;
 
 				if (!type.IsStatic)
 				{
 					code.AppendF($"AddClass<T>(\"{Name}\");\n");
-					//code.Append("AddClassCtor<T>();\n");
 					code.Append("AddClassMethod<T, function T(T)>(\"self\", (self) => self);\n");
 				}
 
@@ -190,7 +196,7 @@ namespace LuaTinker
 					
 					if (method.IsConstructor)
 					{
-						if (method.IsStatic)
+						if (method.IsStatic || type.IsAbstract)
 							continue;
 
 						if (isConstructorEmitted)
@@ -308,6 +314,36 @@ namespace LuaTinker
 				Compiler.MixinRoot(code);
 			}
 
+			/*
+			[Comptime]
+			static void Emit<T>()
+			{
+				if (typeof(T).IsGenericParam)
+					return;
+
+				String code = scope .();
+
+				List<Type> inheritanceChain = scope .();
+				for (var type = typeof(T); type != typeof(Object) && type != null; type = type.BaseType)
+					inheritanceChain.Add(type);
+
+				for (let type in inheritanceChain.Reversed)
+				{
+					if (type != typeof(T))
+					{
+						code.AppendF(
+							$"""
+							if (!mTinkerState.IsClassRegistered<comptype({type.GetTypeId()})>())
+								AutoTinkClass<comptype({type.GetTypeId()})>();\n
+							""");
+					}
+				}
+
+				code.Append("EmitAutoTinkClass<T, const Name>();");
+				Compiler.MixinRoot(code);
+			}
+			*/
+
 #unwarn
 			EmitAutoTinkClass<T, const Name>();
 		}
@@ -330,7 +366,7 @@ namespace LuaTinker
 
 			mTinkerState.SetClassName<T>(name);
 
-			mLua.CreateTable(0, 4);
+			mLua.CreateTable(0, 5);
 
 			mLua.PushString("__name");
 			mLua.PushString(name);
@@ -346,6 +382,10 @@ namespace LuaTinker
 
 			mLua.PushString("__gc");
 			mLua.PushCClosure(=> PointerDestructorLayer, 0);
+			mLua.RawSet(-3);
+
+			mLua.PushString("__tostring");
+			mLua.PushCClosure(=> PointerToStringLayer, 0);
 			mLua.RawSet(-3);
 
 			mLua.SetGlobal(name);
@@ -373,9 +413,12 @@ namespace LuaTinker
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
-				mLua.CreateTable(0, 1);
+				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
 				mLua.PushCClosure(=> DynamicCreatorLayer<T>, 0);
+				mLua.RawSet(-3);
+				mLua.PushString("__tostring");
+				mLua.PushCClosure(=> ConstructorToStringLayer<T>, 0);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -389,9 +432,12 @@ namespace LuaTinker
 			mLua.GetGlobal(mTinkerState.GetClassName<T>());
 			if (mLua.IsTable(-1))
 			{
-				mLua.CreateTable(0, 1);
+				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
 				mLua.PushCClosure(=> CreatorLayer<T, Args>, 0);
+				mLua.RawSet(-3);
+				mLua.PushString("__tostring");
+				mLua.PushCClosure(=> ConstructorToStringLayer<T>, 0);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -831,10 +877,13 @@ namespace LuaTinker
 				new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
 				// register destructor
 				{
-				    mLua.CreateTable(0, 1);
+				    mLua.CreateTable(0, 2);
 				    mLua.PushString("__gc");
 				    mLua.PushCClosure(=> PointerDestructorLayer, 0);
 				    mLua.RawSet(-3);
+					mLua.PushString("__tostring");
+					mLua.PushCClosure(=> PointerToStringLayer, 0);
+					mLua.RawSet(-3);
 				    mLua.SetMetaTable(-2);
 				}
 				mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
