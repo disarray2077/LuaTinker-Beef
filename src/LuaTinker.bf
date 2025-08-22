@@ -373,11 +373,11 @@ namespace LuaTinker
 			mLua.RawSet(-3);
 
 			mLua.PushString("__index");
-			mLua.PushCClosure(=> MetaGetLayer, 0);
+			mLua.PushCClosure(=> GetIndexLayer, 0);
 			mLua.RawSet(-3);
 
 			mLua.PushString("__newindex");
-			mLua.PushCClosure(=> MetaSetLayer, 0);
+			mLua.PushCClosure(=> SetIndexLayer, 0);
 			mLua.RawSet(-3);
 
 			mLua.PushString("__gc");
@@ -769,11 +769,11 @@ namespace LuaTinker
 				mLua.RawSet(-3);
 
 				mLua.PushString("__index");
-				mLua.PushCClosure(=> MetaGetLayer, 0);
+				mLua.PushCClosure(=> GetIndexLayer, 0);
 				mLua.RawSet(-3);
 
 				mLua.PushString("__newindex");
-				mLua.PushCClosure(=> MetaSetLayer, 0);
+				mLua.PushCClosure(=> SetIndexLayer, 0);
 				mLua.RawSet(-3);
 
 				if (@ns.MatchIndex == 0)
