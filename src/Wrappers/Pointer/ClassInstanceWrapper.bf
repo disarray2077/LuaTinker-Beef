@@ -37,9 +37,9 @@ namespace LuaTinker.Wrappers
 
 		private void InternalSet(T obj)
 		{
-			GC.Mark!(obj);
 			ClassInstance = obj;
 			OwnsPointer = true;
+			mReadOnlyPtr = true;
 		}
 		
 		/*
@@ -133,9 +133,19 @@ namespace LuaTinker.Wrappers
 			obj = ClassInstance;
 			return .Object;
 		}
-		
 
-		public override void OnRemoveFromLua(LuaTinkerState tinkerState)
+		public override void ToString(String strBuffer)
+		{
+			ClassInstance.ToString(strBuffer);
+		}
+
+		public override void OnAddedToLua(LuaTinkerState tinkerState)
+		{
+			if (OwnsPointer)
+				tinkerState.RegisterAliveObject(ClassInstance);
+		}
+
+		public override void OnRemovedFromLua(LuaTinkerState tinkerState)
 		{
 			if (OwnsPointer)
 				tinkerState.DeregisterAliveObject(ClassInstance);

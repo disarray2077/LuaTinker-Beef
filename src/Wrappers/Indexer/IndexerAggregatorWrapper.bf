@@ -119,7 +119,7 @@ namespace LuaTinker.Wrappers
 			Runtime.NotImplemented();
 		}
 
-		public override void OnRemoveFromLua(LuaTinkerState tinkerState)
+		public override void OnRemovedFromLua(LuaTinkerState tinkerState)
 		{
 			for (let indexer in mIndexers)
 				tinkerState.DeregisterAliveObject(indexer.Instance);

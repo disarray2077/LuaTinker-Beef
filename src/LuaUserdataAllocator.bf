@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using KeraLua;
 
+using internal KeraLua;
+
 namespace LuaTinker
 {
 	public struct LuaUserdataAllocator : IRawAllocator

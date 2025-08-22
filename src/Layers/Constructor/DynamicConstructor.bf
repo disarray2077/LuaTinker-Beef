@@ -118,7 +118,8 @@ namespace LuaTinker.Layers
 				code.Append("params extraArgs");
 
 			code.Append(");\n");
-
+			
+			code.AppendF($"{depthCode}lua.TinkerState.RegisterAliveObject(wrapper);\n");
 			code.AppendF($"{depthCode}lua.GetGlobal(lua.TinkerState.GetClassName<T>());\n");
 			code.AppendF($"{depthCode}lua.SetMetaTable(-2);\n");
 

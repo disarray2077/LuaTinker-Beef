@@ -21,6 +21,7 @@ namespace LuaTinker.Wrappers
 			get => mPtr;
 			protected set
 			{
+				Runtime.Assert(!mReadOnlyPtr);
 				Debug.Assert(mPtr == null);
 				mPtr = value;
 			}
@@ -33,9 +34,11 @@ namespace LuaTinker.Wrappers
 			obj = null;
 			return .Error;
 		}
+		
+		public virtual void OnAddedToLua(LuaTinkerState tinkerState) {}
+		public virtual void OnRemovedFromLua(LuaTinkerState tinkerState) {}
 
-		public virtual void OnRemoveFromLua(LuaTinkerState tinkerState) {}
-
-	    private void* mPtr;
+	    protected void* mPtr;
+		protected bool mReadOnlyPtr = false;
 	}
 }

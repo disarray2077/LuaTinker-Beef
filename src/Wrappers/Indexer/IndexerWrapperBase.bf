@@ -10,6 +10,8 @@ namespace LuaTinker.Wrappers
 		public abstract void Set(Lua lua);
 
 		public abstract IndexerWrapperBase CreateNew();
-		public virtual void OnRemoveFromLua(LuaTinkerState tinkerState) {}
+
+		public virtual void OnAddedToLua(LuaTinkerState tinkerState) {}
+		public virtual void OnRemovedFromLua(LuaTinkerState tinkerState) {}
 	}
 }

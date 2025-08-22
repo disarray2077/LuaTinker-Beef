@@ -27,15 +27,22 @@ namespace LuaTinker
 			mAliveObjects.Add(obj);
 		}
 
-		public void DeregisterAliveObject<T>(T obj)
+		public void RegisterAliveObject<T>(T obj)
 			where T : class, ILuaOwnedObject
 		{
-			obj.OnRemoveFromLua(this);
-			mAliveObjects.Remove(obj);
+			obj.OnAddedToLua(this);
+			mAliveObjects.Add(obj);
 		}
 
 		public void DeregisterAliveObject(Object obj)
 		{
+			mAliveObjects.Remove(obj);
+		}
+
+		public void DeregisterAliveObject<T>(T obj)
+			where T : class, ILuaOwnedObject
+		{
+			obj.OnRemovedFromLua(this);
 			mAliveObjects.Remove(obj);
 		}
 

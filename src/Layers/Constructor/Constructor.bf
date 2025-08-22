@@ -44,6 +44,8 @@ namespace LuaTinker.Layers
 
 			code.Append(");\n");
 
+			code.AppendF($"lua.TinkerState.RegisterAliveObject(wrapper);\n");
+
 			Compiler.MixinRoot(code);
 		}
 

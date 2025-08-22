@@ -161,10 +161,12 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 			LuaTinker tinker = scope .(lua);
 
+			List<int> list = scope List<int>() { 10, 20, 30 };
+
 			tinker.AddClass<List<int>>("IntList");
 			tinker.AddClassCtor<List<int>>();
 			tinker.AddClassIndexer<List<int>, int>();
-			tinker.AddMethod<delegate List<int>()>("CreateList", new () => new List<int>() { 10, 20, 30 });
+			tinker.AddMethod<delegate List<int>()>("CreateList", new () => list);
 
 			Test.Assert(lua.DoString(
 				@"""

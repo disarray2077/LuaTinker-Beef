@@ -10,8 +10,7 @@ namespace LuaTinker.StackHelpers
 		public static void Create<T>(Lua lua, T val) where T : struct
 		{
 			let alloc = LuaUserdataAllocator(lua);
-			let wrapper = new:alloc ValuePointerWrapper<T>();
-			wrapper.CreateUninitialized();
+			let wrapper = new:alloc ValueTypeWrapper<T>();
 			(*wrapper.ValuePointer) = val;
 		}
 
@@ -24,7 +23,7 @@ namespace LuaTinker.StackHelpers
 				return;
 			}
 			let alloc = LuaUserdataAllocator(lua);
-			let wrapper = new:alloc ClassInstanceWrapper<T>();
+			let wrapper = new:alloc ClassInstanceWrapper<T>(); // TODO: Use ClassTypeWrapper (Type2User will need some refactoring)
 			wrapper.ClassInstance = val;
 		}
 
