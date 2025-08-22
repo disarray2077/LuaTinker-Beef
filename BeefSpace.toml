@@ -1,14 +1,16 @@
 FileVersion = 1
-Projects = {LuaTinker = {Path = "."}, KeraLua = "*", "LuaTinker.Tests" = {Path = "Tests"}, KeraLua = {Path = "../KeraLua-Beef"}, "LuaTinker.Sample" = {Path = "Sample"}}
-Locked = ["KeraLua"]
+Projects = {LuaTinker = {Path = "."}, KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}, "LuaTinker.Tests" = {Path = "Tests"}, KeraLua = {Path = "../KeraLua-Beef"}, "LuaTinker.BasicSample" = {Path = "Sample"}, "LuaTinker.GameSample" = {Path = "GameSample"}, BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}, SDL2 = "*"}
 ExtraPlatforms = ["Linux32", "Linux64"]
 
 [Workspace]
-StartupProject = "LuaTinker.Sample"
+StartupProject = "LuaTinker.BasicSample"
 
 [Configs.Debug.Win64]
-AllocStackTraceDepth = 7
+AllocStackTraceDepth = 5
 
 [Configs.Release_O0.Win64]
 LTOType = "None"
-ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Config = "Release"}, KeraLua = {Config = "Release"}, "LuaTinker.Sample" = {Config = "Release"}}
+ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Config = "Release"}, KeraLua = {Config = "Release"}, "LuaTinker.BasicSample" = {Config = "Release"}}
+
+[Configs.Test.Win64]
+AllocStackTraceDepth = 5

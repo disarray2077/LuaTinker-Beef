@@ -1,5 +1,5 @@
 FileVersion = 1
-Dependencies = {corlib = "*", KeraLua = "*"}
+Dependencies = {corlib = "*", KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}}
 
 [Project]
 Name = "LuaTinker"
