@@ -29,3 +29,19 @@ Name = "MetaTable"
 [[ProjectFolder.Items.Items.Items]]
 Type = "IgnoreSource"
 Name = "MetaContainer.bf"
+
+[[ProjectFolder.Items]]
+Type = "AutoFolder"
+Name = "Wrappers"
+
+[[ProjectFolder.Items.Items]]
+Type = "AutoFolder"
+Name = "Pointer"
+
+[[ProjectFolder.Items.Items.Items]]
+Type = "AutoFolder"
+Name = "Concrete"
+
+[[ProjectFolder.Items.Items.Items.Items]]
+Type = "IgnoreSource"
+Name = "ClassTypeWrapper.bf"

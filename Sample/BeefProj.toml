@@ -2,5 +2,5 @@ FileVersion = 1
 Dependencies = {corlib = "*", LuaTinker = "*"}
 
 [Project]
-Name = "LuaTinker.Sample"
-StartupObject = "LuaTinker.Sample.Program"
+Name = "LuaTinker.BasicSample"
+StartupObject = "LuaTinker.BasicSample.Program"
