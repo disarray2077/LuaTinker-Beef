@@ -14,63 +14,6 @@ namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
 	{
-		/*private static void AddContainerMate<T>(Lua lua)
-			where T : var
-		{
-			String name = scope $"container_{typeof(T).TypeId}";
-			ClassName<T>.Name = name;
-
-			lua.CreateTable(0, 8);
-
-			lua.PushString("__name");
-			lua.PushString(name);
-			lua.RawSet(-3);
-
-			// TODO
-			/*lua.PushString("__index");
-			lua.PushCClosure(=> MetaContainerGetLayer<T>, 0);
-			lua.RawSet(-3);
-
-			lua.PushString("__newindex");
-			lua.PushCClosure(detail::meta_container_set<base_type<T>>, 0);
-			lua.RawSet(-3);
-
-			lua.PushString("__pairs");
-			lua.PushCClosure(detail::meta_container_make_range<base_type<T>>, 0);
-			lua.RawSet(-3);
-
-			lua.PushString("__len");
-			lua.PushCClosure(detail::meta_container_get_len<base_type<T>>, 0);
-			lua.RawSet(-3);
-
-			lua.PushString("to_table");
-			lua.PushCClosure(detail::meta_container_to_table<base_type<T>>, 0);
-			lua.RawSet(-3);
-
-			lua.PushString("push");
-			lua.PushCClosure(detail::meta_container_push<base_type<T>>, 0);
-			lua.RawSet(-3);
-
-			lua.PushString("erase");
-			lua.PushCClosure(detail::meta_container_erase<base_type<T>>, 0);
-			lua.RawSet(-3);*/
-
-			lua.PushString("__gc");
-			lua.PushCClosure(=> DataDestroyerLayer, 0);
-			lua.RawSet(-3);
-
-			lua.SetGlobal(name);
-		}
-
-		private static void NoRegType2User<T, TVal>(Lua lua, T val)
-			where T : ICollection<TVal>
-			where TVal : var
-		{
-			AddContainerMate<T>(lua);
-			lua.GetGlobal(ClassName<T>.Name);
-			lua.SetMetaTable(-2);
-		}*/
-
 		[Inline]
 		private static void NoRegType2User<T>(Lua lua)
 			where T : struct
@@ -131,6 +74,40 @@ namespace LuaTinker.StackHelpers
 			{
 				lua.GetGlobal(tinkerState.GetClassName<RemovePtr<T>>());
 				lua.SetMetaTable(-2);
+			}
+		}
+
+		public static void Push(Lua lua, Object val)
+		{
+			if (val == null)
+			{
+				lua.PushNil();
+				return;
+			}
+
+			if (var s = val as String)
+			{
+				lua.PushString(s);
+			}
+			else if (var sv = val as StringView?)
+			{
+				lua.PushString(sv);
+			}
+			else if (var n = val as INumeric)
+			{
+				lua.PushInteger((int64)n);
+			}
+			else if (var f = val as IFloating)
+			{
+				lua.PushNumber((double)f);
+			}
+			else if (var b = val as bool?)
+			{
+				lua.PushBoolean(b);
+			}
+			else
+			{
+				Push<Object>(lua, val);
 			}
 		}
 		

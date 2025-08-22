@@ -5,6 +5,22 @@ using LuaTinker.Wrappers;
 
 using internal KeraLua;
 
+namespace LuaTinker
+{
+	static
+	{
+		internal static void DumpStack(Lua lua)
+		{
+			Debug.WriteLine(LuaTinker.StackHelpers.StackHelper.EnumStack(lua, .. scope .()));
+		}
+
+		internal static void DumpTable(Lua lua, int32 index)
+		{
+			Debug.WriteLine(LuaTinker.StackHelpers.StackHelper.DumpTable(lua, index, .. scope .()));
+		}
+	}
+}
+
 namespace LuaTinker.StackHelpers
 {
 	public static class StackHelper

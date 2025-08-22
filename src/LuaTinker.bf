@@ -1171,6 +1171,20 @@ namespace LuaTinker
 		public Result<double, StringView> GetNumber(StringView name)
 			=> GetValue<double>(name);
 
+		/// Gets a global Lua table as a disposable `LuaTable` struct.
+		/// This mixin will automatically dispose the LuaTable.
+		/// @param name The name of the global Lua table.
+		/// @return A result containing the `LuaTable` or an error.
+		public mixin GetTable(StringView name)
+		{
+			let res = GetValue<LuaTable>(name);
+			if (res case .Ok(var ref val))
+			{
+				defer:mixin val.Dispose();
+			}
+			res
+		}
+
 		/// Sets the value of a global Lua variable.
 		/// @param name The name of the global variable.
 		/// @param value The value to set.

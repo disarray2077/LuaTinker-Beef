@@ -15,6 +15,12 @@ namespace LuaTinker.StackHelpers
 			Pop<T>(lua, index)
 		}
 
+		public static mixin PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
+			where T : Object where Object : T
+		{
+			_PopAlloc<T>(lua, index, alloc)
+		}
+
 		public static mixin Pop<T>(Lua lua, int32 index)
 			where T : Object where Object : T
 		{
@@ -59,6 +65,8 @@ namespace LuaTinker.StackHelpers
 					return new:alloc box Pop<bool>(lua, index);
 				case .String:
 					return new:alloc box Pop<StringView>(lua, index);
+				case .Table:
+					return new:alloc box Pop<LuaTable>(lua, index);
 				case .Nil:
 					return null;
 				default:
