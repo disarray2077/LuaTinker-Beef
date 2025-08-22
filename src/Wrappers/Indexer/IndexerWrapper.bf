@@ -24,7 +24,7 @@ namespace LuaTinker.Wrappers
 
 		public override Type KeyType => typeof(TKey);
 
-		public override void Get(Lua lua)
+		public override bool Get(Lua lua)
 		{
 			[Comptime]
 			void Emit()
@@ -73,10 +73,11 @@ namespace LuaTinker.Wrappers
 			}
 	
 			Emit();
+			return true;
 	
 		}
 	
-		public override void Set(Lua lua)
+		public override bool Set(Lua lua)
 		{
 			[Comptime]
 			void Emit()
@@ -125,6 +126,7 @@ namespace LuaTinker.Wrappers
 			}
 	
 			Emit();
+			return true;
 		}
 
 		public override IndexerWrapperBase CreateNew()

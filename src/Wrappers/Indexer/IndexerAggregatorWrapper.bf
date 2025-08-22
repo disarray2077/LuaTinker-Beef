@@ -68,7 +68,7 @@ namespace LuaTinker.Wrappers
 		    return false;
 		}
 
-		public override void Get(Lua lua)
+		public override bool Get(Lua lua)
 		{
 			var keyType = GetTypeFromStack(lua, 2);
 
@@ -83,15 +83,13 @@ namespace LuaTinker.Wrappers
 			}
 
 			if (foundIndexer == null)
-			{
-				lua.TinkerState.SetLastError("no indexer found for the given key type");
-				StackHelper.ThrowError(lua, lua.TinkerState);
-			}
+				return false;
 
 			foundIndexer.Get(lua);
+			return true;
 		}
 
-		public override void Set(Lua lua)
+		public override bool Set(Lua lua)
 		{
 			var keyType = GetTypeFromStack(lua, 2);
 
@@ -106,12 +104,10 @@ namespace LuaTinker.Wrappers
 			}
 
 			if (foundIndexer == null)
-			{
-				lua.TinkerState.SetLastError("no indexer found for the given key type");
-				StackHelper.ThrowError(lua, lua.TinkerState);
-			}
+				return false;
 
 			foundIndexer.Set(lua);
+			return true;
 		}
 
 		public override IndexerWrapperBase CreateNew()

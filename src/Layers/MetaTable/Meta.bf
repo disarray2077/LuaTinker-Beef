@@ -65,7 +65,12 @@ namespace LuaTinker.Layers
 					lua.RawGet(-2);
 					if (lua.IsUserData(-1))
 					{
-						User2Type.GetTypePtr<IndexerWrapperBase>(lua, -1).Get(lua);
+						if (!User2Type.GetTypePtr<IndexerWrapperBase>(lua, -1).Get(lua))
+						{
+							let tinkerState = lua.TinkerState;
+							tinkerState.SetLastError("can't find '{}' class variable. (forgot registering class variable ?)", lua.ToStringView(2));
+							StackHelper.ThrowError(lua, tinkerState);
+						}
 						lua.Remove(-2);
 					}
 					else

@@ -6,8 +6,8 @@ namespace LuaTinker.Wrappers
 	public abstract class IndexerWrapperBase : ILuaOwnedObject
 	{
 		public virtual Type KeyType => null;
-		public abstract void Get(Lua lua);
-		public abstract void Set(Lua lua);
+		public abstract bool Get(Lua lua);
+		public abstract bool Set(Lua lua);
 
 		public abstract IndexerWrapperBase CreateNew();
 
