@@ -1,0 +1,18 @@
+FileVersion = 1
+Dependencies = {corlib = "*", BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}, KeraLua = "*", LuaTinker = "*", SDL2 = "*"}
+
+[Project]
+Name = "LuaTinker.GameSample"
+StartupObject = "LuaTinker.GameSample.Program"
+
+[[ProjectFolder.Items]]
+Type = "IgnoreSource"
+Name = "Program_.bf"
+
+[[ProjectFolder.Items]]
+Type = "IgnoreSource"
+Name = "Program2.bf"
+
+[[ProjectFolder.Items]]
+Type = "IgnoreSource"
+Name = "Program3.bf"
