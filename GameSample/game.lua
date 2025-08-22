@@ -68,7 +68,7 @@ function update(dt)
     -- If ball isn't launched, it follows the paddle
     if not game.BallIsLaunched then
         game.Ball.X = game.PaddleX
-    --    return
+        return
     end
 
     -- Iterate backwards so we can safely remove items

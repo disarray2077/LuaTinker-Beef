@@ -62,11 +62,16 @@ static class Program
 		tinker.AutoTinkClass<System.Diagnostics.Stopwatch>();
 		
 		names.Add("FileStream (Class)");
+		tinker.AddClass<System.IO.Stream>(); // TODO: AutoTinkClass
 		tinker.AutoTinkClass<System.IO.BufferedStream>();
+		tinker.AddClassParent<System.IO.BufferedStream, System.IO.Stream>();
 		tinker.AutoTinkClass<System.IO.BufferedFileStream>();
 		tinker.AddClassParent<System.IO.BufferedFileStream, System.IO.BufferedStream>();
 		tinker.AutoTinkClass<System.IO.FileStream>();
 		tinker.AddClassParent<System.IO.FileStream, System.IO.BufferedFileStream>();
+		
+		names.Add("StreamReader (Class)");
+		tinker.AutoTinkClass<System.IO.StreamReader>();
 	}
 
 	static void ExecuteLua(Lua lua, String code)

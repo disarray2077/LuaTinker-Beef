@@ -110,6 +110,9 @@ namespace LuaTinker.Wrappers
 	    public void Create<T1, T2, T3, T4>(T1 t1, T2 t2, T3 t3, T4 t4) where T1 : var where T2 : var where T3 : var where T4 : var
 			=> InternalSet(new T(t1, t2, t3, t4));
 
+	    public void Create<T1, T2, T3, T4, T5>(T1 t1, T2 t2, T3 t3, T4 t4, T5 t5) where T1 : var where T2 : var where T3 : var where T4 : var where T5 : var
+			=> InternalSet(new T(t1, t2, t3, t4, t5));
+
 	    public void CreateParams<T1>(params Span<T1> t1) where T1 : var
 		{
 			// This just doesn't work, so we emit instead.
