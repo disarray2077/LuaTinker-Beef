@@ -5,7 +5,7 @@ using LuaTinker.Wrappers;
 
 using internal KeraLua;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
@@ -36,7 +36,7 @@ namespace LuaTinker.Layers
 			}
 		}
 
-		public static int32 GetIndexLayer(lua_State L)
+		public static int32 IndexGetHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 
@@ -86,7 +86,7 @@ namespace LuaTinker.Layers
 		    return 1;
 		}
 
-		public static int32 SetIndexLayer(lua_State L)
+		public static int32 IndexSetHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 			

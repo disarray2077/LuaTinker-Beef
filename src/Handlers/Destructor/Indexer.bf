@@ -5,11 +5,11 @@ using LuaTinker.Wrappers;
 
 using internal KeraLua;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
-		public static int32 IndexerDestructorLayer(lua_State L)
+		public static int32 IndexerDestructorHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 			var ud = lua.ToUserData(1);

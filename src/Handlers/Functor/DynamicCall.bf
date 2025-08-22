@@ -6,9 +6,9 @@ using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
 using System.Collections;
 
-using internal LuaTinker.Layers;
+using internal LuaTinker.Handlers;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
@@ -286,7 +286,7 @@ namespace LuaTinker.Layers
 		}
 
 		[Comptime]
-		private static void EmitDynamicCallLayer<T, Name, IsStatic>()
+		private static void EmitDynamicCallHandler<T, Name, IsStatic>()
 			where Name : const String
 			where IsStatic : const bool
 		{
@@ -527,14 +527,14 @@ namespace LuaTinker.Layers
 			}
 		}
 
-		public static int32 DynamicCallLayer<T, Name, IsStatic>(lua_State L)
+		public static int32 DynamicCallHandler<T, Name, IsStatic>(lua_State L)
 			where Name : const String
 			where IsStatic : const bool
 		{
 #unwarn
 			let lua = Lua.FromIntPtr(L);
 
-			EmitDynamicCallLayer<T, const Name, const IsStatic>();
+			EmitDynamicCallHandler<T, const Name, const IsStatic>();
 		}
 	}
 }

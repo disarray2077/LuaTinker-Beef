@@ -8,9 +8,9 @@ using System.Reflection;
 using System.Diagnostics;
 
 using internal KeraLua;
-using internal LuaTinker.Layers;
+using internal LuaTinker.Handlers;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
@@ -127,7 +127,7 @@ namespace LuaTinker.Layers
 		}
 
 		[Comptime]
-		private static void EmitDynamicCreatorLayer<T>()
+		private static void EmitDynamicCreatorHandler<T>()
 		{
 			if (typeof(T).IsGenericParam)
 			{
@@ -206,13 +206,13 @@ namespace LuaTinker.Layers
 			Compiler.MixinRoot(code);
 		}
 
-		public static int32 DynamicCreatorLayer<T>(lua_State L)
+		public static int32 DynamicCreatorHandler<T>(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 #unwarn
 			let alloc = LuaUserdataAllocator(lua);
 
-			EmitDynamicCreatorLayer<T>();
+			EmitDynamicCreatorHandler<T>();
 		}
 	}
 }

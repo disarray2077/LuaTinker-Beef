@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Collections;
 
 using LuaTinker.Helpers;
-using LuaTinker.Layers;
+using LuaTinker.Handlers;
 using LuaTinker.Wrappers;
 using LuaTinker.StackHelpers;
 
@@ -54,10 +54,10 @@ namespace LuaTinker
 			// Add GC Mate
 			mLua.CreateTable(0, 2);
 			mLua.PushString("__gc");
-			mLua.PushCClosure(=> PointerDestructorLayer, 0);
+			mLua.PushCClosure(=> PointerDestructorHandler, 0);
 			mLua.RawSet(-3);
 			mLua.PushString("__tostring");
-			mLua.PushCClosure(=> PointerToStringLayer, 0);
+			mLua.PushCClosure(=> PointerToStringHandler, 0);
 			mLua.RawSet(-3);
 			mLua.SetGlobal("__noreg_meta");
 		}
@@ -90,7 +90,7 @@ namespace LuaTinker
 		public void AddMethod<F>(String name, F func) where F : var, struct
 		{
 			mLua.PushLightUserData(func);
-			mLua.PushCClosure(=> CallLayer<F>, 1);
+			mLua.PushCClosure(=> CallHandler<F>, 1);
 			mLua.SetGlobal(name);
 		}
 
@@ -107,14 +107,14 @@ namespace LuaTinker
 			{
 			    mLua.CreateTable(0, 2);
 			    mLua.PushString("__gc");
-			    mLua.PushCClosure(=> PointerDestructorLayer, 0);
+			    mLua.PushCClosure(=> PointerDestructorHandler, 0);
 			    mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> PointerToStringLayer, 0);
+				mLua.PushCClosure(=> PointerToStringHandler, 0);
 				mLua.RawSet(-3);
 			    mLua.SetMetaTable(-2);
 			}
-			mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
+			mLua.PushCClosure(=> DelegateCallHandler<F>, 1);
 			mLua.SetGlobal(name);
 		}
 		
@@ -373,19 +373,19 @@ namespace LuaTinker
 			mLua.RawSet(-3);
 
 			mLua.PushString("__index");
-			mLua.PushCClosure(=> GetIndexLayer, 0);
+			mLua.PushCClosure(=> IndexGetHandler, 0);
 			mLua.RawSet(-3);
 
 			mLua.PushString("__newindex");
-			mLua.PushCClosure(=> SetIndexLayer, 0);
+			mLua.PushCClosure(=> IndexSetHandler, 0);
 			mLua.RawSet(-3);
 
 			mLua.PushString("__gc");
-			mLua.PushCClosure(=> PointerDestructorLayer, 0);
+			mLua.PushCClosure(=> PointerDestructorHandler, 0);
 			mLua.RawSet(-3);
 
 			mLua.PushString("__tostring");
-			mLua.PushCClosure(=> PointerToStringLayer, 0);
+			mLua.PushCClosure(=> PointerToStringHandler, 0);
 			mLua.RawSet(-3);
 
 			mLua.SetGlobal(name);
@@ -415,10 +415,10 @@ namespace LuaTinker
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
-				mLua.PushCClosure(=> DynamicCreatorLayer<T>, 0);
+				mLua.PushCClosure(=> DynamicCreatorHandler<T>, 0);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> ConstructorToStringLayer<T>, 0);
+				mLua.PushCClosure(=> ConstructorToStringHandler<T>, 0);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -437,7 +437,7 @@ namespace LuaTinker
 				mLua.PushCClosure(=> CreatorLayer<T, Args>, 0);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> ConstructorToStringLayer<T>, 0);
+				mLua.PushCClosure(=> ConstructorToStringHandler<T>, 0);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -492,7 +492,7 @@ namespace LuaTinker
 				{
 				    mLua.CreateTable(0, 1);
 				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> IndexerDestructorLayer, 0);
+				    mLua.PushCClosure(=> IndexerDestructorHandler, 0);
 				    mLua.RawSet(-3);
 				    mLua.SetMetaTable(-2);
 				}
@@ -516,7 +516,7 @@ namespace LuaTinker
 			{
 				mLua.PushString(name);
 				mLua.PushLightUserData(func);
-				mLua.PushCClosure(=> CallLayer<F>, 1);
+				mLua.PushCClosure(=> CallHandler<F>, 1);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -532,7 +532,7 @@ namespace LuaTinker
 			if (mLua.IsTable(-1))
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				mLua.PushCClosure(=> DynamicCallLayer<T, const Name, false>, 0);
+				mLua.PushCClosure(=> DynamicCallHandler<T, const Name, false>, 0);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -612,7 +612,7 @@ namespace LuaTinker
 				{
 				    mLua.CreateTable(0, 1);
 				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> VariableDestructorLayer, 0);
+				    mLua.PushCClosure(=> VariableDestructorHandler, 0);
 				    mLua.RawSet(-3);
 				    mLua.SetMetaTable(-2);
 				}
@@ -769,11 +769,11 @@ namespace LuaTinker
 				mLua.RawSet(-3);
 
 				mLua.PushString("__index");
-				mLua.PushCClosure(=> GetIndexLayer, 0);
+				mLua.PushCClosure(=> IndexGetHandler, 0);
 				mLua.RawSet(-3);
 
 				mLua.PushString("__newindex");
-				mLua.PushCClosure(=> SetIndexLayer, 0);
+				mLua.PushCClosure(=> IndexSetHandler, 0);
 				mLua.RawSet(-3);
 
 				if (@ns.MatchIndex == 0)
@@ -857,7 +857,7 @@ namespace LuaTinker
 			{
 				mLua.PushString(methodName);
 				mLua.PushLightUserData(func);
-				mLua.PushCClosure(=> CallLayer<F>, 1);
+				mLua.PushCClosure(=> CallHandler<F>, 1);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -879,14 +879,14 @@ namespace LuaTinker
 				{
 				    mLua.CreateTable(0, 2);
 				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> PointerDestructorLayer, 0);
+				    mLua.PushCClosure(=> PointerDestructorHandler, 0);
 				    mLua.RawSet(-3);
 					mLua.PushString("__tostring");
-					mLua.PushCClosure(=> PointerToStringLayer, 0);
+					mLua.PushCClosure(=> PointerToStringHandler, 0);
 					mLua.RawSet(-3);
 				    mLua.SetMetaTable(-2);
 				}
-				mLua.PushCClosure(=> DelegateCallLayer<F>, 1);
+				mLua.PushCClosure(=> DelegateCallHandler<F>, 1);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -901,7 +901,7 @@ namespace LuaTinker
 			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				mLua.PushCClosure(=> DynamicCallLayer<T, const Name, true>, 0);
+				mLua.PushCClosure(=> DynamicCallHandler<T, const Name, true>, 0);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);

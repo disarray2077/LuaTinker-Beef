@@ -5,19 +5,20 @@ using LuaTinker.Wrappers;
 
 using internal KeraLua;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
-		public static int32 PointerToStringLayer(lua_State L)
+		public static int32 PointerDestructorHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 			var ud = lua.ToUserData(1);
 
 			var obj = (PointerWrapperBase)Internal.UnsafeCastToObject(ud);
-			StackHelper.Push(lua, obj.ToString(.. scope .()));
+			lua.TinkerState?.DeregisterAliveObject(obj);
+			delete:null obj;
 
-			return 1;
+			return 0;
 		}
 	}
 }

@@ -6,12 +6,12 @@ using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
 using LuaTinker.Wrappers;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
 		[Comptime]
-		private static void EmitDelegateCallLayer<F>()
+		private static void EmitDelegateCallHandler<F>()
 			where F : var
 		{
 			let code = scope String();
@@ -157,14 +157,14 @@ namespace LuaTinker.Layers
 			Compiler.MixinRoot(code);
 		}
 
-		public static int32 DelegateCallLayer<F>(lua_State L)
+		public static int32 DelegateCallHandler<F>(lua_State L)
 			where F : var
 		{
 			let lua = Lua.FromIntPtr(L);
 #unwarn
 			let func = User2Type.GetTypePtr<ClassInstanceWrapper<F>>(lua, Lua.UpValueIndex(1)).ClassInstance;
 
-			EmitDelegateCallLayer<F>();
+			EmitDelegateCallHandler<F>();
 
 			// This is necessary to avoid the "Method must return" error
 			Runtime.FatalError("Not reached");

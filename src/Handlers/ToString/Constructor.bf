@@ -5,11 +5,11 @@ using LuaTinker.Wrappers;
 
 using internal KeraLua;
 
-namespace LuaTinker.Layers
+namespace LuaTinker.Handlers
 {
 	static
 	{
-		public static int32 ConstructorToStringLayer<T>(lua_State L)
+		public static int32 ConstructorToStringHandler<T>(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 			StackHelper.Push(lua, scope $"<constructor for {typeof(T)}>");
