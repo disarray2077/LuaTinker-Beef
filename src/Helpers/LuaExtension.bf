@@ -7,12 +7,19 @@ namespace KeraLua
 	extension Lua
 	{
 		internal LuaTinkerState TinkerState = new .() ~ DeleteAndNullify!(_);
+		private static int __counter = 0;
 
         public new LuaStatus PCall(int32 arguments, int32 results, int32 errorFunctionIndex)
         {
 			TinkerState.ClearError();
 			TinkerState.[Friend]IsPCall = true;
 			defer { TinkerState.[Friend]IsPCall = false; }
+
+			// TODO: HACK?
+			// Without this Lua's memory usage seems to grow quite a bit.
+			// I suspect this happens because Lua isn't aware of how much memory is held by PointerWrappers.
+			if (__counter++ % 100 == 0)
+				defer:: { GarbageCollector(.Step, 0); }
 
             return [NoExtension]PCall(arguments, results, errorFunctionIndex);
         }
@@ -26,6 +33,12 @@ namespace KeraLua
 			TinkerState.ClearError();
 			TinkerState.[Friend]IsPCall = true;
 			defer { TinkerState.[Friend]IsPCall = false; }
+
+			// TODO: HACK?
+			// Without this Lua's memory usage seems to grow quite a bit.
+			// I suspect this happens because Lua isn't aware of how much memory is held by PointerWrappers.
+			if (__counter++ % 100 == 0)
+				defer:: { GarbageCollector(.Step, 0); }
 
             return [NoExtension]PCallK(arguments, results, errorFunctionIndex, context, k);
         }
