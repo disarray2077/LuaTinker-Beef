@@ -9,6 +9,7 @@ LuaTinker-Beef allows you to seamlessly call Lua functions from Beef and expose 
 -   **Compile-Time Generation**: No reflection means fast startup and minimal runtime overhead.
 -   **Automatic & Manual Binding**: Quickly bind entire classes with `AutoTinkClass` or manually specify every function, property, and field for fine-grained control.
 -   **Seamless Interop**: Call Lua functions from Beef and vice-versa with natural syntax.
+    -   **Dynamic Overload Resolution**: Function overloads are also supported! LuaTinker will attempt to call the correct function overload at run-time based on the provided arguments.
 -   **Rich Type Support**: Bind classes, structs, methods, properties, fields, enums, and indexers.
 -   **Inheritance**: Correctly handles class and struct inheritance hierarchies.
 
