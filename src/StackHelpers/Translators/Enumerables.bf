@@ -3,6 +3,9 @@ using System.Diagnostics;
 using KeraLua;
 using System.Collections;
 using LuaTinker.Wrappers;
+using internal KeraLua;
+using LuaTinker.StackHelpers;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker.StackHelpersStackHelpers
 {
@@ -13,8 +16,14 @@ namespace LuaTinker.StackHelpersStackHelpers
 		{
 			let lua = Lua.FromIntPtr(L);
 
-			var wrapper = User2Type.GetTypePtr<ValuePointerWrapper<T>>(lua, Lua.UpValueIndex(1));
-			var iter = ref *wrapper.ValuePointer;//ref User2Type<T>.GetTypeRef(lua, Lua.UpValueIndex(1));
+			// Push creates this upvalue via Type2User.Create<decltype(val)>, allocating ValueTypeWrapper<T>.
+			let wrapper = User2Type.TryGetTrustedTypePtr<ValueTypeWrapper<T>>(lua, Lua.UpValueIndex(1));
+			if (wrapper == null)
+			{
+				lua.TinkerState.SetLastError("can't advance iterator. (not a LuaTinker object.)");
+				StackHelper.ThrowError(lua, lua.TinkerState);
+			}
+			var iter = ref *wrapper.ValuePointer;
 
 			let result = iter.GetNext();
 			if (result case .Err)

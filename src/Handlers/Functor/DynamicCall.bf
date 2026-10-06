@@ -4,6 +4,7 @@ using System.Reflection;
 using KeraLua;
 using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
+using internal LuaTinker.StackHelpers;
 using System.Collections;
 
 using internal LuaTinker.Handlers;
@@ -178,13 +179,13 @@ namespace LuaTinker.Handlers
 						if (flags.HasFlag(.This))
 						{
 							if (depth == 1)
-								code.AppendF($"{depthCode}if (lua.IsUserData({depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+								code.AppendF($"{depthCode}if (User2Type.IsLuaTinkerPointerUserdata(lua, {depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 							else
-								code.AppendF($"{depthCode}if (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+								code.AppendF($"{depthCode}if (User2Type.IsObjectTypeCompatible(lua, {depth}, typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 						}
 						else
 						{
-							code.AppendF($"{depthCode}if (lua.IsNil({depth}) || (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()}))))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+							code.AppendF($"{depthCode}if (lua.IsNil({depth}) || User2Type.IsObjectTypeCompatible(lua, {depth}, typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 						}
 					}
 					else if (luaType == .String)
@@ -192,13 +193,13 @@ namespace LuaTinker.Handlers
 						if (flags.HasFlag(.This))
 						{
 							if (depth == 1)
-								code.AppendF($"{depthCode}if (lua.IsUserData({depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+								code.AppendF($"{depthCode}if (User2Type.IsLuaTinkerPointerUserdata(lua, {depth})) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 							else
-								code.AppendF($"{depthCode}if (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+								code.AppendF($"{depthCode}if (User2Type.IsObjectTypeCompatible(lua, {depth}, typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 						}
 						else
 						{
-							code.AppendF($"{depthCode}if (lua.IsString({depth}) || lua.IsNil({depth}) || (lua.IsUserData({depth}) && User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()}))))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
+							code.AppendF($"{depthCode}if (lua.IsString({depth}) || lua.IsNil({depth}) || User2Type.IsObjectTypeCompatible(lua, {depth}, typeof(comptype({type.GetTypeId()})))) // {type.GetFullName(.. scope .())} (Flags: {flags})\n");
 						}
 					}
 					else if (luaType == .Number)
@@ -218,9 +219,9 @@ namespace LuaTinker.Handlers
 
 				if (flags.HasFlag(.This) && depth == 1)
 				{
-					code.AppendF($"{depthCode}\tif (!User2Type.GetObjectType(lua, {depth}).IsSubtypeOf(typeof(comptype({type.GetTypeId()}))) && StackHelper.EnsureValidMetaTable<comptype({type.GetTypeId()})>(lua, 1) == .OkNoMetaTable)\n");
+					code.AppendF($"{depthCode}\tif (!User2Type.IsObjectTypeCompatible(lua, {depth}, typeof(comptype({type.GetTypeId()}))) && StackHelper.EnsureValidMetaTable<comptype({type.GetTypeId()})>(lua, 1) == .OkUnregisteredType)\n");
 					code.AppendF($"{depthCode}\t{{\n");
-					code.AppendF($"{depthCode}\t\tlua.TinkerState.SetLastError($\"can't convert argument 0 to '{{StackHelper.[Friend]GetBestLuaClassName<comptype({type.GetTypeId()})>(lua.TinkerState, .. scope .())}}'\");\n");
+					code.AppendF($"{depthCode}\t\tlua.TinkerState.SetLastError($\"can't convert argument 0 to '{{StackHelper.GetBestLuaClassName<comptype({type.GetTypeId()})>(lua.TinkerState, .. scope .())}}'\");\n");
 					code.AppendF($"{depthCode}\t\tStackHelper.ThrowError(lua, lua.TinkerState);\n");
 					code.AppendF($"{depthCode}\t}}\n");
 				}

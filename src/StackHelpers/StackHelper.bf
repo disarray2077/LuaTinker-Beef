@@ -4,6 +4,8 @@ using System.Diagnostics;
 using LuaTinker.Wrappers;
 
 using internal KeraLua;
+using internal LuaTinker;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker
 {
@@ -242,7 +244,7 @@ namespace LuaTinker.StackHelpers
 		    }
 		}
 
-		private static void GetBestLuaClassName<T>(LuaTinkerState tinkerState, String outString)
+		internal static void GetBestLuaClassName<T>(LuaTinkerState tinkerState, String outString)
 		{
 			if (tinkerState.IsClassRegistered<T>())
 			{
@@ -263,115 +265,65 @@ namespace LuaTinker.StackHelpers
 			OkNeedsConversion
 		}
 
+		/// Checks LuaTinker pointer userdata identity; does not validate general value conversions.
+		[Inline]
 		public static bool CheckMetaTableValidity<T>(Lua lua, int32 index)
+			=> ValidateClassMetatable(lua, index, typeof(T)) != .Error;
+
+		/// Filters GetValue inputs before the selected translator performs conversion.
+		internal static bool CanAttemptValueConversion<T>(Lua lua, int32 index)
 		{
-			let tinkerState = lua.TinkerState;
-			if (lua.GetMetaTable(index))
-			{
-				var validArgument = tinkerState != null && tinkerState.IsClassRegistered<T>();
-
-				if (!validArgument)
-				{
-					lua.PushString("__name");
-					validArgument = lua.RawGet(-2) != .String;
-				}
-				else if (validArgument)
-				{
-					lua.GetGlobal(tinkerState.GetClassName<T>());
-					validArgument = lua.RawEqual(-1, -2);
-				}
-
-				lua.Pop(2);
-
-				return validArgument;
-			}
-
-			return !tinkerState.IsClassRegistered<T>();
+			let type = lua.Type(index);
+			if (type == .UserData)
+				return CheckMetaTableValidity<T>(lua, index);
+			return type != .LightUserData && !lua.TinkerState.IsClassRegistered<T>();
 		}
 
 		public enum EVMTResult
 		{
 			Ok,
-			OkNoMetaTable,
-			OkIsBase
+			OkUnregisteredType,
+			OkIsBase,
+			Error
+		}
+
+		internal static EVMTResult ValidateClassMetatable(Lua lua, int32 index, Type expectedType)
+		{
+			if (!User2Type.IsLuaTinkerPointerUserdata(lua, index))
+				return .Error;
+			let tinkerState = lua.TinkerState;
+			if (!tinkerState.IsClassRegistered(expectedType))
+				return .OkUnregisteredType;
+			lua.GetMetaTable(index);
+			tinkerState.PushClassMetatable(lua, expectedType);
+			EVMTResult result = .Ok;
+			while (!lua.RawEqual(-1, -2))
+			{
+				lua.PushString("__parent");
+				if (lua.RawGet(-3) != .Table)
+				{
+					lua.Pop(3);
+					return .Error;
+				}
+				lua.Replace(-3);
+				result = .OkIsBase;
+			}
+			lua.Pop(2);
+			return result;
 		}
 
 		public static EVMTResult EnsureValidMetaTable<T>(Lua lua, int32 index)
 		{
-			EVMTResult result = .Ok;
-			let tinkerState = lua.TinkerState;
-
-			if (lua.IsUserData(index) && lua.GetMetaTable(index))
+			let result = ValidateClassMetatable(lua, index, typeof(T));
+			if (result == .Error)
 			{
-				var validArgument = tinkerState != null && tinkerState.IsClassRegistered<T>();
-
-				if (!validArgument)
+				let tinkerState = lua.TinkerState;
 				{
-					lua.PushString("__name");
-					validArgument = lua.RawGet(-2) != .String;
+					// Dispose temporary strings before raising a Lua error.
+					tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
 				}
-				else if (validArgument)
-				{
-					lua.GetGlobal(tinkerState.GetClassName<T>());
-					validArgument = lua.RawEqual(-1, -2);
-
-					if (!validArgument)
-					{
-						lua.PushValue(-2);
-
-						int32 inheritanceDepth = 0;
-
-						while (!validArgument)
-						{
-							lua.PushString("__parent");
-							let parentType = lua.RawGet(-2);
-							inheritanceDepth += 1;
-
-							if (parentType == .Table)
-							{
-								lua.GetGlobal(tinkerState.GetClassName<T>());
-								validArgument = lua.RawEqual(-1, -2);
-								lua.Pop(1);
-							}
-							else if (parentType == .Nil)
-								break;
-						}
-
-						lua.Pop(1 + inheritanceDepth);
-
-						if (validArgument)
-							result = .OkIsBase;
-					}
-				}
-
-				if (!validArgument)
-				{
-					let luaTinker = lua.TinkerState;
-					{
-						// Set error in a different scope to make sure the temporary strings destructors run before throwing the error.
-						luaTinker.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
-					}
-					TryThrowError(lua, luaTinker);
-					return default;
-				}
-
-				lua.Pop(2);
+				TryThrowError(lua, tinkerState);
 			}
-			else if (tinkerState.IsClassRegistered<T>())
-			{
-				let luaTinker = lua.TinkerState;
-				{
-					// Set error in a different scope to make sure the temporary strings destructors run before throwing the error.
-					luaTinker.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
-				}
-				TryThrowError(lua, luaTinker);
-				return default;
-			}
-			else
-			{
-				return .OkNoMetaTable;
-			}
-
 			return result;
 		}
 	}

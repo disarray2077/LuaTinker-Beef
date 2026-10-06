@@ -45,9 +45,14 @@ namespace LuaTinker.StackHelpers
 				return null;
 
 			let result = EnsureValidMetaTable<StringBuilder>(lua, index);
+			if (result == .Error)
+				return null;
 
-			let stackObject = User2Type.UnsafeGetObject(lua, index);
-			if (result != .OkNoMetaTable)
+			let stackObject = User2Type.GetObject(lua, index);
+			if (stackObject == null)
+				return null;
+
+			if (result != .OkUnregisteredType)
 			{
 				// We are sure that this conversion is valid, so let's just do it unsafely.
 				let ptr = ((PointerWrapperBase)stackObject).Ptr;

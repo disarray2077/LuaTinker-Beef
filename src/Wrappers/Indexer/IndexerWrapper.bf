@@ -60,13 +60,8 @@ namespace LuaTinker.Wrappers
 				{
 					Compiler.MixinRoot(scope
 						$$"""
-						if (!lua.IsUserData(1))
-						{
-							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
-							StackHelper.ThrowError(lua, lua.TinkerState);
-						}
+						let instance = StackHelper.Pop!<T>(lua, 1);
 
-						let instance = User2Type.GetTypeDirect<ClassInstanceWrapper<T>>(lua, 1).ClassInstance;
 						StackHelper.Push(lua, instance[StackHelper.Pop!<TKey>(lua, 2)]);
 						""");
 				}
@@ -113,13 +108,8 @@ namespace LuaTinker.Wrappers
 				{
 					Compiler.MixinRoot(scope
 						$$"""
-						if (!lua.IsUserData(1))
-						{
-							lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
-							StackHelper.ThrowError(lua, lua.TinkerState);
-						}
+						let instance = StackHelper.Pop!<T>(lua, 1);
 						
-						let instance = User2Type.GetTypeDirect<ClassInstanceWrapper<T>>(lua, 1).ClassInstance;
 						instance[StackHelper.Pop!<TKey>(lua, 2)] = StackHelper.Pop!<GetIndexerValue<T, TKey>.Result>(lua, 3);
 						""");
 				}

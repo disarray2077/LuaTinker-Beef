@@ -12,9 +12,10 @@ namespace LuaTinker.Handlers
 		public static int32 IndexerDestructorHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
-			var ud = lua.ToUserData(1);
+			var obj = User2Type.TryGetTypePtr<IndexerWrapperBase>(lua, 1);
+			if (obj == null)
+				return 0;
 
-			var obj = (IndexerWrapperBase)Internal.UnsafeCastToObject(ud);
 			lua.TinkerState?.DeregisterAliveObject(obj);
 			delete:null obj;
 

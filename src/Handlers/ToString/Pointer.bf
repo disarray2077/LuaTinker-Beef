@@ -12,9 +12,13 @@ namespace LuaTinker.Handlers
 		public static int32 PointerToStringHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
-			var ud = lua.ToUserData(1);
+			let obj = User2Type.TryGetTypePtr<PointerWrapperBase>(lua, 1);
+			if (obj == null)
+			{
+				lua.TinkerState.SetLastError($"can't convert argument 1 ({lua.TypeName(1)}) to 'String'. (not a LuaTinker object.)");
+				StackHelper.ThrowError(lua, lua.TinkerState);
+			}
 
-			var obj = (PointerWrapperBase)Internal.UnsafeCastToObject(ud);
 			StackHelper.Push(lua, obj.ToString(.. scope .()));
 
 			return 1;

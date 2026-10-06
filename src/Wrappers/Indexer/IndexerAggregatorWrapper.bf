@@ -51,6 +51,8 @@ namespace LuaTinker.Wrappers
 
 		private static bool AreTypesCompatible(Type keyType, Type indexerType)
 		{
+		    if (keyType == null)
+		        return false;
 		    if (keyType.IsSubtypeOf(indexerType))
 		        return true;
 

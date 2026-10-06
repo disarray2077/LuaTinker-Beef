@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Diagnostics;
 
 using internal KeraLua;
+using internal LuaTinker;
 using internal LuaTinker.Handlers;
 
 namespace LuaTinker.Handlers
@@ -120,7 +121,7 @@ namespace LuaTinker.Handlers
 			code.Append(");\n");
 			
 			code.AppendF($"{depthCode}lua.TinkerState.RegisterAliveObject(wrapper);\n");
-			code.AppendF($"{depthCode}lua.GetGlobal(lua.TinkerState.GetClassName<T>());\n");
+			code.AppendF($"{depthCode}lua.TinkerState.PushClassMetatable<T>(lua);\n");
 			code.AppendF($"{depthCode}lua.SetMetaTable(-2);\n");
 
 			code.AppendF($"{depthCode}return 1;\n");
