@@ -87,7 +87,7 @@ namespace LuaTinker.Wrappers
 						}
 						
 						let instance = StackHelper.Pop!<T>(lua, 1);
-						instance.{{Name}} = StackHelper.Pop!<{{methodInfo.ReturnType.GetTypeId()}}>(lua, 3);
+						instance.{{Name}} = StackHelper.Pop!<comptype({{methodInfo.GetParamType(0).GetTypeId()}})>(lua, 3);
 						""");
 				}
 			}

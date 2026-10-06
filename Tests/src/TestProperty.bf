@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using KeraLua;
 
 namespace LuaTinker.Tests
@@ -75,6 +76,30 @@ namespace LuaTinker.Tests
 				type.Magic = 5
 				"""
 			));
+		}
+
+		[Test]
+		public static void TestReflectedClassProperty()
+		{
+			let lua = scope Lua(true);
+			lua.Encoding = System.Text.Encoding.UTF8;
+
+			LuaTinker tinker = scope .(lua);
+			tinker.AddClass<List<float>>("FloatList");
+			tinker.AddClassCtor<List<float>>();
+			tinker.AddClassProperty<List<float>, const "Count">();
+			tinker.AddClassProperty<List<float>, const "IsEmpty">();
+
+			if (lua.DoString(
+				"""
+				local list = FloatList()
+				list.Count = 2
+				assert(list.Count == 2)
+				local ok = pcall(function() list.IsEmpty = true end)
+				assert(not ok)
+				"""
+			))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}
 
 		public static void FakeSetSize(Type type, int32 size)
