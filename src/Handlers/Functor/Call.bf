@@ -4,6 +4,7 @@ using System.Reflection;
 using KeraLua;
 using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker.Handlers
 {
@@ -157,11 +158,11 @@ namespace LuaTinker.Handlers
 		}
 
 		public static int32 CallHandler<F>(lua_State L)
-			where F : var
+			where F : var, struct
 		{
 			let lua = Lua.FromIntPtr(L);
 #unwarn
-			let func = User2Type.GetTypeDirect<F>(lua, Lua.UpValueIndex(1));
+			let func = User2Type.GetLightUserDataValue<F>(lua, Lua.UpValueIndex(1));
 
 			EmitCallHandler<F>();
 

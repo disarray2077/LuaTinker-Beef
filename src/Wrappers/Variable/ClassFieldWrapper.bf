@@ -24,13 +24,13 @@ namespace LuaTinker.Wrappers
 
 		public override void Get(Lua lua)
 		{
-			if (!lua.IsUserData(1))
+			let wrapper = User2Type.TryGetTypePtr<PointerWrapperBase>(lua, 1);
+			if (wrapper == null)
 			{
 				lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
 				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
 
-			let wrapper = User2Type.GetTypePtr<PointerWrapperBase>(lua, 1);
 			if (!typeof(T).IsPrimitive && typeof(T).IsStruct)
 				StackHelper.Push(lua, ref GetValueRef((.)wrapper.Ptr));
 			else
@@ -39,13 +39,13 @@ namespace LuaTinker.Wrappers
 
 		public override void Set(Lua lua)
 		{
-			if (!lua.IsUserData(1))
+			let wrapper = User2Type.TryGetTypePtr<PointerWrapperBase>(lua, 1);
+			if (wrapper == null)
 			{
 				lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
 				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
 
-			let wrapper = User2Type.GetTypePtr<PointerWrapperBase>(lua, 1);
 			GetValueRef((.)wrapper.Ptr) = StackHelper.Pop!<T>(lua, 3);
 		}
 	}

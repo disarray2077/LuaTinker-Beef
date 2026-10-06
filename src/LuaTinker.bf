@@ -12,13 +12,17 @@ using LuaTinker.StackHelpers;
 using KeraLua;
 
 using internal KeraLua;
+using internal LuaTinker;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker
 {
 	public class LuaTinker
 	{
 		private Lua mLua;
-		private LuaUserdataAllocator mUserdataAllocator;
+		private LuaUserdataAllocator mPointerUserdataAllocator;
+		private LuaUserdataAllocator mVariableUserdataAllocator;
+		private LuaUserdataAllocator mIndexerUserdataAllocator;
 		private LuaTinkerState mTinkerState;
 
 		/// Initializes a new instance of the LuaTinker class.
@@ -26,8 +30,9 @@ namespace LuaTinker
 		public this(Lua lua)
 		{
 			mLua = lua;
-			mUserdataAllocator = .(lua);
-			Init();
+			mPointerUserdataAllocator = .(lua, .Pointer);
+			mVariableUserdataAllocator = .(lua, .Variable);
+			mIndexerUserdataAllocator = .(lua, .Indexer);
 
 			mTinkerState = lua.TinkerState;
 		}
@@ -48,20 +53,6 @@ namespace LuaTinker
 		{
 			Debug.WriteLine(StackHelper.EnumStack(mLua, .. scope .()));
 		}
-
-		private void Init()
-		{
-			// Add GC Mate
-			mLua.CreateTable(0, 2);
-			mLua.PushString("__gc");
-			mLua.PushCClosure(=> PointerDestructorHandler, 0);
-			mLua.RawSet(-3);
-			mLua.PushString("__tostring");
-			mLua.PushCClosure(=> PointerToStringHandler, 0);
-			mLua.RawSet(-3);
-			mLua.SetGlobal("__noreg_meta");
-		}
-
 		/// Registers an enumeration type in the Lua global scope.
 		/// Creates a Lua table where keys are the enum member names and values are their integer equivalents.
 		/// @param name The name to use for the enum table in Lua. If empty, the type's name is used.
@@ -102,18 +93,7 @@ namespace LuaTinker
 			Debug.AssertNotStack(func);
 			mTinkerState.RegisterAliveObject(func);
 
-			new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
-			// register destructor
-			{
-			    mLua.CreateTable(0, 2);
-			    mLua.PushString("__gc");
-			    mLua.PushCClosure(=> PointerDestructorHandler, 0);
-			    mLua.RawSet(-3);
-				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> PointerToStringHandler, 0);
-				mLua.RawSet(-3);
-			    mLua.SetMetaTable(-2);
-			}
+			new:mPointerUserdataAllocator ClassInstanceWrapper<F>(func, true);
 			mLua.PushCClosure(=> DelegateCallHandler<F>, 1);
 			mLua.SetGlobal(name);
 		}
@@ -349,7 +329,7 @@ namespace LuaTinker
 		}
 
 		/// Registers a Beef class type in Lua.
-		/// This creates a global table that will serve as the metatable for instances of this class.
+		/// Stores the instance metatable in the registry and exposes it as a global class table.
 		/// @param name The name to use for the class in Lua. If empty, the type's name is used.
 		public void AddClass<T>(String name = String.Empty)
 		{
@@ -364,7 +344,12 @@ namespace LuaTinker
 				}
 			}
 
-			mTinkerState.SetClassName<T>(name);
+			if (!mTinkerState.TryRegisterClass<T>(name))
+			{
+				Debug.Assert(false, mTinkerState.GetLastError());
+				StackHelper.TryThrowError(mLua, mTinkerState);
+				return;
+			}
 
 			mLua.CreateTable(0, 5);
 
@@ -388,7 +373,19 @@ namespace LuaTinker
 			mLua.PushCClosure(=> PointerToStringHandler, 0);
 			mLua.RawSet(-3);
 
+			UserdataMetatables.Mark(mLua, -1, .Pointer);
+			mTinkerState.StoreClassMetatable<T>(mLua);
 			mLua.SetGlobal(name);
+		}
+
+		private bool EnsureClassRegistered<T>()
+		{
+			if (mTinkerState.IsClassRegistered<T>())
+				return true;
+			mTinkerState.SetLastError($"can't bind class '{typeof(T)}' (class not registered.)");
+			Debug.Assert(false, mTinkerState.GetLastError());
+			StackHelper.TryThrowError(mLua, mTinkerState);
+			return false;
 		}
 
 		/// Establishes an inheritance relationship between two registered classes in Lua.
@@ -396,11 +393,12 @@ namespace LuaTinker
 		/// @where P The parent class type.
 		public void AddClassParent<T, P>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>() || !EnsureClassRegistered<P>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString("__parent");
-				mLua.GetGlobal(mTinkerState.GetClassName<P>());
+				mTinkerState.PushClassMetatable<P>(mLua);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -410,8 +408,9 @@ namespace LuaTinker
 		/// This version dynamically finds a matching constructor at runtime.
 		public void AddClassCtor<T>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
@@ -429,8 +428,9 @@ namespace LuaTinker
 		/// @where Args A single argument type or a tuple representing the constructor's argument types.
 		public void AddClassCtor<T, Args>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
@@ -449,8 +449,9 @@ namespace LuaTinker
 		/// @where TKey The key type of the indexer.
 		public void AddClassIndexer<T, TKey>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (!mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) != .Table)
 			{
 				mLua.Pop(1);
 				return;
@@ -459,13 +460,13 @@ namespace LuaTinker
 			mLua.PushString("__bfindexer");
 			mLua.RawGet(-2);
 
-			let existingIndexer = User2Type.GetTypePtr<IndexerWrapperBase>(mLua, -1);
+			let existingIndexer = User2Type.TryGetTypePtr<IndexerWrapperBase>(mLua, -1);
 			mLua.Pop(1);
 
 			if (existingIndexer == null)
 			{
 				mLua.PushString("__bfindexer");
-				new:mUserdataAllocator IndexerWrapper<T, TKey>();
+				new:mIndexerUserdataAllocator IndexerWrapper<T, TKey>();
 				mLua.RawSet(-3);
 			}
 			else if (var aggregator = existingIndexer as IndexerAggregatorWrapper)
@@ -476,7 +477,7 @@ namespace LuaTinker
 			}
 			else
 			{
-				var newAggregator = new:mUserdataAllocator IndexerAggregatorWrapper();
+				var newAggregator = new:mIndexerUserdataAllocator IndexerAggregatorWrapper();
 
 				let existingIndexerClone = existingIndexer.CreateNew();
 				let newIndexer = new IndexerWrapper<T, TKey>();
@@ -488,14 +489,6 @@ namespace LuaTinker
 
 				mLua.PushString("__bfindexer");
 				mLua.PushValue(-2);
-				// register destructor
-				{
-				    mLua.CreateTable(0, 1);
-				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> IndexerDestructorHandler, 0);
-				    mLua.RawSet(-3);
-				    mLua.SetMetaTable(-2);
-				}
 				mLua.RawSet(-4);
 
 				mLua.Pop(1);
@@ -511,8 +504,9 @@ namespace LuaTinker
 		/// @param func The function pointer to bind.
 		public void AddClassMethod<T, F>(String name, F func) where F : var, struct
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
 				mLua.PushLightUserData(func);
@@ -528,8 +522,9 @@ namespace LuaTinker
 		public void AddClassMethod<T, Name>(String name = "")
 			where Name : const String
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
 				mLua.PushCClosure(=> DynamicCallHandler<T, const Name, false>, 0);
@@ -564,11 +559,12 @@ namespace LuaTinker
 			}
 			_Emit();
 
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				new:mUserdataAllocator ClassFieldWrapper<comptype(memberTypeId)>(memberOffset);
+				new:mVariableUserdataAllocator ClassFieldWrapper<comptype(memberTypeId)>(memberOffset);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -579,11 +575,12 @@ namespace LuaTinker
 		public void AddClassProperty<T, Name>(String name = "")
 			where Name : const String
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				new:mUserdataAllocator ClassPropertyWrapper<T, Name>();
+				new:mVariableUserdataAllocator ClassPropertyWrapper<T, Name>();
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -600,22 +597,15 @@ namespace LuaTinker
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
 			Debug.AssertNotStack(getter);
 			Debug.AssertNotStack(setter);
+			if (!EnsureClassRegistered<T>())
+				return;
 			mTinkerState.RegisterAliveObject(getter);
 			mTinkerState.RegisterAliveObject(setter);
 
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator DelegatePropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
-				// register destructor
-				{
-				    mLua.CreateTable(0, 1);
-				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> VariableDestructorHandler, 0);
-				    mLua.RawSet(-3);
-				    mLua.SetMetaTable(-2);
-				}
+				new:mVariableUserdataAllocator DelegatePropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -628,11 +618,12 @@ namespace LuaTinker
 		public void AddClassProperty<T, TVar>(String name, function TVar(T) getter, function void(T, TVar) setter)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -645,11 +636,12 @@ namespace LuaTinker
 		public void AddClassProperty<T, TVar>(String name, function TVar(T this) getter, function void(T this, TVar) setter)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -816,6 +808,7 @@ namespace LuaTinker
 
 		/// Creates a new nested table in Lua.
 		/// @param path A dot-separated path for the table.
+		[Inline]
 		public void NewTable(String path)
 			=> AddNamespace(path);
 
@@ -874,18 +867,7 @@ namespace LuaTinker
 			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(methodName);
-				new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
-				// register destructor
-				{
-				    mLua.CreateTable(0, 2);
-				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> PointerDestructorHandler, 0);
-				    mLua.RawSet(-3);
-					mLua.PushString("__tostring");
-					mLua.PushCClosure(=> PointerToStringHandler, 0);
-					mLua.RawSet(-3);
-				    mLua.SetMetaTable(-2);
-				}
+				new:mPointerUserdataAllocator ClassInstanceWrapper<F>(func, true);
 				mLua.PushCClosure(=> DelegateCallHandler<F>, 1);
 				mLua.RawSet(-3);
 			}
@@ -1082,7 +1064,7 @@ namespace LuaTinker
 			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 
-			if (mLua.IsNil(-1) || !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			if (mLua.IsNil(-1) || !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
 				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
 				return .Err(mTinkerState.GetLastError());
@@ -1102,7 +1084,7 @@ namespace LuaTinker
 			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 
-			if (!mLua.IsNil(-1) && !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			if (!mLua.IsNil(-1) && !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
 				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
 				return .Err(mTinkerState.GetLastError());
@@ -1122,7 +1104,7 @@ namespace LuaTinker
 			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 
-			if (!mLua.IsNil(-1) && !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			if (!mLua.IsNil(-1) && !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
 				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
 				return .Err(mTinkerState.GetLastError());

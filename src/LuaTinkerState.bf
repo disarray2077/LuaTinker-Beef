@@ -5,11 +5,20 @@ using System.Reflection;
 using KeraLua;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker
 {
 	public class LuaTinkerState
 	{
-		private Dictionary<TypeId, String> mClassNames = new .() ~ DeleteDictionaryAndValues!(_);
+		private class ClassRegistration
+		{
+			// This registration's stable address is its private registry key for the state's lifetime.
+			public String Name ~ delete _;
+			public this(StringView name) { Name = new .(name); }
+		}
+
+		private Dictionary<TypeId, ClassRegistration> mClasses = new .() ~ DeleteDictionaryAndValues!(_);
 		private String mLastError = new .() ~ delete _;
 
 		public bool IsPCall { get; private set; }
@@ -69,29 +78,56 @@ namespace LuaTinker
 
 		public bool IsClassRegistered<T>()
 		{
-			return mClassNames.ContainsKey(typeof(T).TypeId);
+			return mClasses.ContainsKey(typeof(T).TypeId);
 		}
 
 		public StringView GetClassName<T>()
 		{
-			if (mClassNames.TryGetValue(typeof(T).TypeId, let name))
-				return .(name);
+			if (mClasses.TryGetValue(typeof(T).TypeId, let registration))
+				return .(registration.Name);
 			Runtime.FatalError("GetClassName() failed");
 		}
 
-		public void SetClassName<T>(StringView name)
+		internal bool TryRegisterClass<T>(StringView name)
 		{
-			if (mClassNames.TryAdd(typeof(T).TypeId, let keyPtr, let valuePtr))
+			for (let registration in mClasses.Values)
 			{
-				*valuePtr = new String(name);
+				if (registration.Name == name)
+				{
+					SetLastError($"can't register class '{name}' (name already registered.)");
+					return false;
+				}
 			}
-			else
+			if (IsClassRegistered<T>())
 			{
-				let nameStr = *valuePtr;
-				nameStr.Clear();
-				nameStr.Set(name);
-				nameStr.EnsureNullTerminator();
+				SetLastError($"can't register class '{name}' (type already registered.)");
+				return false;
 			}
+			mClasses.Add(typeof(T).TypeId, new ClassRegistration(name));
+			return true;
 		}
+
+		internal void StoreClassMetatable<T>(Lua lua)
+		{
+			let registration = mClasses[typeof(T).TypeId];
+			lua.PushValue(-1);
+			lua.RawSetByHashCode(LuaRegistry.Index, Internal.UnsafeCastToPtr(registration));
+		}
+
+		[Inline]
+		internal LuaType PushClassMetatable<T>(Lua lua) => PushClassMetatable(lua, typeof(T));
+
+		internal LuaType PushClassMetatable(Lua lua, Type type)
+		{
+			if (!mClasses.TryGetValue(type.TypeId, let registration))
+			{
+				lua.PushNil();
+				return .Nil;
+			}
+			return lua.RawGetByHashCode(LuaRegistry.Index, Internal.UnsafeCastToPtr(registration));
+		}
+
+		[Inline]
+		internal bool IsClassRegistered(Type type) => mClasses.ContainsKey(type.TypeId);
 	}
 }

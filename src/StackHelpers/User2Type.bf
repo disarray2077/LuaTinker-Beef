@@ -4,17 +4,26 @@ using System.Diagnostics;
 using LuaTinker.Wrappers;
 
 using internal KeraLua;
+using internal LuaTinker;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker.StackHelpers
 {
 	public struct User2Type
 	{
-		public static T GetTypeDirect<T>(Lua lua, int32 index)
+		[Inline]
+		internal static bool IsLuaTinkerPointerUserdata(Lua lua, int32 index)
+			=> UserdataMetatables.IsKind(lua, index, .Pointer);
+
+		/// Decodes LuaTinker-owned, pointer-sized function values stored as light userdata.
+		internal static T GetLightUserDataValue<T>(Lua lua, int32 index) where T : var, struct
 		{
-			if (!lua.IsUserData(index))
+			if (sizeof(T) > sizeof(void*))
+				Runtime.FatalError(scope $"Light userdata value {typeof(T)} is {sizeof(T)} bytes (pointer: {sizeof(void*)})");
+			if (lua.Type(index) != .LightUserData)
 			{
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				luaTinker.SetLastError($"expected 'LightUserData' but got '{lua.TypeName(index)}'");
 				StackHelper.TryThrowError(lua, luaTinker);
 				return default;
 			}
@@ -24,76 +33,100 @@ namespace LuaTinker.StackHelpers
 
 		public static Object GetObject(Lua lua, int32 index)
 		{
-			if (!lua.IsUserData(index))
+			if (!LuaUserdataAllocator.TryGetPayload(lua, index, .Pointer, let ptr))
 			{
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
+				luaTinker.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to 'LuaTinker object'");
 				StackHelper.TryThrowError(lua, luaTinker);
 				return default;
 			}
-			return Internal.UnsafeCastToObject(lua.ToUserData(index));
+			return Internal.UnsafeCastToObject(ptr);
 		}
 
 		public static Type GetObjectType(Lua lua, int32 index)
 		{
-			if (!lua.IsUserData(index))
-			{
-				/*let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
-				StackHelper.TryThrowError(lua, luaTinker);*/
-				return default;
-			}
-			Object object = Internal.UnsafeCastToObject(lua.ToUserData(index));
+			if (!LuaUserdataAllocator.TryGetPayload(lua, index, .Pointer, let ptr))
+				return null;
+			Object object = Internal.UnsafeCastToObject(ptr);
 			if (let wrapper = object as PointerWrapperBase)
 				return wrapper.Type;
 			return object.GetType();
 		}
 
-		[Inline]
-		public static Object UnsafeGetObject(Lua lua, int32 index)
+		public static bool IsObjectTypeCompatible(Lua lua, int32 index, Type expectedType)
 		{
-			return Internal.UnsafeCastToObject(lua.ToUserData(index));
+			if (lua.TinkerState.IsClassRegistered(expectedType))
+				return StackHelper.ValidateClassMetatable(lua, index, expectedType) != .Error;
+			let actualType = GetObjectType(lua, index);
+			return actualType != null && actualType.IsSubtypeOf(expectedType);
+		}
+
+		private static T TryGetTypePtr<T>(Lua lua, int32 index, LuaUserdataKind kind) where T : class
+		{
+			if (!LuaUserdataAllocator.TryGetPayload(lua, index, kind, let ptr))
+				return null;
+			return Internal.UnsafeCastToObject(ptr) as T;
 		}
 
 		[Inline]
-		private static T* GetTypePtr<T>(Lua lua, void* ptr) where T : struct*
-		{
-			return (T*)ptr;
-		}
+		public static T TryGetTypePtr<T>(Lua lua, int32 index) where T : PointerWrapperBase
+			=> TryGetTypePtr<T>(lua, index, .Pointer);
+
+		/// The validated Pointer metatable kind guarantees this exact family base.
+		[Inline]
+		public static T TryGetTypePtr<T>(Lua lua, int32 index) where T : PointerWrapperBase where PointerWrapperBase : T
+			=> TryGetTrustedTypePtr<T>(lua, index, .Pointer);
 
 		[Inline]
-		private static T GetTypePtr<T>(Lua lua, void* ptr) where T : class
+		public static T TryGetTypePtr<T>(Lua lua, int32 index) where T : VariableWrapperBase
+			=> TryGetTypePtr<T>(lua, index, .Variable);
+
+		/// The validated Variable metatable kind guarantees this exact family base.
+		[Inline]
+		public static T TryGetTypePtr<T>(Lua lua, int32 index) where T : VariableWrapperBase where VariableWrapperBase : T
+			=> TryGetTrustedTypePtr<T>(lua, index, .Variable);
+
+		[Inline]
+		public static T TryGetTypePtr<T>(Lua lua, int32 index) where T : IndexerWrapperBase
+			=> TryGetTypePtr<T>(lua, index, .Indexer);
+
+		/// The validated Indexer metatable kind guarantees this exact family base.
+		[Inline]
+		public static T TryGetTypePtr<T>(Lua lua, int32 index) where T : IndexerWrapperBase where IndexerWrapperBase : T
+			=> TryGetTrustedTypePtr<T>(lua, index, .Indexer);
+
+		/// Callers guarantee the concrete wrapper by construction, or request its validated family base.
+		/// Deliberate metatable/upvalue tampering is outside this helper's threat model.
+		internal static T TryGetTrustedTypePtr<T>(Lua lua, int32 index, LuaUserdataKind kind) where T : class
 		{
-#if DEBUG || BF_DYNAMIC_CAST_CHECK
+			if (!LuaUserdataAllocator.TryGetPayload(lua, index, kind, let ptr))
+				return null;
 			let obj = Internal.UnsafeCastToObject(ptr);
-			if (let res = obj as T)
-				return res;
-#unwarn
-			let luaTinker = lua.TinkerState;
-			luaTinker.SetLastError($"expected '{typeof(T)}' but got '{obj.GetType()}'");
-			StackHelper.TryThrowError(lua, luaTinker);
-			return default;
+#if DEBUG
+			let wrapper = obj as T;
+			if (wrapper == null)
+				Runtime.FatalError("Trusted LuaTinker userdata has an unexpected wrapper type");
+			return wrapper;
 #else
-			return (T)Internal.UnsafeCastToObject(ptr);
+			return (T)obj;
 #endif
 		}
 
-		public static T GetTypePtr<T>(Lua lua, int32 index) where T : var
-		{
-			if (!lua.IsUserData(index))
-			{
-				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"expected 'UserData' but got '{lua.TypeName(index)}'");
-				StackHelper.TryThrowError(lua, luaTinker);
-				return default;
-			}
-			return GetTypePtr<T>(lua, lua.ToUserData(index));
-		}
-
+		/// Pointer kind validates the family; callers guarantee any concrete subtype by construction.
 		[Inline]
-		public static T UnsafeGetTypePtr<T>(Lua lua, int32 index) where T : var
-		{
-			return GetTypePtr<T>(lua, lua.ToUserData(index));
-		}
+		internal static T TryGetTrustedTypePtr<T>(Lua lua, int32 index) where T : PointerWrapperBase
+			=> TryGetTrustedTypePtr<T>(lua, index, .Pointer);
+
+		/// Variable kind validates the family; callers guarantee any concrete subtype by construction.
+		[Inline]
+		internal static T TryGetTrustedTypePtr<T>(Lua lua, int32 index) where T : VariableWrapperBase
+			=> TryGetTrustedTypePtr<T>(lua, index, .Variable);
+
+		/// Indexer kind validates the family; callers guarantee any concrete subtype by construction.
+		[Inline]
+		internal static T TryGetTrustedTypePtr<T>(Lua lua, int32 index) where T : IndexerWrapperBase
+			=> TryGetTrustedTypePtr<T>(lua, index, .Indexer);
+
+
 	}
 }

@@ -33,7 +33,9 @@ namespace LuaTinker.StackHelpers
 		{
 			if (lua.IsUserData(index))
 			{
-				let wrapper = User2Type.UnsafeGetTypePtr<PointerWrapperBase>(lua, index);
+				let wrapper = User2Type.GetObject(lua, index) as PointerWrapperBase;
+				if (wrapper == null)
+					return default;
 				switch (wrapper.ToObject(alloc, let obj))
 				{
 				case .Object, .NewObject:
@@ -90,8 +92,18 @@ namespace LuaTinker.StackHelpers
 		{
 			if (lua.IsUserData(index))
 			{
-				let wrapper = User2Type.GetTypePtr<PointerWrapperBase>(lua, index);
-				return (String)Internal.UnsafeCastToObject(wrapper.[Friend]mPtr);
+				let wrapper = User2Type.GetObject(lua, index) as PointerWrapperBase;
+				if (wrapper == null)
+					return default;
+				if (!wrapper.Type.IsValueType && (wrapper.ToObject(alloc, let obj) case .Object))
+				{
+					if (let str = obj as String)
+						return str;
+				}
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"can't convert argument {index} to 'String'");
+				TryThrowError(lua, luaTinker);
+				return default;
 			}
 			else
 			{

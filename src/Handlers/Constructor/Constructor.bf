@@ -5,6 +5,7 @@ using LuaTinker.StackHelpers;
 using LuaTinker.Helpers;
 
 using internal KeraLua;
+using internal LuaTinker;
 
 namespace LuaTinker.Handlers
 {
@@ -57,7 +58,7 @@ namespace LuaTinker.Handlers
 			let tinkerState = lua.TinkerState;
 
 			EmitCreatorLayer<T, Args>();
-			lua.GetGlobal(tinkerState.GetClassName<T>());
+			tinkerState.PushClassMetatable<T>(lua);
 			lua.SetMetaTable(-2);
 
 			return 1;

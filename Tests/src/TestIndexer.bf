@@ -6,6 +6,41 @@ namespace LuaTinker.Tests
 {
 	static class TestIndexer
 	{
+		class DerivedList : List<int> {}
+		class FurtherDerivedList : DerivedList {}
+
+		[Test]
+		public static void TestInheritedIndexer()
+		{
+			let lua = scope Lua(true);
+			LuaTinker tinker = scope .(lua);
+			tinker.AddClass<List<int>>("IntList");
+			tinker.AddClassIndexer<List<int>, int>();
+			tinker.AddClassMethod<List<int>, function void(List<int> this, int)>("Add", => List<int>.Add);
+			tinker.AddClass<DerivedList>();
+			tinker.AddClassParent<DerivedList, List<int>>();
+			tinker.AddClass<FurtherDerivedList>();
+			tinker.AddClassParent<FurtherDerivedList, DerivedList>();
+			tinker.AddClassCtor<FurtherDerivedList>();
+			let borrowed = scope DerivedList() { 10 };
+			tinker.SetValue("borrowed", borrowed);
+			if (lua.DoString(
+				"""
+				assert(borrowed[0] == 10)
+				borrowed[0] = 11
+				assert(borrowed[0] == 11)
+				created = FurtherDerivedList()
+				created:Add(20)
+				assert(created[0] == 20)
+				created[0] = 21
+				assert(created[0] == 21)
+				"""
+			))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			Test.Assert(borrowed[0] == 11);
+			Test.Assert(tinker.GetValue<FurtherDerivedList>("created").Get()[0] == 21);
+		}
+
 		[Test]
 		public static void TestList()
 		{

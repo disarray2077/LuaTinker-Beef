@@ -4,7 +4,10 @@ using System.Reflection;
 using KeraLua;
 using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
+using internal LuaTinker.StackHelpers;
 using LuaTinker.Wrappers;
+
+using internal KeraLua;
 
 namespace LuaTinker.Handlers
 {
@@ -161,8 +164,15 @@ namespace LuaTinker.Handlers
 			where F : var
 		{
 			let lua = Lua.FromIntPtr(L);
+			// AddMethod/AddNamespaceMethod allocate ClassInstanceWrapper<F> for this closure upvalue.
+			let wrapper = User2Type.TryGetTrustedTypePtr<ClassInstanceWrapper<F>>(lua, Lua.UpValueIndex(1));
+			if (wrapper == null)
+			{
+				lua.TinkerState.SetLastError("can't call function. (not a LuaTinker object.)");
+				StackHelper.ThrowError(lua, lua.TinkerState);
+			}
 #unwarn
-			let func = User2Type.GetTypePtr<ClassInstanceWrapper<F>>(lua, Lua.UpValueIndex(1)).ClassInstance;
+			let func = wrapper.ClassInstance;
 
 			EmitDelegateCallHandler<F>();
 

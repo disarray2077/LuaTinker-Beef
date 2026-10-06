@@ -9,33 +9,12 @@ using LuaTinker.StackHelpers;
 using LuaTinker.Helpers;
 
 using internal KeraLua;
+using internal LuaTinker;
 
 namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
 	{
-		[Inline]
-		private static void NoRegType2User<T>(Lua lua)
-			where T : struct
-		{
-			// register destructor
-			lua.GetGlobal("__noreg_meta");
-			Debug.Assert(lua.Type(-1) == .Table, "UserData GC isn't registered!");
-			lua.SetMetaTable(-2);
-		}
-
-		[SkipCall]
-		private static void NoRegType2User<T>(Lua lua)
-			where T : String
-		{
-			// nothing
-		}
-
-		[SkipCall]
-		private static void NoRegType2User<T>(Lua lua)
-		{
-			// nothing
-		}
 
 		public static void Push<T>(Lua lua, T? val) where T : var
 		{
@@ -50,13 +29,9 @@ namespace LuaTinker.StackHelpers
 			Type2User.Create(lua, val);
 
 			let tinkerState = lua.TinkerState;
-			if (!tinkerState.IsClassRegistered<RemovePtr<T>>())
+			if (lua.Type(-1) == .UserData && tinkerState.IsClassRegistered<RemovePtr<T>>())
 			{
-				NoRegType2User<T>(lua);
-			}
-			else
-			{
-				lua.GetGlobal(tinkerState.GetClassName<RemovePtr<T>>());
+				tinkerState.PushClassMetatable<RemovePtr<T>>(lua);
 				lua.SetMetaTable(-2);
 			}
 		}
@@ -66,13 +41,9 @@ namespace LuaTinker.StackHelpers
 			Type2User.Create<T>(lua, ref val);
 
 			let tinkerState = lua.TinkerState;
-			if (!tinkerState.IsClassRegistered<RemovePtr<T>>())
+			if (lua.Type(-1) == .UserData && tinkerState.IsClassRegistered<RemovePtr<T>>())
 			{
-				NoRegType2User<T>(lua);
-			}
-			else
-			{
-				lua.GetGlobal(tinkerState.GetClassName<RemovePtr<T>>());
+				tinkerState.PushClassMetatable<RemovePtr<T>>(lua);
 				lua.SetMetaTable(-2);
 			}
 		}
@@ -149,9 +120,14 @@ namespace LuaTinker.StackHelpers
 			}
 
 			let result = EnsureValidMetaTable<T>(lua, index);
+			if (result == .Error)
+				return ref dummy;
 
-			let stackObject = User2Type.UnsafeGetObject(lua, index);
-			if (result != .OkNoMetaTable)
+			let stackObject = User2Type.GetObject(lua, index);
+			if (stackObject == null)
+				return ref dummy;
+
+			if (result != .OkUnregisteredType)
 			{
 				// We are sure that this conversion is valid, so let's just do it unsafely.
 				let ptr = ((PointerWrapperBase)stackObject).Ptr;
@@ -203,9 +179,14 @@ namespace LuaTinker.StackHelpers
 				return null;
 
 			let result = EnsureValidMetaTable<T>(lua, index);
+			if (result == .Error)
+				return null;
 
-			let stackObject = User2Type.UnsafeGetObject(lua, index);
-			if (result != .OkNoMetaTable)
+			let stackObject = User2Type.GetObject(lua, index);
+			if (stackObject == null)
+				return null;
+
+			if (result != .OkUnregisteredType)
 			{
 				// We are sure that this conversion is valid, so let's just do it unsafely.
 				let ptr = ((PointerWrapperBase)stackObject).Ptr;
