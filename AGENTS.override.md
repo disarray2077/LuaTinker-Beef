@@ -9,7 +9,7 @@ Use the following order as the starting plan, with one focused commit per group.
 | Order | Group | Description |
 | --- | --- | --- |
 | 1 | Property setter fix | Correct the reflected setter's value type and cover writable and read-only property bindings. |
-| 2 | Userdata safety | Consolidate allocation-header tagging and checked wrapper extraction. |
+| 2 | Userdata safety | Register metatable identity internally and validate userdata families before extracting wrappers. |
 | 3 | Code generation refactor | Introduce shared invocation and overload generators and the cleaned-up CodeWriter, preserving existing behavior. |
 | 4 | Ref/out arguments | Add value-by-ref binding and explicit ref/out argument hints. |
 | 5 | Numeric arguments | Add integer, enum, float/double hints and overload diagnostics. |
@@ -32,8 +32,32 @@ Use the following order as the starting plan, with one focused commit per group.
 ## Review and reporting rules
 
 - Treat `playground_draft` as the baseline for review, not an implementation that must be copied exactly. Deliberate revisions may require corresponding changes in later steps.
+- When a Lua lookup returns the pushed value's `LuaType` (for example, `RawGet`, `RawGetByHashCode`, or `GetGlobal`), use that return value for subsequent type checks instead of querying the same value again through `Type` or `Is*`. Forward the returned type through lookup helpers when callers need it. Reuse it only while it still describes the value being checked. Match the types the allocation path actually produces rather than mechanically preserving a broader `Is*` predicate: LuaTinker wrappers always use full userdata, so check `.UserData` without also accepting `.LightUserData`.
+- Use public methods for public API access and `using internal` for access to internal methods. Do not use `[Friend]` to bypass ordinary method visibility. Reserve `[Friend]` for tests or specific extraordinary cases where accessing another class's non-public field or member is preferable and less intrusive than relaxing its visibility; explain why such an exception is justified.
+- Add cleanup scopes before raising Lua errors only when actual caller-scoped resources must be disposed first. Interpolated arguments passed to the formatting overload of `SetLastError` do not themselves allocate a caller-scoped string; do not wrap such calls in an extra block merely because they use interpolation. Preserve scopes needed for explicitly scoped temporaries, including those created inside interpolated expressions.
 - For all tests brought over or changed during this work, focus assertions on LuaTinker's bindings and observable interop behavior. Remove assertions whose only purpose is to validate a bound dependency's implementation or invariants.
   - Keep suitable existing dependency types as binding targets. Removing dependency-behavior assertions does not imply replacing the target with a custom fixture. Review assertions individually and make the smallest relevant change.
   - Preserve meaningful negative binding coverage, including rejected writes to read-only properties. Do not remove such coverage merely because the property belongs to a dependency.
 - In the user-facing reply, report changes from the draft baseline, including implementation differences and assertions or scenarios added, removed, or changed, with reasons. Identify a different baseline explicitly if one is used. Distinguish test-scope changes from intentional changes to the binding contract, and report validation results and execution blockers separately.
-- Keep this file limited to instructions for this work. Do not record review history or individual change reports here.
+- Keep this file focused on this rebuild. Briefly record noteworthy departures from `playground_draft` when they affect behavior, ownership, type identity, or assumptions that later porting groups must preserve. Include the reason, implementation status, and consequences for later work. Omit routine review history and minor edits such as inlining, comment cleanup, formatting, or error-message wording.
+
+## Threat model
+
+The threat model is normal Lua/Beef use, including ordinary mistakes and invalid arguments—not deliberate corruption of internal state or adversarial attempts to subvert runtime invariants. Do not add hardening, defensive branches, or extra abstractions solely for intentionally corrupted inputs; implement only the checks needed for normal behavior.
+
+## Noteworthy design changes
+
+### Group 2: Registry-backed metatable validation
+
+Status: implemented in the current rebuild. This replaces the draft's allocation-header ownership and kind tagging, and its reliance on public class globals for internal type identity, with a shared metatable-based validation model. Metatables now establish ownership and type identity together, avoiding parallel allocation tags and mutable global lookups.
+
+- Store registered class metatables in the Lua registry under private per-type keys. Constructors, methods, properties, inheritance, and conversions must retrieve them internally. Public class names remain Lua-facing access points; rebinding a global must not change internal class identity.
+- Recognize LuaTinker metatables through private userdata-kind markers before reading any userdata header or payload. Reduce the header to the information needed to locate the payload.
+- Relative to the public API before group 2, remove `User2Type.GetTypeDirect`, `GetTypePtr`, `UnsafeGetTypePtr`, and `UnsafeGetObject`. The draft already replaces the first three with family-specific `TryGetTypePtr` overloads; this rebuild also consolidates `UnsafeGetObject` into `GetObject` so extraction consistently validates ownership. These removals have no compatibility shims; downstream callers must migrate.
+- Compare actual metatables with the registry metatable for the expected Beef type, following the existing `__parent` relationship for inheritance. Preserve borrowed and unregistered values. Reject userdata without a recognized pointer metatable before interpreting its payload.
+  - Unlike the draft, indexer lookup also follows `__parent`. Indexer access uses the normal class conversion rather than requiring an exact generic wrapper type, so derived instances can use base indexers. Preserve this behavior in later indexer changes.
+- Keep class registration unique: registering a different Beef type under an already registered Lua class name must not replace or reuse the existing binding. Repeated registration of a type is also rejected; extend its existing registered metatable through the binding APIs.
+- Remove public `LuaTinkerState.SetClassName<T>` in favor of internal `TryRegisterClass<T>`, since registration must establish registry identity rather than just record a name. Downstream callers must use `LuaTinker.AddClass<T>`; no compatibility shim is provided. Later groups must not restore name-only registration.
+- Rename `EVMTResult.OkNoMetaTable` to `OkUnregisteredType`: accepted userdata has a metatable, while the expected Beef type may be unregistered. Downstream callers must use the new enum member; no compatibility alias is provided.
+- Make `CheckMetaTableValidity<T>` strictly validate LuaTinker pointer userdata, matching `EnsureValidMetaTable<T>`. It is not a general value-conversion predicate. Generic `GetValue<T>` uses a separate preliminary filter so ordinary Lua values still reach their translators. Preserve this distinction in later conversion work.
+- Adapt later porting groups to this model rather than restoring draft allocation tags or global-based identity. Cover valid instances, inheritance, borrowed and unregistered values, independence from public globals, and ordinary invalid or foreign userdata. Follow the threat model above; exclude deliberate metatable or upvalue corruption.
