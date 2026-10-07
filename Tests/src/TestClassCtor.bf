@@ -30,6 +30,33 @@ namespace LuaTinker.Tests
 			}
 		}
 
+		[Reflect(.All)]
+		public class VariadicConstruction
+		{
+			public int Value;
+			public this(params Span<int> values)
+			{
+				for (let value in values)
+					Value += value;
+			}
+		}
+
+		[Test]
+		public static void TestVariadicConstructorArguments()
+		{
+			let lua = scope Lua(true);
+			LuaTinker tinker = scope .(lua);
+			tinker.AddClass<VariadicConstruction>();
+			tinker.AddClassCtor<VariadicConstruction>();
+			tinker.AddClassVar<VariadicConstruction, const "Value">();
+			if (lua.DoString("""
+				assert(VariadicConstruction().Value == 0)
+				assert(VariadicConstruction(1, 2, 3).Value == 6)
+				assert(not pcall(function() VariadicConstruction(1, 'bad') end))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
 		struct ConstructedDisposable : IDisposable
 		{
 			public static int DisposeCount;

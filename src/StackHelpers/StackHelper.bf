@@ -96,7 +96,7 @@ namespace LuaTinker.StackHelpers
 			{
 				// NOTE:
 				// We do this because we need to make sure the String's destructor is called before the `lua.Error` call!
-				delegate void(String) setError = scope (errStr) => { tinkerState.SetLastError(errStr); };
+				delegate void(String) setError = scope (errStr) => tinkerState.SetLastError(errStr);
 				errFunc(setError);
 			}
 
