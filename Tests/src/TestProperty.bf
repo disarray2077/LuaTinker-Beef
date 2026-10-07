@@ -28,7 +28,7 @@ namespace LuaTinker.Tests
 				});
 
 			tinker.AddMethod("GetType", (function Type())
-				() => { return typeof(Self); });
+				() => typeof(Self));
 
 			if (lua.DoString(
 				@"""
@@ -61,7 +61,7 @@ namespace LuaTinker.Tests
 				null);
 
 			tinker.AddMethod("GetType", (function Type())
-				() => { return typeof(Self); });
+				() => typeof(Self));
 
 			Test.Assert(lua.DoString(
 				@"""
@@ -127,7 +127,7 @@ namespace LuaTinker.Tests
 				});
 
 			tinker.AddMethod("GetType", (function Type())
-				() => { return typeof(Self); });
+				() => typeof(Self));
 
 			Test.Assert(lua.DoString(
 				@"""

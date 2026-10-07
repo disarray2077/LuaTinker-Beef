@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using KeraLua;
 using LuaTinker.Wrappers;
 using LuaTinker.StackHelpers;
@@ -6,6 +7,7 @@ using LuaTinker.Helpers;
 
 using internal KeraLua;
 using internal LuaTinker;
+using internal LuaTinker.Handlers;
 
 namespace LuaTinker.Handlers
 {
@@ -16,36 +18,18 @@ namespace LuaTinker.Handlers
 			where T : var
 		{
 			if (typeof(T).IsGenericParam)
+			{
+				// Generic analysis still needs the original metatable-and-return tail.
+				Compiler.MixinRoot("lua.TinkerState.PushClassMetatable<T>(lua);\nlua.SetMetaTable(-2);\nreturn 1;");
 				return;
-
-			let type = typeof(Args);
-			let code = scope String();
-
-			if (typeof(T).IsObject)
-				code.Append("let wrapper = new:alloc ClassInstanceWrapper<T>();\n");
-			else
-				code.Append("let wrapper = new:alloc ValuePointerWrapper<T>();\n");
-
-			code.Append("wrapper.Create(");
-
-			if (type.IsTuple)
-			{
-				int fieldCount = type.FieldCount;
-				for (int i = 0; i < fieldCount; i++)
-				{
-					code.AppendF($"StackHelper.Pop!<comptype({GetTupleFieldType<Args>(i).GetTypeId()})>(lua, {i + 2})");
-	
-					if (i != fieldCount - 1)
-						code.Append(", ");
-				}
-			} else if (type != typeof(void))
-			{
-				code.Append("StackHelper.Pop!<Args>(lua, 2)");
 			}
 
-			code.Append(");\n");
-
-			code.AppendF($"lua.TinkerState.RegisterAliveObject(wrapper);\n");
+			let code = scope String();
+			let writer = scope CodeWriter(code);
+			List<LuaParameter> parameters = scope .();
+			NormalizeDirectConstructorParameters<Args>(parameters);
+			EmitConstruction<T>(parameters, 0, parameters.Count, writer);
+			writer.Finish();
 
 			Compiler.MixinRoot(code);
 		}
@@ -55,13 +39,8 @@ namespace LuaTinker.Handlers
 			let lua = Lua.FromIntPtr(L);
 #unwarn
 			let alloc = LuaUserdataAllocator(lua);
-			let tinkerState = lua.TinkerState;
 
 			EmitCreatorLayer<T, Args>();
-			tinkerState.PushClassMetatable<T>(lua);
-			lua.SetMetaTable(-2);
-
-			return 1;
 		}
 	}
 }
