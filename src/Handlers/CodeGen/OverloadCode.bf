@@ -44,21 +44,20 @@ namespace LuaTinker.Handlers
 			if (numericTypes.Count > 1)
 				writer.Line(scope $"let selectedNumericType{stackIndex} = StackHelper.SelectNumeric<{candidateTypes}>(lua, {stackIndex}, {argumentPosition});");
 			CodeWriter.ConditionalChain numericChain = default;
-			for (int numericIndex < numericTypes.Count)
+			for (let type in numericTypes)
 			{
-				let type = numericTypes[numericIndex];
 				List<Trie<MatchKey>> typeBranches = scope .();
 				for (let node in numericBranches)
 					if (node.Value.MatchType == type)
 						typeBranches.Add(node);
 				let condition = numericTypes.Count == 1
 					? scope $"StackHelper.SelectNumeric<{candidateTypes}>(lua, {stackIndex}, {argumentPosition}) == 0"
-					: scope $"selectedNumericType{stackIndex} == {numericIndex}";
+					: scope $"selectedNumericType{stackIndex} == {@type.Index}";
 				delegate void(CodeWriter) emitBody = scope (body) =>
 				{
 					EmitTrieBranches<T>(positionIndex, typeBranches, candidates, parameters, positions, body, dispatchKind);
 				};
-				if (numericIndex == 0)
+				if (@type.Index == 0)
 					numericChain = writer.If(condition, emitBody);
 				else
 					numericChain = numericChain.ElseIf(condition, emitBody);
@@ -239,19 +238,18 @@ namespace LuaTinker.Handlers
 			}
 			fixedArgumentCounts.Sort();
 			if (variadicMinimum >= 0)
-				for (int i = fixedArgumentCounts.Count - 1; i >= 0; i--)
-					if (fixedArgumentCounts[i] >= variadicMinimum)
-						fixedArgumentCounts.RemoveAt(i);
+				for (let count in fixedArgumentCounts)
+					if (count >= variadicMinimum)
+						@count.RemoveFast();
 
 			String validArgumentCount = scope .();
 			String expectedArgumentCounts = scope .();
-			for (int i < fixedArgumentCounts.Count)
+			for (let count in fixedArgumentCounts)
 			{
-				let count = fixedArgumentCounts[i];
-				if (i > 0)
+				if (@count.Index > 0)
 				{
 					validArgumentCount.Append(" || ");
-					expectedArgumentCounts.Append(i == fixedArgumentCounts.Count - 1 && variadicMinimum < 0 ? " or " : ", ");
+					expectedArgumentCounts.Append(@count.Index == fixedArgumentCounts.Count - 1 && variadicMinimum < 0 ? " or " : ", ");
 				}
 				validArgumentCount.AppendF($"lua.GetTop() == {count + implicitArgumentCount}");
 				expectedArgumentCounts.AppendF($"{count}");

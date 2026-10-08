@@ -97,8 +97,8 @@ namespace LuaTinker.Handlers
 			let type = typeof(Args);
 			if (type.IsTuple)
 			{
-				for (int i = 0; i < type.FieldCount; i++)
-					AddLuaParameter(parameters, GetTupleFieldType<Args>(i), i + 2, i + 1, .Ordinary, false);
+				for (let field in type.GetFields(.DeclaredOnly))
+					AddLuaParameter(parameters, field.FieldType, @field.Index + 2, @field.Index + 1, .Ordinary, false);
 			}
 			else if (type != typeof(void))
 				AddLuaParameter(parameters, type, 2, 1, .Ordinary, false);

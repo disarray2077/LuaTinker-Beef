@@ -33,16 +33,16 @@ namespace LuaTinker.StackHelpers
 				String candidates = scope .();
 				String names = scope .();
 				int32 int32Index = -1;
-				for (int i < count)
+				for (let field in candidateType.GetFields(.DeclaredOnly))
 				{
-					let type = candidateType.GetField(i).Get().FieldType;
-					if (i > 0)
+					let type = field.FieldType;
+					if (@field.Index > 0)
 					{
 						candidates.Append(", ");
 						names.Append(", ");
 					}
 					if (type == typeof(int32))
-						int32Index = (int32)i;
+						int32Index = @field.Index;
 					let isEnumLike = type.IsEnum || type.IsTypedPrimitive;
 					candidates.AppendF($".(typeof(comptype({type.GetTypeId()})), {isEnumLike ? "true" : "false"})");
 					names.Append((scope $"{type}").Quote(.. scope .()));
@@ -81,15 +81,14 @@ namespace LuaTinker.StackHelpers
 			int32 matches = 0;
 			int32 enumMatches = 0;
 			// Retain matching candidates for ambiguity diagnostics as well as selection.
-			for (int i < candidates.Length)
+			for (let candidate in candidates)
 			{
-				let candidate = candidates[i];
-				let matched = i == int32Index ? matchesInt32 :
+				let matched = @candidate.Index == int32Index ? matchesInt32 :
 					(!preferInt32 || candidate.IsEnumLike) && IsNumericArgument(lua, index, candidate.Type);
-				matchingTypes[i] = matched;
+				matchingTypes[@candidate.Index] = matched;
 				if (!matched)
 					continue;
-				selected = (int32)i;
+				selected = (int32)@candidate.Index;
 				matches++;
 				if (candidate.IsEnumLike)
 					enumMatches++;
@@ -100,10 +99,9 @@ namespace LuaTinker.StackHelpers
 			{
 				let value = lua.ToInteger(index);
 				bool hasDefinedEnum = false;
-				for (int i < candidates.Length)
+				for (let candidate in candidates)
 				{
-					let candidate = candidates[i];
-					if (matchingTypes[i] && candidate.IsEnumLike && Enum.IsDefined(candidate.Type, value))
+					if (matchingTypes[@candidate.Index] && candidate.IsEnumLike && Enum.IsDefined(candidate.Type, value))
 					{
 						hasDefinedEnum = true;
 						break;
@@ -111,21 +109,20 @@ namespace LuaTinker.StackHelpers
 				}
 				if (hasDefinedEnum)
 				{
-					for (int i < candidates.Length)
+					for (let candidate in candidates)
 					{
-						let candidate = candidates[i];
-						if (matchingTypes[i] && candidate.IsEnumLike && !Enum.IsDefined(candidate.Type, value))
+						if (matchingTypes[@candidate.Index] && candidate.IsEnumLike && !Enum.IsDefined(candidate.Type, value))
 						{
-							matchingTypes[i] = false;
+							matchingTypes[@candidate.Index] = false;
 							matches--;
 						}
 					}
 					// Filtering may remove the last recorded match; locate the sole survivor.
 					if (matches == 1)
-						for (int i < candidates.Length)
-							if (matchingTypes[i])
+						for (let matched in matchingTypes)
+							if (matched)
 							{
-								selected = (int32)i;
+								selected = (int32)@matched.Index;
 								break;
 							}
 				}
@@ -141,14 +138,14 @@ namespace LuaTinker.StackHelpers
 			state.SetLastError($"ambiguous numeric overload at argument {argument} (");
 			let message = state.GetLastError();
 			bool first = true;
-			for (int i < typeNames.Length)
+			for (let typeName in typeNames)
 			{
-				if (!matchingTypes[i])
+				if (!matchingTypes[@typeName.Index])
 					continue;
 				if (!first)
 					message.Append(" or ");
 				message.Append('\'');
-				message.Append(typeNames[i]);
+				message.Append(typeName);
 				message.Append('\'');
 				first = false;
 			}

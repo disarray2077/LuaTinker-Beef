@@ -32,15 +32,11 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		private static void EmitVariadicStorage(LuaParameter parameter, bool annotateTypes, bool construction, CodeWriter writer)
+		private static void EmitVariadicStorage(LuaParameter parameter, bool construction, CodeWriter writer)
 		{
 			Debug.Assert(parameter.VariadicElementType != null);
 			let element = parameter.VariadicElementType;
-			let elementCode = scope $"comptype({element.GetTypeId()})";
-			let declarationCode = scope String();
-			declarationCode.Append(elementCode);
-			if (annotateTypes)
-				declarationCode.AppendF($"/*{element}*/");
+			let declarationCode = scope $"comptype({element.GetTypeId()})/*{element}*/";
 
 			if (construction)
 			{
@@ -67,9 +63,8 @@ namespace LuaTinker.Handlers
 			if (returnType.IsTuple)
 			{
 				let fieldCount = returnType.FieldCount;
-				for (int i = 0; i < fieldCount; i++)
+				for (let field in returnType.GetFields(.DeclaredOnly))
 				{
-					let field = returnType.GetField(i).Get();
 					writer.Line(scope $"StackHelper.Push(lua, {(returnsRef ? "ref " : "")}ret.{field.Name});");
 				}
 				writer.Line(scope $"return {fieldCount};");
@@ -87,7 +82,7 @@ namespace LuaTinker.Handlers
 		{
 			let returnType = method.ReturnType;
 			if (parameterCount > 0 && parameters[parameterStart + parameterCount - 1].IsVariadic)
-				EmitVariadicStorage(parameters[parameterStart + parameterCount - 1], annotateTypes, false, writer);
+				EmitVariadicStorage(parameters[parameterStart + parameterCount - 1], false, writer);
 
 			let invocation = scope String();
 			if (returnType != typeof(void))
@@ -111,15 +106,14 @@ namespace LuaTinker.Handlers
 				}
 			}
 			invocation.Append("func(");
-			for (int i = parameterStart; i < parameterStart + parameterCount; i++)
+			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
 			{
-				let parameter = parameters[i];
 				if (parameter.IsVariadic)
 					invocation.Append("params extraArgs");
 				else
 					EmitDecodedArgument(parameter, scope $"comptype({parameter.DecodedType.GetTypeId()})",
 						scope $"{parameter.LuaStackIndex}", false, invocation);
-				if (i != parameterStart + parameterCount - 1)
+				if (@parameter.Index != parameterCount - 1)
 					invocation.Append(", ");
 			}
 			invocation.Append(");");
@@ -130,9 +124,8 @@ namespace LuaTinker.Handlers
 		private static void EmitTypedCall<T>(MethodInfo method, List<LuaParameter> parameters, int parameterStart, int parameterCount, CodeWriter writer)
 		{
 			let methodParams = scope String();
-			for (int i = parameterStart; i < parameterStart + parameterCount; i++)
+			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
 			{
-				let parameter = parameters[i];
 				if (!methodParams.IsEmpty)
 					methodParams.Append(", ");
 				if (parameter.Role == .This)
@@ -183,7 +176,7 @@ namespace LuaTinker.Handlers
 			let lastParameter = parameterStart + parameterCount - 1;
 			bool variadic = parameterCount > 0 && parameters[lastParameter].IsVariadic;
 			if (variadic)
-				EmitVariadicStorage(parameters[lastParameter], false, true, writer);
+				EmitVariadicStorage(parameters[lastParameter], true, writer);
 			if (typeof(T).IsObject)
 				writer.Line("let wrapper = new:alloc ClassInstanceWrapper<T>();");
 			else
@@ -193,15 +186,14 @@ namespace LuaTinker.Handlers
 				creation.AppendF($"wrapper.CreateParams<comptype({parameters[lastParameter].VariadicElementType.GetTypeId()})>(");
 			else
 				creation.Append("wrapper.Create(");
-			for (int i = parameterStart; i < parameterStart + parameterCount; i++)
+			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
 			{
-				let parameter = parameters[i];
-				if (variadic && i == lastParameter)
+				if (variadic && @parameter.Index == parameterCount - 1)
 					creation.Append("params extraArgs");
 				else
 					EmitDecodedArgument(parameter, scope $"comptype({parameter.DecodedType.GetTypeId()})",
 						scope $"{parameter.LuaStackIndex}", false, creation);
-				if (i != lastParameter)
+				if (@parameter.Index != parameterCount - 1)
 					creation.Append(", ");
 			}
 			creation.Append(");");

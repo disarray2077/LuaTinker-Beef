@@ -69,10 +69,8 @@ namespace LuaTinker.Handlers
 
 		private static void BuildOverloadTrie(Trie<MatchKey> trie, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, bool isConstructor)
 		{
-			for (int candidateIndex < candidates.Count)
+			for (let candidate in candidates)
 			{
-				let candidate = candidates[candidateIndex];
-
 				// Every candidate at a given depth consumes the same Lua stack slot.
 				for (int i = positions.Count; i < candidate.ParameterCount; i++)
 				{
@@ -85,24 +83,23 @@ namespace LuaTinker.Handlers
 				{
 					if (!isConstructor)
 						Runtime.Assert(!node.IsEnd);
-					node.CandidateIndex = candidateIndex;
+					node.CandidateIndex = @candidate.Index;
 					node.IsEnd = true;
 					continue;
 				}
 
-				for (int i < candidate.ParameterCount)
+				for (let parameter in parameters.GetRange(candidate.ParameterStart, candidate.ParameterCount))
 				{
-					let parameter = parameters[candidate.ParameterStart + i];
 					MatchFlags flags = parameter.Role == .This ? .This : (parameter.IsVariadic ? .Params : .None);
 					if (parameter.IsVariadic && parameter.VariadicElementType == null)
 						Runtime.NotImplemented();
 					let matchType = parameter.IsVariadic ? parameter.VariadicElementType : parameter.DeclaredType;
 					node = node.Insert(.(matchType, flags));
-					if (i == candidate.ParameterCount - 1)
+					if (@parameter.Index == candidate.ParameterCount - 1)
 					{
 						if (!isConstructor)
 							Runtime.Assert(!node.IsEnd);
-						node.CandidateIndex = candidateIndex;
+						node.CandidateIndex = @candidate.Index;
 						node.IsEnd = true;
 					}
 				}
