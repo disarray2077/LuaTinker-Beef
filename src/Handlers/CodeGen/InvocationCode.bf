@@ -12,7 +12,7 @@ namespace LuaTinker.Handlers
 	{
 		[Inline]
 		private static bool IsHintableType(Type type)
-			=> IsNumericType(type);
+			=> IsNumericType(type) || type.IsPointer;
 
 		// This is the sole decision site for converting one Lua argument into a Beef value.
 		private static void EmitDecodedArgument(LuaParameter parameter, StringView typeCode, StringView stackIndex, bool variadicStorage, String code)

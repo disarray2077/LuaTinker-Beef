@@ -101,6 +101,8 @@ namespace LuaTinker.Handlers
 						condition.AppendF($"lua.IsString({stackIndex}) || lua.IsNil({stackIndex}) || User2Type.IsObjectTypeCompatible(lua, {stackIndex}, typeof(comptype({type.GetTypeId()})))");
 					else
 						condition.AppendF($"lua.Is{luaType}({stackIndex})");
+					if (type.IsPointer && !flags.HasFlag(.This))
+						condition.Insert(0, scope $"StackHelper.IsNullPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()}))) || ");
 				}
 
 				writer.Line(scope $"// {type.GetFullName(.. scope .())} (Flags: {flags})");
@@ -166,12 +168,15 @@ namespace LuaTinker.Handlers
 			let argumentPosition = positions[positionIndex].DiagnosticIndex;
 			writer.Line(scope $"matchedOverloadArguments[{positionIndex}] = false;");
 			List<Type> numericTypes = scope .();
+			List<Type> pointerTypes = scope .();
 			List<Trie<MatchKey>> numericBranches = scope .();
 			List<Trie<MatchKey>> otherBranches = scope .();
 			for (let node in root.OrderedChildren)
 			{
 				let param = node.Value;
 				let type = param.MatchType;
+				if (!param.Flags.HasFlag(.This) && type.IsPointer && !pointerTypes.Contains(type))
+					pointerTypes.Add(type);
 				if (!param.Flags.HasFlag(.This) && IsNumericType(type))
 				{
 					numericBranches.Add(node);
@@ -181,6 +186,8 @@ namespace LuaTinker.Handlers
 				else
 					otherBranches.Add(node);
 			}
+			if (pointerTypes.Count > 1)
+				writer.Line(scope $"StackHelper.EnsureUnambiguousNullPointer(lua, {stackIndex}, {argumentPosition});");
 			if (numericTypes.IsEmpty)
 				EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, writer, dispatchKind);
 			else

@@ -41,6 +41,7 @@ namespace LuaTinker
 			AddNumericCast<uint32>("uint32");
 			AddNumericCast<float>("float");
 			AddNumericCast<double>("double");
+			AddNullPointerHint();
 		}
 
 		public ~this()
@@ -66,6 +67,18 @@ namespace LuaTinker
 			mLua.PushCClosure(=> NumericArgumentCastHandler<T>, 0);
 			mLua.RawSet(-3);
 			mLua.SetGlobal(name);
+		}
+
+		private void AddNullPointerHint()
+		{
+			mLua.CreateTable(0, 2);
+			mLua.PushString("int32");
+			StackHelper.PushNullPointerArgumentHint(mLua, typeof(int32*));
+			mLua.RawSet(-3);
+			mLua.PushString("void");
+			StackHelper.PushNullPointerArgumentHint(mLua);
+			mLua.RawSet(-3);
+			mLua.SetGlobal("nullptr");
 		}
 
 		private void PushEnumTable<E>(bool typed) where E : enum
