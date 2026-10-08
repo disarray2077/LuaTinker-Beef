@@ -88,7 +88,8 @@ namespace LuaTinker.Helpers
 		{
 			if (!mAtLineStart)
 				Runtime.FatalError("Cannot open a block inside a source line");
-			Line(header);
+			if (!header.IsEmpty)
+				Line(header);
 			Line("{");
 			mDepth++;
 		}
@@ -115,6 +116,14 @@ namespace LuaTinker.Helpers
 				Line(body);
 			CloseBlock();
 		}
+
+		[Inline]
+		public void Block(delegate void(CodeWriter) body)
+			=> Block("", body);
+
+		[Inline]
+		public void Block(StringView body)
+			=> Block("", body);
 
 		public void Block(StringView header, delegate void(CodeWriter) body)
 		{

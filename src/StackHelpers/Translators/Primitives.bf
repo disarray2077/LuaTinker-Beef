@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using KeraLua;
+using LuaTinker.Helpers;
 
 using internal KeraLua;
 
@@ -34,7 +35,7 @@ namespace LuaTinker.StackHelpers
 				return default;
 			}
 			let value = res.GetValueOrDefault();
-			if (value > (int64)(T)value)
+			if (!CanRepresentInteger(typeof(T), value))
 			{
 				let luaTinker = lua.TinkerState;
 				luaTinker.SetLastError($"number is out of range for the type '{typeof(T)}'");
@@ -72,7 +73,15 @@ namespace LuaTinker.StackHelpers
 				TryThrowError(lua, luaTinker);
 				return default;
 			}
-			return (T)value.GetValueOrDefault();
+			let numericValue = value.GetValueOrDefault();
+			if (!CanRepresentFloating(typeof(T), numericValue))
+			{
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"number is out of range for the type '{typeof(T)}'");
+				TryThrowError(lua, luaTinker);
+				return default;
+			}
+			return (T)numericValue;
 		}
 
 		[Inline]

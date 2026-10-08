@@ -17,6 +17,8 @@ extension StackHelper
 	public static T Pop<T>(Lua lua, int32 index)
 		where T : struct, LuaTable where LuaTable : T
 	{
+		if (!EnsureNotArgumentHint(lua, index, typeof(T)))
+			return default;
 		if (lua.IsNil(index))
 		{
 			return default;

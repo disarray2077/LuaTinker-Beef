@@ -10,6 +10,10 @@ namespace LuaTinker.Handlers
 {
 	static
 	{
+		[Inline]
+		private static bool IsHintableType(Type type)
+			=> IsNumericType(type);
+
 		// This is the sole decision site for converting one Lua argument into a Beef value.
 		private static void EmitDecodedArgument(LuaParameter parameter, StringView typeCode, StringView stackIndex, bool variadicStorage, String code)
 		{
@@ -17,6 +21,10 @@ namespace LuaTinker.Handlers
 			{
 				code.Append("ref ");
 				code.AppendF($"StackHelper.PopRef<{typeCode}>(lua, {stackIndex})");
+			}
+			else if (IsHintableType(parameter.DecodedType))
+			{
+				code.AppendF($"StackHelper.PopHinted<{typeCode}>(lua, {stackIndex})");
 			}
 			else
 			{

@@ -28,6 +28,7 @@ namespace LuaTinker.Handlers
 			public Type DecodedType;
 			public LuaParameterMode Mode;
 			public int LuaStackIndex;
+			public int DiagnosticIndex;
 			public Type VariadicElementType;
 			public LuaParameterRole Role;
 
@@ -38,13 +39,14 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		private static void AddLuaParameter(List<LuaParameter> parameters, Type declaredType, int stackIndex, LuaParameterRole role, bool decodeRef = true)
+		private static void AddLuaParameter(List<LuaParameter> parameters, Type declaredType, int stackIndex, int diagnosticIndex, LuaParameterRole role, bool decodeRef = true)
 		{
 			LuaParameter parameter = .();
 			parameter.DeclaredType = declaredType;
 			parameter.DecodedType = declaredType;
 			parameter.Mode = .Value;
 			parameter.LuaStackIndex = stackIndex;
+			parameter.DiagnosticIndex = diagnosticIndex;
 			parameter.Role = role;
 			if (decodeRef && (let refType = declaredType as RefType))
 			{
@@ -67,16 +69,16 @@ namespace LuaTinker.Handlers
 		internal static void NormalizeMethodParameters(MethodInfo method, List<LuaParameter> parameters)
 		{
 			if (!method.IsStatic)
-				AddLuaParameter(parameters, method.DeclaringType, 1, .This);
+				AddLuaParameter(parameters, method.DeclaringType, 1, 0, .This);
 			for (int i = 0; i < method.ParamCount; i++)
-				AddLuaParameter(parameters, method.GetParamType(i), i + (method.IsStatic ? 1 : 2),
+				AddLuaParameter(parameters, method.GetParamType(i), i + (method.IsStatic ? 1 : 2), i + 1,
 					method.GetParamFlags(i).HasFlag(.Params) ? .Variadic : .Ordinary);
 		}
 
 		internal static void NormalizeConstructorParameters(MethodInfo ctor, List<LuaParameter> parameters, int visibleStart)
 		{
 			for (int i = visibleStart; i < ctor.ParamCount; i++)
-				AddLuaParameter(parameters, ctor.GetParamType(i), 2 + i - visibleStart,
+				AddLuaParameter(parameters, ctor.GetParamType(i), 2 + i - visibleStart, i - visibleStart + 1,
 					ctor.GetParamFlags(i).HasFlag(.Params) ? .Variadic : .Ordinary, false);
 		}
 
@@ -84,7 +86,7 @@ namespace LuaTinker.Handlers
 		{
 			bool hasThisParameter = method.ParamCount > 0 && method.GetParamName(0) == "this";
 			for (int i = 0; i < method.ParamCount; i++)
-				AddLuaParameter(parameters, method.GetParamType(i), i + 1,
+				AddLuaParameter(parameters, method.GetParamType(i), i + 1, i + (hasThisParameter ? 0 : 1),
 					hasThisParameter && i == 0 ? .This : (method.GetParamFlags(i).HasFlag(.Params) ? .Variadic : .Ordinary));
 		}
 
@@ -96,10 +98,10 @@ namespace LuaTinker.Handlers
 			if (type.IsTuple)
 			{
 				for (int i = 0; i < type.FieldCount; i++)
-					AddLuaParameter(parameters, GetTupleFieldType<Args>(i), i + 2, .Ordinary, false);
+					AddLuaParameter(parameters, GetTupleFieldType<Args>(i), i + 2, i + 1, .Ordinary, false);
 			}
 			else if (type != typeof(void))
-				AddLuaParameter(parameters, type, 2, .Ordinary, false);
+				AddLuaParameter(parameters, type, 2, 1, .Ordinary, false);
 		}
 	}
 }

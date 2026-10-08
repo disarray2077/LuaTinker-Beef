@@ -55,7 +55,7 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		internal struct SelectorPosition : this(int LuaStackIndex);
+		internal struct SelectorPosition : this(int LuaStackIndex, int DiagnosticIndex);
 
 		internal struct OverloadCandidate : this(MethodInfo Method, int ParameterStart, int ParameterCount);
 
@@ -77,7 +77,7 @@ namespace LuaTinker.Handlers
 				for (int i = positions.Count; i < candidate.ParameterCount; i++)
 				{
 					let parameter = parameters[candidate.ParameterStart + i];
-					positions.Add(.(parameter.LuaStackIndex));
+					positions.Add(.(parameter.LuaStackIndex, parameter.DiagnosticIndex));
 				}
 
 				Trie<MatchKey> node = trie;
@@ -110,7 +110,7 @@ namespace LuaTinker.Handlers
 
 			if (positions.IsEmpty)
 			{
-				positions.Add(.(isConstructor ? 2 : 1));
+				positions.Add(.(isConstructor ? 2 : 1, 1));
 			}
 		}
 	}
