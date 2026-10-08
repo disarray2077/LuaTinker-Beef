@@ -58,6 +58,14 @@ namespace LuaTinker.StackHelpers
 				return;
 			}
 			let hintIndex = lua.AbsIndex(index);
+			lua.RawGetInteger(hintIndex, 1);
+			let tag = lua.ToInteger(-1);
+			lua.Pop(1);
+			if (tag == 4 || tag == 5)
+			{
+				name.Append(tag == 4 ? "nullptr.int32 hint" : "nullptr.void hint");
+				return;
+			}
 			lua.RawGetInteger(hintIndex, 2);
 			let typeId = lua.ToInteger(-1);
 			lua.Pop(1);
