@@ -31,6 +31,8 @@ namespace LuaTinker.StackHelpers
 		private static Object _PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
 			where T : Object
 		{
+			if (!EnsureNotArgumentHint(lua, index))
+				return default;
 			if (lua.IsUserData(index))
 			{
 				let wrapper = User2Type.GetObject(lua, index) as PointerWrapperBase;

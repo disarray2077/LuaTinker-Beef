@@ -14,6 +14,7 @@ using KeraLua;
 using internal KeraLua;
 using internal LuaTinker;
 using internal LuaTinker.StackHelpers;
+using internal LuaTinker.Handlers;
 
 namespace LuaTinker
 {
@@ -35,6 +36,11 @@ namespace LuaTinker
 			mIndexerUserdataAllocator = .(lua, .Indexer);
 
 			mTinkerState = lua.TinkerState;
+			StackHelper.RegisterArgumentHintMetatable(mLua);
+			AddNumericCast<int32>("int32");
+			AddNumericCast<uint32>("uint32");
+			AddNumericCast<float>("float");
+			AddNumericCast<double>("double");
 		}
 
 		public ~this()
@@ -53,25 +59,42 @@ namespace LuaTinker
 		{
 			Debug.WriteLine(StackHelper.EnumStack(mLua, .. scope .()));
 		}
+		private void AddNumericCast<T>(String name) where T : var, struct
+		{
+			mLua.CreateTable(0, 1);
+			mLua.PushString("cast");
+			mLua.PushCClosure(=> NumericArgumentCastHandler<T>, 0);
+			mLua.RawSet(-3);
+			mLua.SetGlobal(name);
+		}
+
+		private void PushEnumTable<E>(bool typed) where E : enum
+		{
+			mLua.CreateTable(0, typeof(E).FieldCount + 1);
+			for (let field in typeof(E).GetFields())
+			{
+				mLua.PushString(field.Name);
+				let value = field.[Friend]mFieldData.[Friend]mData;
+				if (typed)
+					StackHelper.PushNumericArgumentHint(mLua, typeof(E), value);
+				else
+					mLua.PushInteger(value);
+				mLua.RawSet(-3);
+			}
+			mLua.PushString("cast");
+			mLua.PushCClosure(=> NumericArgumentCastHandler<E>, 0);
+			mLua.RawSet(-3);
+		}
+
 		/// Registers an enumeration type in the Lua global scope.
-		/// Creates a Lua table where keys are the enum member names and values are their integer equivalents.
+		/// By default member values are Lua integers; typed members carry numeric cast hints.
 		/// @param name The name to use for the enum table in Lua. If empty, the type's name is used.
-		public void AddEnum<E>(String name = String.Empty)
-			where E : enum
+		public void AddEnum<E>(String name = String.Empty, bool typed = false) where E : enum
 		{
 			var name;
 			if (name.IsEmpty)
 				name = typeof(E).GetName(.. scope:: String());
-
-			mLua.CreateTable(0, typeof(E).FieldCount);
-
-			for (let field in typeof(E).GetFields())
-			{
-				mLua.PushString(field.Name);
-				mLua.PushInteger(field.[Friend]mFieldData.[Friend]mData);
-				mLua.SetTable(-3);
-			}
-
+			PushEnumTable<E>(typed);
 			mLua.SetGlobal(name);
 		}
 
@@ -815,28 +838,17 @@ namespace LuaTinker
 		/// Registers an enumeration type within a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param enumName The name for the enum table in Lua. If empty, the type's name is used.
-		public void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty)
-			where E : enum
+		public void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty, bool typed = false) where E : enum
 		{
 			if (FindNamespaceTable(namespacePath))
 			{
 				var enumName;
 				if (enumName.IsEmpty)
 					enumName = typeof(E).GetName(.. scope:: String());
-
 				mLua.PushString(enumName);
-				mLua.CreateTable(0, typeof(E).FieldCount);
-	
-				for (let field in typeof(E).GetFields())
-				{
-					mLua.PushString(field.Name);
-					mLua.PushInteger(field.[Friend]mFieldData.[Friend]mData);
-					mLua.SetTable(-3);
-				}
-
+				PushEnumTable<E>(typed);
 				mLua.RawSet(-3);
 			}
-
 			mLua.Pop(1);
 		}
 

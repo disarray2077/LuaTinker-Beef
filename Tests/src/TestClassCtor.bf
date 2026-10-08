@@ -66,6 +66,24 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
+		public static void TestConstructorArgumentDiagnostics()
+		{
+			let lua = scope Lua(true);
+			LuaTinker tinker = scope .(lua);
+			tinker.AddClass<ConstructedDisposable>();
+			tinker.AddClassCtor<ConstructedDisposable>();
+			if (lua.DoString("""
+				local ok, err = pcall(function() ConstructedDisposable('invalid') end)
+				assert(not ok and err:find("at argument 1 but got 'string'", 1, true), tostring(err))
+				ok, err = pcall(function() ConstructedDisposable() end)
+				assert(not ok and err:find("expected '1' arguments but got '0'", 1, true), tostring(err))
+				ok, err = pcall(function() ConstructedDisposable(1, 2) end)
+				assert(not ok and err:find("expected '1' arguments but got '2'", 1, true), tostring(err))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
 		public static void TestFailedStructConstructionFinalization()
 		{
 			ConstructedDisposable.DisposeCount = 0;
