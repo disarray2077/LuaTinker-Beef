@@ -13,6 +13,7 @@ namespace LuaTinker.Wrappers
 		}
 
 		public override Type Type => typeof(T);
+		public override bool CanPassByRef => true;
 
 		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{

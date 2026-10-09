@@ -40,6 +40,7 @@ namespace LuaTinker.Wrappers
 			=> mData = .(t1, t2, t3, t4);
 
 		public override Type Type => typeof(T);
+		public override bool CanPassByRef => true;
 
 		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{

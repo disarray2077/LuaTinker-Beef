@@ -13,6 +13,7 @@ namespace LuaTinker.Wrappers
 		}
 
 		public override Type Type => typeof(T);
+		public override bool CanPassByRef => true;
 
 		public override void ToString(String strBuffer)
 		{

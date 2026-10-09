@@ -86,40 +86,21 @@ namespace LuaTinker.StackHelpers
 		{
 			if (lua.IsNil(index))
 				return null;
+			if (typeof(T) == typeof(char8*) && lua.Type(index) == .String)
+				return (T)lua.ToStringView(index, false).Ptr;
 
 			let stackObject = User2Type.GetObject(lua, index);
-			if (let ptrWrapper = stackObject as PointerWrapper<RemovePtr<T>>)
-				return ptrWrapper.Ptr;
-			else if (let refPtrWrapper = stackObject as RefPointerWrapper<RemovePtr<T>>)
-				return &refPtrWrapper.Reference;
-			else if (let valuePointer = GetOwnedValuePointer<RemovePtr<T>>(stackObject))
-				return valuePointer;
-			else
+			if (let pointerWrapper = stackObject as PointerWrapperBase)
+				if (IsPointerWrapperArgument(pointerWrapper, typeof(T)))
+					return (T)pointerWrapper.Ptr;
+
+			let tinkerState = lua.TinkerState;
 			{
-				let tinkerState = lua.TinkerState;
-				{
-					// Set error in a different scope to make sure the temporary strings destructors run before throwing the error.
-					tinkerState.SetLastError($"can't convert argument {index} to 'ptr {GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
-				}
-				TryThrowError(lua, tinkerState);
-				return default;
+				// Dispose the scoped class-name string before raising the Lua error.
+				tinkerState.SetLastError($"can't convert argument {index} to 'ptr {GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
 			}
-		}
-
-		[Inline]
-		public static bool IsOwnedValuePointerArgument<T>(Lua lua, int32 index) where T : var, struct*
-			=> GetOwnedValuePointer<RemovePtr<T>>(User2Type.TryGetTypePtr<PointerWrapperBase>(lua, index)) != null;
-
-		[Inline]
-		private static T* GetOwnedValuePointer<T>(Object stackObject) where T : var
-			=> null;
-
-		[Inline]
-		private static T* GetOwnedValuePointer<T>(Object stackObject) where T : var, struct
-		{
-			if (let wrapper = stackObject as ValueTypeWrapper<T>)
-				return wrapper.ValuePointer;
-			return null;
+			TryThrowError(lua, tinkerState);
+			return default;
 		}
 
 		public static ref T Pop<T>(Lua lua, int32 index) where T : var, struct

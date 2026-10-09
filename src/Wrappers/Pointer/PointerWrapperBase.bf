@@ -28,6 +28,7 @@ namespace LuaTinker.Wrappers
 		}
 
 		public virtual Type Type => null;
+		public virtual bool CanPassByRef => false;
 
 		public virtual ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
