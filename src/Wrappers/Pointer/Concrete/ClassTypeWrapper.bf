@@ -4,95 +4,96 @@ using System.Reflection;
 
 namespace LuaTinker.Wrappers
 {
+	/// Owns a class appended to its Lua userdata allocation.
 	public sealed class ClassTypeWrapper<T> : PointerWrapperBase
 		where T : var, class
 	{
 		private T mData;
 
-		public ~this()
-		{
-			delete:append mData;
-			mData = null;
-		}
-
+		// Concrete constructors let Beef calculate the class's append-storage size before allocation.
 		[OnCompile(.TypeInit), Comptime]
 		static void Init()
 		{
-			String emitStr = scope .();
+			if (typeof(T).IsGenericParam || typeof(T).IsAbstract)
+				return;
 
-			for (var methodInfo in typeof(T).GetMethods(.Public | .DeclaredOnly))
+			let constructors = scope String();
+			let signatures = scope HashSet<String>();
+			defer { for (let signature in signatures) delete signature; }
+
+			for (let method in typeof(T).GetMethods(.Public | .DeclaredOnly))
 			{
-				if (methodInfo.IsStatic)
-					continue;
-				if (!methodInfo.IsConstructor)
+				if (!method.IsConstructor || method.IsStatic || method.GenericArgCount != 0)
 					continue;
 
-				if (methodInfo.AllowAppendKind == .Yes)
-					emitStr.AppendF("[System.AllowAppend]\n");
-				if (methodInfo.AllowAppendKind == .ZeroGap)
-					emitStr.AppendF("[System.AllowAppend(ZeroGap=true)]\n");
-				if (methodInfo.CheckedKind == .Checked)
-					emitStr.AppendF("[System.Checked]\n");
-				if (methodInfo.CheckedKind == .Unchecked)
-					emitStr.AppendF("[System.Unchecked]\n");
+				let signature = scope String();
+				let declaration = scope String();
+				let arguments = scope String();
+				for (int i < method.ParamCount)
+				{
+					let flags = method.GetParamFlags(i);
+					if (flags.HasFlag(.Implicit))
+						continue;
+					let type = method.GetParamType(i);
+					signature.AppendF($"{type.GetTypeId()}:{flags.HasFlag(.Params)};");
+					if (!declaration.IsEmpty)
+					{
+						declaration.Append(", ");
+						arguments.Append(", ");
+					}
+					if (flags.HasFlag(.Params))
+					{
+						declaration.Append("params ");
+						arguments.Append("params ");
+					}
+					if (let refType = type as RefType)
+					{
+						switch (refType.RefKind)
+						{
+						case .Ref:
+							declaration.Append("ref ");
+							arguments.Append("ref ");
+						case .Out:
+							declaration.Append("out ");
+							arguments.Append("out ");
+						case .In:
+							declaration.Append("in ");
+						case .Mut:
+							declaration.Append("mut ");
+							arguments.Append("ref ");
+						}
+					}
+					declaration.AppendF($"comptype({type.GetTypeId()}) arg{i}");
+					arguments.AppendF($"arg{i}");
+				}
+				if (signatures.Contains(signature))
+					continue;
+				signatures.Add(new String(signature));
 
-				emitStr.AppendF("public this(");
-				methodInfo.GetParamsDecl(emitStr);
-				emitStr.AppendF(")\n");
-				emitStr.AppendF("{{\n");
-				emitStr.AppendF("\tvar val = append T(");
-				methodInfo.GetArgsList(emitStr);
-				emitStr.AppendF(");\n");
-				emitStr.AppendF("\tmData = val;\n");
-				emitStr.AppendF("\tmPtr = Internal.UnsafeCastToPtr(mData);\n");
-				emitStr.AppendF("\tmReadOnlyPtr = true;\n");
-				emitStr.AppendF("}}\n");
+				// The wrapper appends the class even when its constructor has no append storage.
+				constructors.Append("[System.AllowAppend]\n");
+				if (method.CheckedKind == .Checked)
+					constructors.Append("[System.Checked]\n");
+				else if (method.CheckedKind == .Unchecked)
+					constructors.Append("[System.Unchecked]\n");
+				constructors.Append("public this(");
+				constructors.Append(declaration);
+				constructors.Append(")\n{\nlet instance = append T(");
+				constructors.Append(arguments);
+				constructors.Append(");\nmData = instance;\nmPtr = Internal.UnsafeCastToPtr(instance);\nmReadOnlyPtr = true;\n}\n");
 			}
 
-			Compiler.EmitTypeBody(typeof(Self), emitStr);
+			constructors.Append("public ~this()\n{\n");
+			if (typeof(T).ImplementsInterface(typeof(IDisposable)))
+				constructors.Append("mData.Dispose();\n");
+			constructors.Append("delete:append mData;\n}\n");
+
+			Compiler.EmitTypeBody(typeof(Self), constructors);
 		}
 
-		public T ClassInstance
-		{
-			get => (T)Internal.UnsafeCastToObject(Ptr);
-		}
-
-	    [Inline]
-	    public void Create()
-			=> mData = .();
-
-	    [Inline]
-	    public void Create<T1>(T1 t1) where T1 : var
-			=> mData = .(t1);
-
-	    [Inline]
-	    public void Create<T1, T2>(T1 t1, T2 t2) where T1 : var where T2 : var
-			=> mData = .(t1, t2);
-
-	    [Inline]
-	    public void Create<T1, T2, T3>(T1 t1, T2 t2, T3 t3) where T1 : var where T2 : var where T3 : var
-			=> mData = .(t1, t2, t3);
-
-	    [Inline]
-	    public void Create<T1, T2, T3, T4>(T1 t1, T2 t2, T3 t3, T4 t4) where T1 : var where T2 : var where T3 : var where T4 : var
-			=> mData = .(t1, t2, t3, t4);
-
-	    public void CreateParams<T1>(params Span<T1> t1) where T1 : var
-		{
-			// This just doesn't work, so we emit instead.
-			//InternalSet(new T(params t1));
-
-			[Comptime]
-			static void Emit()
-			{
-				if (typeof(T1).IsGenericParam)
-					return;
-				Compiler.MixinRoot(scope $"mData = .(params t1);");
-			}
-
-			Emit();
-		} 
-
+		[Inline]
+		public T ClassInstance => mData;
+		[Inline]
 		public override Type Type => typeof(T);
 
 		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
@@ -117,12 +118,4 @@ namespace LuaTinker.Wrappers
 		}
 	}
 
-	extension ClassTypeWrapper<T>
-		where T : class, IDisposable
-	{
-		public ~this()
-		{
-			ClassInstance.Dispose();
-		}
-	}
 }
