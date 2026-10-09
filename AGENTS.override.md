@@ -80,11 +80,11 @@ The final organization separates parameter normalization and trie construction f
 - After review, remove legacy hash preservation and emit trie branches in their explicit insertion order from candidate discovery. This intentionally replaces dictionary-order precedence for overlapping predicates. The first matching branch that successfully dispatches wins; numeric ties, `Object` catch-all branches, and nil-compatible branches have no implicit specificity ranking. Conversion failure after selection does not retry later candidates. Group 5 must extend this explicit ordering rather than rely on hash iteration.
 - Accept empty variadic argument lists in reflected constructor and method dispatch and in bound functions and delegates. During code generation, find the first variadic child in the preceding node's ordered children, preferring an exact fixed-arity terminal when no trailing arguments are supplied; bound-call arity excludes the variadic parameter from the required count. This fixes existing rejection of empty lists rather than merely preserving the draft's behavior. Preserve these rules in later argument and ownership ports.
 
-### Group 4: Ref/out arguments deferred
+### Group 4: Explicit ref/out hints deferred
 
 Status: deferred at the user's request; continue with group 5. The final playground Lua scripts in `playground_draft` do not use explicit `ref(holder)` or `out(holder)` hints. They use primitive reference cells such as `ref.int32(0)` and `ref.uint32(0)`, passed directly to SDL and OpenGL calls; those cells remain planned for group 9.
 
-Preserve existing reference binding behavior while deferring group 4's new value-by-ref support and explicit hints. When porting later groups, separate any shared dependencies from the deferred ref/out features rather than bringing those features over implicitly. Reassess dependencies when implementing group 9's reference cells.
+Only the explicit `ref(holder)` and `out(holder)` argument hints are deferred. Ordinary `ref`/`out` binding and direct use of reference cells are in scope for later groups that need them. Keep those paths separate from the deferred hint constructors and decoding.
 
 ### Group 5: Numeric hints and overload diagnostics
 
@@ -158,3 +158,11 @@ Status: implemented with two ownership and identity corrections to `playground_d
 - Close Lua before deleting that shared state so userdata finalizers can still unregister owned objects. Beef runs the extension field cleanup before KeraLua's destructor; the draft's delete-first cleanup lets finalizers recreate the lazy state and leak it. Preserve this shutdown order in later ownership and runtime work.
 
 Keep the draft's protection-state restoration across `PCall`, `PCallK`, and both `Resume` overloads. The periodic `GarbageCollector(.Step, 0)` now also covers `Resume`, using the existing shared call counter. It remains a workaround for observed memory growth, with wrapper-memory accounting only a suspected cause; it does not resolve argument-temporary cleanup or establish that the underlying lifetime problem is fixed.
+
+### Group 14: Ordinary output parameters in SDL bindings
+
+Status: ordinary `out` binding is included alongside the native SDL Playground, correcting the earlier interpretation that all new ref/out support was deferred. This supersedes group 8's exclusion of ordinary `out` parameters; the explicit `ref(holder)`/`out(holder)` hints remain deferred.
+
+Normalize `out` separately from `ref`, emit the declared mode for calls and function signatures, and use the existing `PopRef` decoder to obtain writable storage from owned reference cells or borrowed values. SDL's `PollEvent` and `QueryTexture` use ordinary AutoTink registration rather than SDL-specific adapters. Preserve the existing exclusions for reflected reference constructors and pointer-valued references; later work must distinguish those limitations from the hint deferral.
+
+Unlike the draft's Windows fallback allowlist, scan the bundled SDL2 DLL's exports using `dumpbin` discovered through Visual Studio's `vswhere` at comptime. Windows now binds supported exported methods, matching the Linux export-scan policy; retain the allowlist when discovery or scanning fails. Later Windows bindings must preserve the bundled-library assumption or update discovery to inspect their actual linked library.
