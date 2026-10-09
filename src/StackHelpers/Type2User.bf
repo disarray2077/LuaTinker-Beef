@@ -23,7 +23,7 @@ namespace LuaTinker.StackHelpers
 				return;
 			}
 			let alloc = LuaUserdataAllocator(lua);
-			let wrapper = new:alloc ClassInstanceWrapper<T>(); // TODO: Use ClassTypeWrapper (Type2User will need some refactoring)
+			let wrapper = new:alloc ClassInstanceWrapper<T>();
 			wrapper.ClassInstance = val;
 		}
 

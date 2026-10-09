@@ -92,6 +92,8 @@ namespace LuaTinker.StackHelpers
 				return ptrWrapper.Ptr;
 			else if (let refPtrWrapper = stackObject as RefPointerWrapper<RemovePtr<T>>)
 				return &refPtrWrapper.Reference;
+			else if (let valuePointer = GetOwnedValuePointer<RemovePtr<T>>(stackObject))
+				return valuePointer;
 			else
 			{
 				let tinkerState = lua.TinkerState;
@@ -102,6 +104,18 @@ namespace LuaTinker.StackHelpers
 				TryThrowError(lua, tinkerState);
 				return default;
 			}
+		}
+
+		[Inline]
+		private static T* GetOwnedValuePointer<T>(Object stackObject) where T : var
+			=> null;
+
+		[Inline]
+		private static T* GetOwnedValuePointer<T>(Object stackObject) where T : var, struct
+		{
+			if (let wrapper = stackObject as ValueTypeWrapper<T>)
+				return wrapper.ValuePointer;
+			return null;
 		}
 
 		public static ref T Pop<T>(Lua lua, int32 index) where T : var, struct
@@ -144,7 +158,7 @@ namespace LuaTinker.StackHelpers
 				return ref *(T*)ptr;
 			}
 
-			if (let valueWrapper = stackObject as ValuePointerWrapper<T>)
+			if (let valueWrapper = stackObject as ValueTypeWrapper<T>)
 				return ref *valueWrapper.ValuePointer;
 			else if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
 				return ref refPtrWrapper.Reference;
@@ -205,6 +219,8 @@ namespace LuaTinker.StackHelpers
 
 			if (let valueWrapper = stackObject as ClassInstanceWrapper<T>)
 				return valueWrapper.ClassInstance;
+			else if (let ownedWrapper = stackObject as ClassTypeWrapper<T>)
+				return ownedWrapper.ClassInstance;
 			else if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
 				return refPtrWrapper.Reference;
 			else if (let ptrWrapper = stackObject as PointerWrapper<T>)
@@ -232,11 +248,22 @@ namespace LuaTinker.StackHelpers
 			}
 		}
 
+		[Inline]
 		public static ref T PopRef<T>(Lua lua, int32 index) where T : var
+			=> ref PopRef<T>(lua, index, User2Type.GetObject(lua, index));
+
+		public static ref T PopRef<T>(Lua lua, int32 index) where T : var, struct
+		{
+			let stackObject = User2Type.GetObject(lua, index);
+			if (let valueWrapper = stackObject as ValueTypeWrapper<T>)
+				return ref *valueWrapper.ValuePointer;
+			return ref PopRef<T>(lua, index, stackObject);
+		}
+
+		private static ref T PopRef<T>(Lua lua, int32 index, Object stackObject) where T : var
 		{
 			static T dummy = default;
 
-			let stackObject = User2Type.GetObject(lua, index);
 			if (let refPtrWrapper = stackObject as RefPointerWrapper<T>)
 				return ref refPtrWrapper.Reference;
 			else if (let ptrWrapper = stackObject as PointerWrapper<T>)

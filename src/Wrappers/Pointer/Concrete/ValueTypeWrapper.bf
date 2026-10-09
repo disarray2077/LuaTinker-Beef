@@ -3,6 +3,7 @@ using System.Diagnostics;
 
 namespace LuaTinker.Wrappers
 {
+	/// Owns a struct stored inline in its Lua userdata allocation.
 	public sealed class ValueTypeWrapper<T> : PointerWrapperBase
 		where T : var, struct
 	{
@@ -15,6 +16,7 @@ namespace LuaTinker.Wrappers
 			mReadOnlyPtr = true;
 		}
 
+		[Inline]
 		public T* ValuePointer => &mData;
 
 	    [Inline]

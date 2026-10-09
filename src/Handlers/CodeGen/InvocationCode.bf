@@ -15,8 +15,9 @@ namespace LuaTinker.Handlers
 			=> IsNumericType(type) || type.IsPointer;
 
 		// This is the sole decision site for converting one Lua argument into a Beef value.
-		private static void EmitDecodedArgument(LuaParameter parameter, StringView typeCode, StringView stackIndex, bool variadicStorage, String code)
+		private static void EmitDecodedArgument(LuaParameter parameter, StringView stackIndex, bool variadicStorage, String code)
 		{
+			let typeCode = scope $"comptype({parameter.DecodedType.GetTypeId()})";
 			if (parameter.Mode != .Value)
 			{
 				code.Append("ref ");
@@ -49,7 +50,7 @@ namespace LuaTinker.Handlers
 				writer.Line(scope $"int extraArgsCount = lua.GetTop() - {parameter.LuaStackIndex - 1};");
 			writer.Line(scope $"{declarationCode}[] extraArgs = scope {declarationCode}[extraArgsCount] (?);");
 			let elementExpression = scope String();
-			EmitDecodedArgument(parameter, declarationCode, scope $"i + {parameter.LuaStackIndex}", true, elementExpression);
+			EmitDecodedArgument(parameter, scope $"i + {parameter.LuaStackIndex}", true, elementExpression);
 			writer.ForStatement("for (int32 i = 0; i < extraArgsCount; i++)", scope $"extraArgs[i] = {elementExpression};");
 		}
 
@@ -111,8 +112,7 @@ namespace LuaTinker.Handlers
 				if (parameter.IsVariadic)
 					invocation.Append("params extraArgs");
 				else
-					EmitDecodedArgument(parameter, scope $"comptype({parameter.DecodedType.GetTypeId()})",
-						scope $"{parameter.LuaStackIndex}", false, invocation);
+					EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, invocation);
 				if (@parameter.Index != parameterCount - 1)
 					invocation.Append(", ");
 			}
@@ -177,22 +177,31 @@ namespace LuaTinker.Handlers
 			bool variadic = parameterCount > 0 && parameters[lastParameter].IsVariadic;
 			if (variadic)
 				EmitVariadicStorage(parameters[lastParameter], true, writer);
-			if (typeof(T).IsObject)
-				writer.Line("let wrapper = new:alloc ClassInstanceWrapper<T>();");
-			else
-				writer.Line("let wrapper = new:alloc ValuePointerWrapper<T>();");
+			// Decode before allocation so failed arguments cannot finalize an uninitialized owned value.
+			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+			{
+				if (parameter.IsVariadic)
+					continue;
+				let argument = scope String();
+				argument.AppendF($"{(parameter.Mode == .Ref ? "ref var" : "let")} constructorArgument{@parameter.Index} = ");
+				EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, argument);
+				argument.Append(";");
+				writer.Line(argument);
+			}
+			bool isClass = typeof(T).IsObject;
+			if (!isClass)
+				writer.Line("let wrapper = new:alloc ValueTypeWrapper<T>();");
 			let creation = scope String();
-			if (variadic)
-				creation.AppendF($"wrapper.CreateParams<comptype({parameters[lastParameter].VariadicElementType.GetTypeId()})>(");
+			if (isClass)
+				creation.Append("let wrapper = new:alloc ClassTypeWrapper<T>(");
 			else
-				creation.Append("wrapper.Create(");
+				creation.Append("*wrapper.ValuePointer = .(");
 			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
 			{
 				if (variadic && @parameter.Index == parameterCount - 1)
 					creation.Append("params extraArgs");
 				else
-					EmitDecodedArgument(parameter, scope $"comptype({parameter.DecodedType.GetTypeId()})",
-						scope $"{parameter.LuaStackIndex}", false, creation);
+					creation.AppendF($"{(parameter.Mode == .Ref ? "ref " : "")}constructorArgument{@parameter.Index}");
 				if (@parameter.Index != parameterCount - 1)
 					creation.Append(", ");
 			}

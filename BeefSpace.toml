@@ -1,9 +1,18 @@
 FileVersion = 1
-Projects = {LuaTinker = {Path = "."}, KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}, "LuaTinker.Tests" = {Path = "Tests"}, KeraLua = {Path = "../KeraLua-Beef"}, "LuaTinker.BasicSample" = {Path = "Sample"}, "LuaTinker.GameSample" = {Path = "GameSample"}, BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}, SDL2 = "*"}
 ExtraPlatforms = ["Linux32", "Linux64"]
 
 [Workspace]
 StartupProject = "LuaTinker.BasicSample"
+
+[Projects]
+LuaTinker = {Path = "."}
+KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}
+"LuaTinker.Tests" = {Path = "Tests"}
+KeraLua = {Path = "../KeraLua-Beef"}
+"LuaTinker.BasicSample" = {Path = "Sample"}
+"LuaTinker.GameSample" = {Path = "GameSample"}
+BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
+SDL2 = "*"
 
 [Configs.Debug.Win64]
 AllocStackTraceDepth = 5

@@ -32,6 +32,23 @@ namespace LuaTinker
 		}
 
 		[Inline]
+		public void* AllocTyped(Type type, int size, int align)
+		{
+#if BF_ENABLE_OBJECT_DEBUG_FLAGS
+			// COMPILER-BUG: Work around Beef's custom allocation path omitting the required debug append record.
+			// Reserve and zero it here; [Friend] is needed because Type has no public query for this flag.
+			if (type.[Friend]mTypeFlags.HasFlag(.HasAppendWantMark))
+			{
+				let appendInfoSize = 4 * sizeof(int);
+				let payload = Alloc(size + appendInfoSize, align);
+				Internal.MemSet((uint8*)payload + size, 0, appendInfoSize);
+				return payload;
+			}
+#endif
+			return Alloc(size, align);
+		}
+
+		[Inline]
 		public void* Alloc(int size, int align)
 		{
 			Debug.Assert(size >= 0 && align > 0 && size <= int32.MaxValue - sizeof(Header) - align);
