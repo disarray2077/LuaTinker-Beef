@@ -24,8 +24,10 @@ namespace LuaTinker
 		public bool IsPCall { get; private set; }
 		public bool HasError => !mLastError.IsEmpty;
 
-		// This exists only to make GC happy.
+#if BF_ENABLE_REALTIME_LEAK_CHECK
+		// Keep Lua-owned Beef objects visible to realtime leak tracking.
 		internal List<Object> mAliveObjects = new .() ~ delete _;
+#endif
 
 		public this()
 		{
@@ -33,26 +35,34 @@ namespace LuaTinker
 
 		public void RegisterAliveObject(Object obj)
 		{
+#if BF_ENABLE_REALTIME_LEAK_CHECK
 			mAliveObjects.Add(obj);
+#endif
 		}
 
 		public void RegisterAliveObject<T>(T obj)
 			where T : class, ILuaOwnedObject
 		{
 			obj.OnAddedToLua(this);
+#if BF_ENABLE_REALTIME_LEAK_CHECK
 			mAliveObjects.Add(obj);
+#endif
 		}
 
 		public void DeregisterAliveObject(Object obj)
 		{
+#if BF_ENABLE_REALTIME_LEAK_CHECK
 			mAliveObjects.Remove(obj);
+#endif
 		}
 
 		public void DeregisterAliveObject<T>(T obj)
 			where T : class, ILuaOwnedObject
 		{
 			obj.OnRemovedFromLua(this);
+#if BF_ENABLE_REALTIME_LEAK_CHECK
 			mAliveObjects.Remove(obj);
+#endif
 		}
 
 		public void ClearError()
