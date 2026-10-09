@@ -20,7 +20,7 @@ namespace LuaTinker.Handlers
 			let typeCode = scope $"comptype({parameter.DecodedType.GetTypeId()})";
 			if (parameter.Mode != .Value)
 			{
-				code.Append("ref ");
+				code.Append(parameter.Mode == .Ref ? "ref " : "out ");
 				code.AppendF($"StackHelper.PopRef<{typeCode}>(lua, {stackIndex})");
 			}
 			else if (IsHintableType(parameter.DecodedType))
@@ -137,6 +137,8 @@ namespace LuaTinker.Handlers
 					methodParams.Append("params ");
 				if (parameter.Mode == .Ref)
 					methodParams.Append("ref ");
+				else if (parameter.Mode == .Out)
+					methodParams.Append("out ");
 				methodParams.AppendF($"comptype({parameter.DeclaredType.GetTypeId()})/*{parameter.DeclaredType}*/");
 			}
 			writer.Line(scope $"function comptype({method.ReturnType.GetTypeId()})({methodParams}) func = => T.{method.Name};");

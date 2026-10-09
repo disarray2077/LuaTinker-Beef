@@ -12,7 +12,8 @@ namespace LuaTinker.Handlers
 		public enum LuaParameterMode : int8
 		{
 			Value,
-			Ref
+			Ref,
+			Out
 		}
 
 		public enum LuaParameterRole : int8
@@ -53,6 +54,7 @@ namespace LuaTinker.Handlers
 				switch (refType.RefKind)
 				{
 				case .Ref: parameter.Mode = .Ref;
+				case .Out: parameter.Mode = .Out;
 				default: Runtime.FatalError(scope $"Not implemented {refType.RefKind}!");
 				}
 				parameter.DecodedType = refType.UnderlyingType;

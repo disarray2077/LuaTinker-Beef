@@ -59,7 +59,7 @@ namespace LuaTinker.Tests
 			public delegate void CallbackDelegate(int value);
 			public static int Twice(int value) => value * 2;
 			public static int Twice(String value) => value.Length;
-			public static int Twice(out int value) { value = 42; return 0; }
+			public static int Twice(out int32 value) { value = 42; return 0; }
 			public static int Twice(Callback callback) => -1;
 			public static void SetCallback(Callback callback) {}
 			public static void SetDelegate(CallbackDelegate callback) {}
@@ -112,6 +112,25 @@ namespace LuaTinker.Tests
 				assert(api.ReadRef(holder) == 7)
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
+		public static void TestOutParameters()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AutoTinkClass<MixedAPI>();
+			int32 holder = 7;
+			tinker.SetValue("holder", ref holder);
+			if (lua.DoString("""
+				local api = LuaTinker.Tests.TestAutoTink.MixedAPI
+				assert(api.Twice(holder) == 0)
+				local cell = ref.int32(7)
+				assert(api.Twice(cell) == 0)
+				assert(cell.value == 42)
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			Test.Assert(holder == 42);
 		}
 
 		[Test]

@@ -26,7 +26,7 @@ namespace LuaTinker.Helpers
 					// Dynamic constructors only generate value arguments.
 					if (method.IsConstructor)
 						return false;
-					if (refType.RefKind != .Ref)
+					if (refType.RefKind != .Ref && refType.RefKind != .Out)
 						return false;
 					paramType = refType.UnderlyingType;
 					// Pointer-valued out/ref needs a mutable pointer cell, not a pointer to the target.
@@ -198,6 +198,8 @@ namespace LuaTinker
 								{
 								case .Ref:
 									methodParams.Append("ref ");
+								case .Out:
+									methodParams.Append("out ");
 								default:
 									Runtime.FatalError(scope $"Not implemented {retParamType.RefKind}!");
 								}
