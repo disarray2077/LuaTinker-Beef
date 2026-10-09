@@ -9,53 +9,11 @@ namespace LuaTinker.StackHelpers
 {
 	// PopDispatch works around a limitation in Beef: conditional generic constraints work reliably for types, but not individual methods.
 	// Placing Run on a generic type lets us use a conditional type extension to replace its implementation.
-	struct PopDispatch<T> where T : var
+	internal struct PopDispatch<T> where T : var
 	{
-		public static mixin Run(Lua lua, int32 index, LuaType? knownType)
+		public static mixin Pop(Lua lua, int32 index, LuaType? knownType)
 		{
 			StackHelper.Pop<T>(lua, index)
-		}
-	}
-
-	extension PopDispatch<T> where T : var where IsInputSpan<T>.Result : Yes
-	{
-		public new static mixin Run(Lua lua, int32 index, LuaType? knownType)
-		{
-			T result = default;
-			let valueType = knownType.HasValue ? knownType.Value : lua.Type(index);
-			if (valueType == .UserData)
-				result = StackHelper.Pop<T>(lua, index);
-			else
-			{
-				switch (StackHelper.CheckInputSpan<FirstGenericArg<T>>(lua, index, valueType))
-				{
-				case .Err(let failure):
-					// Friend keeps this injected mixin independent of the caller's internal imports.
-					let state = lua.[Friend]TinkerState;
-					failure.SetError(state);
-					StackHelper.TryThrowError(lua, state);
-				case .Ok(let count):
-					FirstGenericArg<T>[] elements = scope:mixin FirstGenericArg<T>[count](?);
-					let tableIndex = lua.AbsIndex(index);
-					for (int32 sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++)
-					{
-						lua.RawGetInteger(tableIndex, sequenceIndex);
-						elements[sequenceIndex - 1] = StackHelper.Pop!:mixin<FirstGenericArg<T>>(lua, -1);
-						lua.Pop(1);
-					}
-					if (typeof(FirstGenericArg<T>) == typeof(LuaTable))
-					{
-						static void DisposeInputSpanTables(Span<LuaTable> tables)
-						{
-							for (var table in tables)
-								table.Dispose();
-						}
-						defer:mixin DisposeInputSpanTables(Span<LuaTable>((LuaTable*)elements.Ptr, count));
-					}
-					result = (T)Span<FirstGenericArg<T>>(elements);
-				}
-			}
-			result
 		}
 	}
 
@@ -64,8 +22,9 @@ namespace LuaTinker.StackHelpers
 		public static mixin Pop<T>(Lua lua, int32 index)
 			where T : var
 		{
+			// Friend lets this public mixin use the internal dispatch type in the caller's scope.
 #unwarn
-			PopDispatch<T>.Run!:mixin(lua, index, null)
+			([Friend]PopDispatch<T>.Pop!:mixin(lua, index, null))
 		}
 
 		public static mixin PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)

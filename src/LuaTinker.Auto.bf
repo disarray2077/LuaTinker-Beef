@@ -225,7 +225,12 @@ namespace LuaTinker
 					if (field.DeclaringType != type)
 						continue;
 
-					if (!field.IsStatic)
+					if (field.IsStatic)
+					{
+						if (!field.IsConst && !field.IsReadOnly)
+							code.AppendF($"AddNamespaceVar<T, const \"{field.Name}\">(\"{type.GetFullName(.. scope .())}\");\n");
+					}
+					else
 						code.AppendF($"AddClassVar<T, const \"{field.Name}\">();\n");
 				}
 

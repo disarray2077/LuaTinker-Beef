@@ -732,6 +732,44 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a mutable static field of T to a Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param name The name of the variable.
+		public void AddNamespaceVar<T, Name>(String namespacePath, String name = "")
+			where Name : const String
+		{
+			[Comptime]
+			static void EmitField()
+			{
+				let type = typeof(T);
+				if (type.IsGenericParam)
+				{
+					Compiler.MixinRoot("mLua.PushNil();");
+					return;
+				}
+				let field = type.GetField(Name).Get();
+				if (!field.IsStatic || field.IsConst || field.IsReadOnly)
+					Runtime.FatalError(scope $"AddNamespaceVar requires a mutable static field: {type}.{Name}");
+				Compiler.MixinRoot(scope $"new:mVariableUserdataAllocator VariableWrapper<comptype({field.FieldType.GetTypeId()})>(&T.{Name});");
+			}
+
+			let top = mLua.GetTop();
+			defer mLua.SetTop(top);
+			if (FindNamespaceTable(namespacePath))
+			{
+				StackHelper.PushNamespaceBindings(mLua);
+				let luaName = name.IsEmpty ? Name : name;
+				mLua.PushString(luaName);
+				EmitField();
+				mLua.RawSet(-3);
+				mLua.Pop(1);
+				mLua.PushString(luaName);
+				mLua.PushNil();
+				mLua.RawSet(-4);
+				mLua.SetMetaTable(-2);
+			}
+		}
+
 		/// Adds a variable by value to a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param varName The name of the variable.
@@ -1006,8 +1044,9 @@ namespace LuaTinker
 			mTinkerState.ClearError();
 			let valueType = mLua.GetGlobal(name);
 			defer mLua.Pop(1);
+			// Friend lets this public mixin use the internal dispatch type in the caller's scope.
 #unwarn
-			let values = PopDispatch<Span<T>>.Run!:mixin(mLua, -1, valueType);
+			let values = [Friend]PopDispatch<Span<T>>.Pop!:mixin(mLua, -1, valueType);
 			Result<Span<T>, StringView> result = mTinkerState.HasError ? .Err(mTinkerState.GetLastError()) : .Ok(values);
 			result
 		}

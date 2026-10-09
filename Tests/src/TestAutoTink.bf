@@ -7,6 +7,37 @@ namespace LuaTinker.Tests
 {
 	class TestAutoTink
 	{
+		public static class FunctionAPI
+		{
+			public static int32 Count;
+			public static function int32(int32) Callback;
+			public const int32 Constant = 7;
+			public static readonly int32 ReadOnly = 9;
+		}
+
+		[Test]
+		public static void TestStaticFields()
+		{
+			FunctionAPI.Count = 3;
+			FunctionAPI.Callback = (value) => value + 1;
+			defer { FunctionAPI.Callback = null; }
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AutoTinkClass<FunctionAPI>();
+			if (lua.DoString("""
+				local api = LuaTinker.Tests.TestAutoTink.FunctionAPI
+				assert(api.Count == 3)
+				api.Count = 7
+				assert(api.Callback(41) == 42)
+				assert(api.Constant == nil and api.ReadOnly == nil)
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			Test.Assert(FunctionAPI.Count == 7);
+			FunctionAPI.Callback = (value) => value * 2;
+			if (lua.DoString("assert(LuaTinker.Tests.TestAutoTink.FunctionAPI.Callback(21) == 42)"))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
 		public static class FilteredAPI
 		{
 			public static int Twice(int value) => value * 2;
