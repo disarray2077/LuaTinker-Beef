@@ -42,6 +42,7 @@ namespace LuaTinker
 			AddNumericCast<float>("float");
 			AddNumericCast<double>("double");
 			AddNullPointerHint();
+			AddOwnedValues();
 		}
 
 		public ~this()
@@ -79,6 +80,41 @@ namespace LuaTinker
 			StackHelper.PushNullPointerArgumentHint(mLua);
 			mLua.RawSet(-3);
 			mLua.SetGlobal("nullptr");
+		}
+
+		private void AddOwnedValues()
+		{
+			mLua.CreateTable(0, 2);
+			AddOwnedValueConstructor<int32>("int32");
+			AddOwnedValueConstructor<uint32>("uint32");
+			mLua.SetGlobal("ref");
+		}
+
+		private void AddOwnedValueConstructor<T>(StringView name) where T : var, struct, INumeric
+		{
+			mLua.CreateTable(0, 6);
+			UserdataMetatables.Mark(mLua, -1, .Pointer);
+			mLua.PushString("__index");
+			mLua.PushCClosure(=> IndexGetHandler, 0);
+			mLua.RawSet(-3);
+			mLua.PushString("__newindex");
+			mLua.PushCClosure(=> IndexSetHandler, 0);
+			mLua.RawSet(-3);
+			mLua.PushString("__gc");
+			mLua.PushCClosure(=> PointerDestructorHandler, 0);
+			mLua.RawSet(-3);
+			mLua.PushString("__tostring");
+			mLua.PushCClosure(=> PointerToStringHandler, 0);
+			mLua.RawSet(-3);
+			mLua.PushString("value");
+			new:mVariableUserdataAllocator ClassFieldWrapper<T>(0);
+			mLua.RawSet(-3);
+
+			mLua.PushString(name);
+			mLua.PushValue(-2);
+			mLua.PushCClosure(=> OwnedValueConstructorHandler<T>, 1);
+			mLua.RawSet(-4);
+			mLua.Pop(1);
 		}
 
 		private void PushEnumTable<E>(bool typed) where E : enum
