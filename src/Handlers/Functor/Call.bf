@@ -6,6 +6,8 @@ using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
 using LuaTinker.Wrappers;
 
+using internal KeraLua;
+
 namespace LuaTinker.Handlers
 {
 	static
@@ -37,6 +39,30 @@ namespace LuaTinker.Handlers
 
 			EmitCallHandler<F>();
 
+			// This is necessary to avoid the "Method must return" error
+			Runtime.FatalError("Not reached");
+		}
+
+		public static int32 FunctionPointerCallHandler<F>(lua_State L) where F : var, struct
+		{
+			let lua = Lua.FromIntPtr(L);
+			let wrapper = User2Type.TryGetTypePtr<ValueTypeWrapper<F>>(lua, 1);
+			if (wrapper == null)
+			{
+				lua.TinkerState.SetLastError("can't call function. (not a LuaTinker object.)");
+				StackHelper.ThrowError(lua, lua.TinkerState);
+			}
+#unwarn
+			let func = *wrapper.ValuePointer;
+			if (func == null)
+			{
+				lua.TinkerState.SetLastError("can't call null function pointer");
+				StackHelper.ThrowError(lua, lua.TinkerState);
+			}
+			lua.Remove(1);
+
+			EmitCallHandler<F>();
+			
 			// This is necessary to avoid the "Method must return" error
 			Runtime.FatalError("Not reached");
 		}

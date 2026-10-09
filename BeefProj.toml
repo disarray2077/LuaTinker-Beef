@@ -20,15 +20,3 @@ Name = "Translators"
 [[ProjectFolder.Items.Items.Items]]
 Type = "IgnoreSource"
 Name = "Enumerables.bf"
-
-[[ProjectFolder.Items]]
-Type = "AutoFolder"
-Name = "Wrappers"
-
-[[ProjectFolder.Items.Items]]
-Type = "AutoFolder"
-Name = "Pointer"
-
-[[ProjectFolder.Items.Items.Items]]
-Type = "AutoFolder"
-Name = "Concrete"

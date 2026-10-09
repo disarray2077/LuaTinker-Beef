@@ -15,7 +15,6 @@ namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
 	{
-
 		public static void Push<T>(Lua lua, T? val) where T : var
 		{
 			if (!val.HasValue)

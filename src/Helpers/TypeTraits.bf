@@ -20,6 +20,16 @@ namespace LuaTinker.Helpers
 		struct Yes;
 		struct No;
 
+		// Type has no public function-kind query; inspect its flag without relaxing corlib visibility.
+		[Inline]
+		public static bool IsFunctionType(Type type)
+			=> !type.IsGenericParam && type.[Friend]mTypeFlags.HasFlag(.Function);
+
+		struct IsFunction<T> where T : var
+		{
+			public typealias Result = comptype(IsFunctionType(typeof(T)) ? typeof(Yes) : typeof(No));
+		}
+
 		struct IsInputSpan<T> where T : var
 		{
 			public typealias Result = comptype(_isInputSpan(typeof(T)));

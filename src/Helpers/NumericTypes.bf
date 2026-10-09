@@ -6,8 +6,8 @@ namespace LuaTinker.Helpers
 	{
 		[Inline]
 		public static bool IsNumericType(Type type)
-			=> type.IsInteger || type.IsEnum || type.IsFloatingPoint ||
-				(type.IsTypedPrimitive && (type.UnderlyingType.IsInteger || type.UnderlyingType.IsFloatingPoint));
+			=> !IsFunctionType(type) && (type.IsInteger || type.IsEnum || type.IsFloatingPoint ||
+				(type.IsTypedPrimitive && (type.UnderlyingType.IsInteger || type.UnderlyingType.IsFloatingPoint)));
 
 		public static bool CanRepresentInteger(Type type, int64 value)
 		{

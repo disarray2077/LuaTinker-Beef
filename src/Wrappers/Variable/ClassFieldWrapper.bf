@@ -1,6 +1,7 @@
 using System;
 using KeraLua;
 using LuaTinker.StackHelpers;
+using LuaTinker.Helpers;
 
 using internal KeraLua;
 
@@ -31,7 +32,7 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
 
-			if (!typeof(T).IsPrimitive && typeof(T).IsStruct)
+			if (!typeof(T).IsPrimitive && typeof(T).IsStruct && !IsFunctionType(typeof(T)))
 				StackHelper.Push(lua, ref GetValueRef((.)wrapper.Ptr));
 			else
 				StackHelper.Push(lua, GetValueRef((.)wrapper.Ptr));
