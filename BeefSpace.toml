@@ -2,7 +2,7 @@ FileVersion = 1
 ExtraPlatforms = ["Linux32", "Linux64"]
 
 [Workspace]
-StartupProject = "LuaTinker.BasicSample"
+StartupProject = "LuaTinker.Playground"
 
 [Projects]
 LuaTinker = {Path = "."}
@@ -11,6 +11,7 @@ KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}
 KeraLua = {Path = "../KeraLua-Beef"}
 "LuaTinker.BasicSample" = {Path = "Sample"}
 "LuaTinker.GameSample" = {Path = "GameSample"}
+"LuaTinker.Playground" = {Path = "Playground"}
 BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
 SDL2 = "*"
 

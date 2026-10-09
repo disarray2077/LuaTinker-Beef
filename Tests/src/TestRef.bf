@@ -100,6 +100,28 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
+		public static void TestOutParameters()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AddMethod<function void(out int32)>("Write", (value) => { value = 42; });
+			tinker.AddMethod<delegate void(out int32)>("WriteDelegate", new (value) => { value = 7; });
+			int32 holder = 0;
+			tinker.SetValue("holder", ref holder);
+			if (lua.DoString("""
+				Write(holder)
+				local cell = ref.int32(0)
+				Write(cell)
+				assert(cell.value == 42)
+				WriteDelegate(cell)
+				assert(cell.value == 7)
+				assert(not pcall(function() Write(0) end))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			Test.Assert(holder == 42);
+		}
+
+		[Test]
 		public static void Test2()
 		{
 			let lua = scope Lua(true);

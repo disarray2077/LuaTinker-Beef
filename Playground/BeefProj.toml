@@ -1,0 +1,14 @@
+FileVersion = 1
+
+[Project]
+Name = "LuaTinker.Playground"
+StartupObject = "LuaTinker.Playground.Program"
+
+[Dependencies]
+corlib = "*"
+KeraLua = "*"
+LuaTinker = "*"
+SDL2 = "*"
+
+[Configs.Debug.Win64]
+DebugCommandArguments = "sdl_render.lua"
