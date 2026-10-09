@@ -44,7 +44,8 @@ namespace LuaTinker.Handlers
 				if (ctor.AllowAppendKind == .ZeroGap)
 					continue;
 
-				ctors.Add(ctor);
+				if (CanAutoTinkMethod(ctor))
+					ctors.Add(ctor);
 			}
 		}
 

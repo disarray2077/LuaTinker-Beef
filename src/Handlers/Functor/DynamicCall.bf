@@ -61,7 +61,7 @@ namespace LuaTinker.Handlers
 				if (IsStatic != method.IsStatic)
 					continue;
 
-				if (method.Name == Name)
+				if (method.Name == Name && CanAutoTinkMethod(method))
 					methods.Add(method);
 			}
 		}
