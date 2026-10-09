@@ -112,8 +112,8 @@ namespace LuaTinker.Handlers
 						condition.AppendF($"lua.IsString({stackIndex}) || lua.IsNil({stackIndex}) || User2Type.IsObjectTypeCompatible(lua, {stackIndex}, typeof(comptype({type.GetTypeId()})))");
 					else
 						condition.AppendF($"lua.Is{luaType}({stackIndex})");
-					if (type.IsPointer && !flags.HasFlag(.This))
-						condition.Insert(0, scope $"StackHelper.IsNullPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()}))) || ");
+					if (type.IsPointer && !(type is RefType) && !flags.HasFlag(.This))
+						condition.Insert(0, scope $"StackHelper.IsNullPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()}))) || StackHelper.IsOwnedValuePointerArgument<comptype({type.GetTypeId()})>(lua, {stackIndex}) || ");
 					if (selection == .SingleInputSpan && !flags.HasFlag(.This) && !flags.HasFlag(.Params) && GetSpanElement(type) != null)
 						condition.Insert(0, scope $"(lua.Type({stackIndex}) == .Table && !StackHelper.IsArgumentHint(lua, {stackIndex})) || ");
 				}
@@ -223,7 +223,7 @@ namespace LuaTinker.Handlers
 				if (!param.Flags.HasFlag(.This) && !param.Flags.HasFlag(.Params))
 					if (GetSpanElement(type) != null && !inputSpanTypes.Contains(type))
 						inputSpanTypes.Add(type);
-				if (!param.Flags.HasFlag(.This) && type.IsPointer && !pointerTypes.Contains(type))
+				if (!param.Flags.HasFlag(.This) && type.IsPointer && !(type is RefType) && !pointerTypes.Contains(type))
 					pointerTypes.Add(type);
 				if (!param.Flags.HasFlag(.This) && IsNumericType(type))
 				{

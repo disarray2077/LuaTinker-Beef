@@ -107,6 +107,10 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[Inline]
+		public static bool IsOwnedValuePointerArgument<T>(Lua lua, int32 index) where T : var, struct*
+			=> GetOwnedValuePointer<RemovePtr<T>>(User2Type.TryGetTypePtr<PointerWrapperBase>(lua, index)) != null;
+
+		[Inline]
 		private static T* GetOwnedValuePointer<T>(Object stackObject) where T : var
 			=> null;
 
