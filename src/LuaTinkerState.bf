@@ -21,7 +21,7 @@ namespace LuaTinker
 		private Dictionary<TypeId, ClassRegistration> mClasses = new .() ~ DeleteDictionaryAndValues!(_);
 		private String mLastError = new .() ~ delete _;
 
-		public bool IsPCall { get; private set; }
+		public bool IsPCall { get; internal set; }
 		public bool HasError => !mLastError.IsEmpty;
 
 #if BF_ENABLE_REALTIME_LEAK_CHECK
