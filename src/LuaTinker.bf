@@ -36,6 +36,7 @@ namespace LuaTinker
 			mIndexerUserdataAllocator = .(lua, .Indexer);
 
 			mTinkerState = lua.TinkerState;
+			AddCStringConversion();
 			StackHelper.RegisterArgumentHintMetatable(mLua);
 			AddNumericCast<int32>("int32");
 			AddNumericCast<uint32>("uint32");
@@ -80,6 +81,17 @@ namespace LuaTinker
 			StackHelper.PushNullPointerArgumentHint(mLua);
 			mLua.RawSet(-3);
 			mLua.SetGlobal("nullptr");
+		}
+
+		private void AddCStringConversion()
+		{
+			if (mLua.GetGlobal("string") == .Table)
+			{
+				mLua.PushString("from_cstr");
+				mLua.PushCClosure(=> CStringFromPointerHandler, 0);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
 		}
 
 		private void AddOwnedValues()

@@ -80,6 +80,24 @@ namespace LuaTinker.Handlers
 		private static void EmitTrieBranches<T>(int positionIndex, List<Trie<MatchKey>> branches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, BranchSelection selection)
 		{
 			let stackIndex = positions[positionIndex].LuaStackIndex;
+
+			List<Type> pointerTypes = scope .();
+			for (let branch in branches)
+				if (!branch.Value.Flags.HasFlag(.This) && branch.Value.MatchType.IsPointer && !(branch.Value.MatchType is RefType) && !pointerTypes.Contains(branch.Value.MatchType))
+					pointerTypes.Add(branch.Value.MatchType);
+			let hasVoidPointerFallback = pointerTypes.Count > 1 && pointerTypes.Contains(typeof(void*));
+			if (hasVoidPointerFallback)
+			{
+				String types = scope .();
+				for (let type in pointerTypes)
+				{
+					if (!types.IsEmpty)
+						types.Append(", ");
+					types.AppendF($"typeof(comptype({type.GetTypeId()}))");
+				}
+				writer.Line(scope $"static Type[{pointerTypes.Count}] pointerTypes{stackIndex} = .({types});");
+			}
+
 			CodeWriter.ConditionalChain lastBranch = default;
 			for (let node in branches)
 			{
@@ -93,7 +111,12 @@ namespace LuaTinker.Handlers
 				if (selection == .None || selection == .SingleInputSpan)
 				{
 					let luaType = BeefTypeToLuaType(type);
-					if (type == typeof(Object))
+					if (type.IsPointer && !(type is RefType) && !flags.HasFlag(.This))
+					{
+						let competingTypes = hasVoidPointerFallback && type == typeof(void*) ? scope $", pointerTypes{stackIndex}" : "";
+						condition.AppendF($"StackHelper.IsPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()})){competingTypes})");
+					}
+					else if (type == typeof(Object))
 					{
 						if (selection == .SingleInputSpan)
 							condition.AppendF($"lua.Type({stackIndex}) != .Table && ");
@@ -112,8 +135,6 @@ namespace LuaTinker.Handlers
 						condition.AppendF($"lua.IsString({stackIndex}) || lua.IsNil({stackIndex}) || User2Type.IsObjectTypeCompatible(lua, {stackIndex}, typeof(comptype({type.GetTypeId()})))");
 					else
 						condition.AppendF($"lua.Is{luaType}({stackIndex})");
-					if (type.IsPointer && !(type is RefType) && !flags.HasFlag(.This))
-						condition.Insert(0, scope $"StackHelper.IsNullPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()}))) || StackHelper.IsOwnedValuePointerArgument<comptype({type.GetTypeId()})>(lua, {stackIndex}) || ");
 					if (selection == .SingleInputSpan && !flags.HasFlag(.This) && !flags.HasFlag(.Params) && GetSpanElement(type) != null)
 						condition.Insert(0, scope $"(lua.Type({stackIndex}) == .Table && !StackHelper.IsArgumentHint(lua, {stackIndex})) || ");
 				}
