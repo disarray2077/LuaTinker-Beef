@@ -1078,11 +1078,19 @@ namespace LuaTinker
 			return true;
 		}
 
+		[Comptime]
+		private static void RequireGetValueResultType<T>() where T : var
+		{
+			if (GetSpanElement(typeof(T)) != null)
+				Runtime.FatalError("GetValue cannot return a caller-scoped Span; use the GetSpan mixin");
+		}
+
 		/// Gets the value of a global Lua variable.
 		/// @param name The name of the global variable.
 		/// @return A result containing the value or an error message.
 		public Result<T, StringView> GetValue<T>(StringView name) where T : var
 		{
+			RequireGetValueResultType<T>();
 			Debug.Assert(mLua.GetTop() == 0);
 			mTinkerState.ClearError();
 
@@ -1168,6 +1176,21 @@ namespace LuaTinker
 					result = .Err(mTinkerState.GetLastError());
 			}
 
+			result
+		}
+
+		/// Gets a global Lua variable as a Span.
+		/// This mixin will allocate a Array in the stack if necessary, and returns a `Result<String, Span<T>>`.
+		/// @param name The name of the global variable.
+		public mixin GetSpan<T>(StringView name) where T : var
+		{
+			Debug.Assert(mLua.GetTop() == 0);
+			mTinkerState.ClearError();
+			let valueType = mLua.GetGlobal(name);
+			defer mLua.Pop(1);
+#unwarn
+			let values = PopDispatch<Span<T>>.Run!:mixin(mLua, -1, valueType);
+			Result<Span<T>, StringView> result = mTinkerState.HasError ? .Err(mTinkerState.GetLastError()) : .Ok(values);
 			result
 		}
 

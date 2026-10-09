@@ -1,18 +1,71 @@
 using System;
 using KeraLua;
 using LuaTinker.Wrappers;
+using LuaTinker.Helpers;
 
 using internal KeraLua;
 
 namespace LuaTinker.StackHelpers
 {
+	// PopDispatch works around a limitation in Beef: conditional generic constraints work reliably for types, but not individual methods.
+	// Placing Run on a generic type lets us use a conditional type extension to replace its implementation.
+	struct PopDispatch<T> where T : var
+	{
+		public static mixin Run(Lua lua, int32 index, LuaType? knownType)
+		{
+			StackHelper.Pop<T>(lua, index)
+		}
+	}
+
+	extension PopDispatch<T> where T : var where IsInputSpan<T>.Result : Yes
+	{
+		public new static mixin Run(Lua lua, int32 index, LuaType? knownType)
+		{
+			T result = default;
+			let valueType = knownType.HasValue ? knownType.Value : lua.Type(index);
+			if (valueType == .UserData)
+				result = StackHelper.Pop<T>(lua, index);
+			else
+			{
+				switch (StackHelper.CheckInputSpan<FirstGenericArg<T>>(lua, index, valueType))
+				{
+				case .Err(let failure):
+					// Friend keeps this injected mixin independent of the caller's internal imports.
+					let state = lua.[Friend]TinkerState;
+					failure.SetError(state);
+					StackHelper.TryThrowError(lua, state);
+				case .Ok(let count):
+					FirstGenericArg<T>[] elements = scope:mixin FirstGenericArg<T>[count](?);
+					let tableIndex = lua.AbsIndex(index);
+					for (int32 sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++)
+					{
+						lua.RawGetInteger(tableIndex, sequenceIndex);
+						elements[sequenceIndex - 1] = StackHelper.Pop!:mixin<FirstGenericArg<T>>(lua, -1);
+						lua.Pop(1);
+					}
+					if (typeof(FirstGenericArg<T>) == typeof(LuaTable))
+					{
+						static void DisposeInputSpanTables(Span<LuaTable> tables)
+						{
+							for (var table in tables)
+								table.Dispose();
+						}
+						defer:mixin DisposeInputSpanTables(Span<LuaTable>((LuaTable*)elements.Ptr, count));
+					}
+					result = (T)Span<FirstGenericArg<T>>(elements);
+				}
+			}
+			result
+		}
+	}
+
 	extension StackHelper
 	{
 		public static mixin Pop<T>(Lua lua, int32 index)
 			where T : var
 		{
-			// pass through
-			Pop<T>(lua, index)
+#unwarn
+			PopDispatch<T>.Run!:mixin(lua, index, null)
 		}
 
 		public static mixin PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
@@ -92,7 +145,8 @@ namespace LuaTinker.StackHelpers
 		private static String _PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
 			where T : String where String : T
 		{
-			if (lua.IsUserData(index))
+			let valueType = lua.Type(index);
+			if (valueType == .UserData)
 			{
 				let wrapper = User2Type.GetObject(lua, index) as PointerWrapperBase;
 				if (wrapper == null)
@@ -110,7 +164,15 @@ namespace LuaTinker.StackHelpers
 			else
 			{
 				if (let strView = Pop<T>(lua, index))
-					return new:alloc String()..Reference(strView);
+				{
+					let str = new:alloc String();
+					// PCall borrows rooted Lua strings; numeric conversion produces an unrooted temporary.
+					if (valueType == .String && lua.TinkerState.IsPCall)
+						str.Reference(strView);
+					else
+						str.Append(strView);
+					return str;
+				}
 				else
 					return null;
 			}

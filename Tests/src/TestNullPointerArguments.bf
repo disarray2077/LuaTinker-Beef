@@ -7,17 +7,17 @@ namespace LuaTinker.Tests
 	{
 		public static class PointerAPI
 		{
-			[Inline] public static int32 Select(int32* value) => value == null ? 1 : -1;
-			[Inline] public static int32 Select(float* value) => value == null ? 2 : -2;
-			[Inline] public static int32 Select(int32 value) => 3;
-			[Inline] public static bool OnlyInt32(int32* value) => value == null;
-			[Inline] public static bool OnlyFloat(float* value) => value == null;
-			[Inline] public static bool OnlyVoid(void* value) => value == null;
-			[Inline] public static int32 OnlyValue(int32 value) => value;
-			[Inline] public static int32 RefOnly(ref int32 value) => value;
-			[Inline] public static bool OnlyObject(Object value) => value == null;
-			[Inline] public static bool OnlyArray(int32[] value) => value == null;
-			[Inline] public static int32 OnlySpan(Span<int32> value) => (int32)value.Length;
+			public static int32 Select(int32* value) => value == null ? 1 : -1;
+			public static int32 Select(float* value) => value == null ? 2 : -2;
+			public static int32 Select(int32 value) => 3;
+			public static bool OnlyInt32(int32* value) => value == null;
+			public static bool OnlyFloat(float* value) => value == null;
+			public static bool OnlyVoid(void* value) => value == null;
+			public static int32 OnlyValue(int32 value) => value;
+			public static int32 RefOnly(ref int32 value) => value;
+			public static bool OnlyObject(Object value) => value == null;
+			public static bool OnlyArray(int32[] value) => value == null;
+			public static int32 OnlySpan(Span<int32> value) => (int32)value.Length;
 			public static int32 Variadic(params Span<int32*> values)
 			{
 				for (let value in values)
@@ -25,7 +25,7 @@ namespace LuaTinker.Tests
 						return -1;
 				return (int32)values.Length;
 			}
-			[Inline] public static int32 Variadic(params Span<float*> values) => -2;
+			public static int32 Variadic(params Span<float*> values) => -2;
 		}
 
 		public class PointerCtor
@@ -33,8 +33,8 @@ namespace LuaTinker.Tests
 			public int32 Kind;
 			public this(int32* value) { Kind = value == null ? 1 : -1; }
 			public this(float* value) { Kind = value == null ? 2 : -2; }
-			[Inline] public int32 Pick(int32* value) => value == null ? 1 : -1;
-			[Inline] public int32 Pick(float* value) => value == null ? 2 : -2;
+			public int32 Pick(int32* value) => value == null ? 1 : -1;
+			public int32 Pick(float* value) => value == null ? 2 : -2;
 		}
 
 		public class ManualPointerCtor
@@ -91,7 +91,7 @@ namespace LuaTinker.Tests
 			tinker.AddClass<ManualPointerCtor>();
 			tinker.AddClassCtor<ManualPointerCtor, int32*>();
 			tinker.AddClassVar<ManualPointerCtor, const "IsNull">();
-			tinker.AddMethod<function bool(int32*)>("Direct", => PointerAPI.OnlyInt32);
+			tinker.AddMethod<function bool(int32*)>("Direct", (value) => value == null);
 			tinker.AddMethod<delegate bool(float*)>("Delegate", new (value) => value == null);
 			if (lua.DoString("""
 				assert(PointerCtor(nullptr.int32).Kind == 1)
