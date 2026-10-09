@@ -39,9 +39,13 @@ namespace LuaTinker.StackHelpers
 			lua.SetMetaTable(-2);
 		}
 
+		[Inline]
 		public static bool IsArgumentHint(Lua lua, int32 index)
+			=> IsArgumentHint(lua, index, lua.Type(index));
+
+		public static bool IsArgumentHint(Lua lua, int32 index, LuaType type)
 		{
-			if (!lua.IsTable(index) || !lua.GetMetaTable(index))
+			if (type != .Table || !lua.GetMetaTable(index))
 				return false;
 
 			lua.RawGetByHashCode(LuaRegistry.Index, &sArgumentHintMetatableKey);

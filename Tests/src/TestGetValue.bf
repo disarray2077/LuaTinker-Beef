@@ -6,6 +6,36 @@ namespace LuaTinker.Tests
 	class TestGetValue
 	{
 		[Test]
+		public static void TestGetStringLifetime()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			if (lua.DoString("word = string.rep('alpha', 40) .. string.char(0) .. 'beta'; number = 123456"))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			let wordResult = tinker.GetString!("word");
+			let numberResult = tinker.GetString!("number");
+			if (lua.DoString("word = nil; number = nil; collectgarbage('collect')"))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			String expected = scope .();
+			for (int i < 40)
+				expected.Append("alpha");
+			expected.Append("\0beta");
+			Test.Assert((wordResult case .Ok(let word)) && word == expected);
+			Test.Assert((numberResult case .Ok(let number)) && number == "123456");
+		}
+
+		[Test]
+		public static void TestPCallStringStorage()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AddMethod<delegate bool(String)>("BorrowsString", new (value) => value.Ptr == lua.ToStringView(1).Ptr);
+			tinker.AddMethod<delegate bool(String)>("CopiesNumber", new (value) => value.Ptr != lua.ToStringView(1).Ptr);
+			if (lua.DoString("assert(BorrowsString(string.rep('alpha', 40))); assert(CopiesNumber(123456))"))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
 		public static void Test()
 		{
 			let lua = scope Lua(true);

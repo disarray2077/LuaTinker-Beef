@@ -72,6 +72,10 @@ namespace LuaTinker.Tests
 
 		public static class NumericOverloads
 		{
+			public static int32 WithFallback(String value) => 1;
+			public static int32 WithFallback(Object value) => 2;
+			public static int32 WithFallback(uint8 value) => 8;
+			public static int32 WithFallback(uint32 value) => 32;
 			public static int32 Pick(int32 value) => 32;
 			public static int32 Pick(uint32 value) => 132;
 			public static int32 PickEnum(SignedChoice value) => 1;
@@ -108,7 +112,6 @@ namespace LuaTinker.Tests
 					total += (int32)value;
 				return total;
 			}
-			public static int32 Direct(uint32 value) => (int32)value;
 			public static int32 DeepestFailure(bool first, bool second, StringView third) => 1;
 			public static int32 DeepestFailure(Object first, int32 second) => 2;
 		}
@@ -138,6 +141,23 @@ namespace LuaTinker.Tests
 				assert(api.Pick(1) == 32)
 				assert(api.Pick(int32.cast(1)) == 32)
 				assert(api.Pick(uint32.cast(1)) == 132)
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
+		public static void TestNumericOverloadsWithOrdinaryFallback()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AutoTinkClass<NumericOverloads>();
+			if (lua.DoString("""
+				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				assert(api.WithFallback(300) == 32)
+				assert(api.WithFallback(uint32.cast(1)) == 32)
+				assert(api.WithFallback("text") == 1)
+				assert(api.WithFallback(-4) == 2)
+				assert(not pcall(function() api.WithFallback(1) end))
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}
@@ -286,7 +306,7 @@ namespace LuaTinker.Tests
 			tinker.AddClass<ManualUIntCtor>();
 			tinker.AddClassCtor<ManualUIntCtor, uint32>();
 			tinker.AddClassVar<ManualUIntCtor, const "Kind">();
-			tinker.AddMethod<function int32(uint32)>("DirectUInt", => NumericOverloads.Direct);
+			tinker.AddMethod<function int32(uint32)>("DirectUInt", (value) => (int32)value);
 			tinker.AddMethod<delegate int32(uint32)>("DirectDelegate", new (value) => (int32)value + 1);
 			if (lua.DoString("""
 				assert(NumericCtor(1).Kind == 32)

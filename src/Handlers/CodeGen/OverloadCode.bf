@@ -18,6 +18,14 @@ namespace LuaTinker.Handlers
 			InstanceMethod
 		}
 
+		internal enum BranchSelection
+		{
+			None,
+			Numeric,
+			SingleInputSpan,
+			InputSpan
+		}
+
 		private static LuaType BeefTypeToLuaType(Type type)
 		{
 			if (type == typeof(bool))
@@ -29,7 +37,7 @@ namespace LuaTinker.Handlers
 			return .UserData;
 		}
 
-		private static void EmitNumericDispatch<T>(int positionIndex, List<Type> numericTypes, List<Trie<MatchKey>> numericBranches, List<Trie<MatchKey>> otherBranches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind)
+		private static void EmitNumericDispatch<T>(int positionIndex, List<Type> numericTypes, List<Trie<MatchKey>> numericBranches, List<Trie<MatchKey>> otherBranches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, BranchSelection otherSelection)
 		{
 			let stackIndex = positions[positionIndex].LuaStackIndex;
 			let argumentPosition = positions[positionIndex].DiagnosticIndex;
@@ -55,7 +63,7 @@ namespace LuaTinker.Handlers
 					: scope $"selectedNumericType{stackIndex} == {@type.Index}";
 				delegate void(CodeWriter) emitBody = scope (body) =>
 				{
-					EmitTrieBranches<T>(positionIndex, typeBranches, candidates, parameters, positions, body, dispatchKind);
+					EmitTrieBranches<T>(positionIndex, typeBranches, candidates, parameters, positions, body, dispatchKind, .Numeric);
 				};
 				if (@type.Index == 0)
 					numericChain = writer.If(condition, emitBody);
@@ -65,11 +73,11 @@ namespace LuaTinker.Handlers
 			if (!otherBranches.IsEmpty)
 				numericChain.Else(scope (body) =>
 				{
-					EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, body, dispatchKind);
+					EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, body, dispatchKind, otherSelection);
 				});
 		}
 
-		private static void EmitTrieBranches<T>(int positionIndex, List<Trie<MatchKey>> branches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind)
+		private static void EmitTrieBranches<T>(int positionIndex, List<Trie<MatchKey>> branches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, BranchSelection selection)
 		{
 			let stackIndex = positions[positionIndex].LuaStackIndex;
 			CodeWriter.ConditionalChain lastBranch = default;
@@ -81,13 +89,16 @@ namespace LuaTinker.Handlers
 				if (flags.HasFlag(.Params))
 					Runtime.Assert(node.IsEnd);
 
-				LuaType luaType = BeefTypeToLuaType(type);
-				bool isNumericEdge = !flags.HasFlag(.This) && luaType == .Number;
 				String condition = scope .();
-				if (!isNumericEdge)
+				if (selection == .None || selection == .SingleInputSpan)
 				{
+					let luaType = BeefTypeToLuaType(type);
 					if (type == typeof(Object))
+					{
+						if (selection == .SingleInputSpan)
+							condition.AppendF($"lua.Type({stackIndex}) != .Table && ");
 						condition.AppendF($"!StackHelper.IsArgumentHint(lua, {stackIndex})");
+					}
 					else if ((luaType == .UserData || luaType == .String) && flags.HasFlag(.This))
 					{
 						if (stackIndex == 1)
@@ -103,6 +114,8 @@ namespace LuaTinker.Handlers
 						condition.AppendF($"lua.Is{luaType}({stackIndex})");
 					if (type.IsPointer && !flags.HasFlag(.This))
 						condition.Insert(0, scope $"StackHelper.IsNullPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()}))) || ");
+					if (selection == .SingleInputSpan && !flags.HasFlag(.This) && !flags.HasFlag(.Params) && GetSpanElement(type) != null)
+						condition.Insert(0, scope $"(lua.Type({stackIndex}) == .Table && !StackHelper.IsArgumentHint(lua, {stackIndex})) || ");
 				}
 
 				writer.Line(scope $"// {type.GetFullName(.. scope .())} (Flags: {flags})");
@@ -147,6 +160,7 @@ namespace LuaTinker.Handlers
 						});
 					}
 				};
+
 				if (condition.IsEmpty)
 					emitBody(writer);
 				else
@@ -162,6 +176,36 @@ namespace LuaTinker.Handlers
 			}
 		}
 
+		private static void EmitInputSpanDispatch<T>(int positionIndex, List<Trie<MatchKey>> branches, List<Type> spanTypes, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind)
+		{
+			let stackIndex = positions[positionIndex].LuaStackIndex;
+			String spanCandidates = scope .();
+			for (let spanType in spanTypes)
+			{
+				if (@spanType.Index > 0)
+					spanCandidates.Append(", ");
+				spanCandidates.AppendF($"comptype({GetSpanElement(spanType).GetTypeId()})");
+			}
+			writer.Line(scope $"let selectedInputSpanType{stackIndex} = StackHelper.SelectInputSpan<({spanCandidates})>(lua, {stackIndex}, {positions[positionIndex].DiagnosticIndex});");
+			CodeWriter.ConditionalChain chain = default;
+			for (let spanType in spanTypes)
+			{
+				delegate void(CodeWriter) emitBody = scope (body) =>
+				{
+					List<Trie<MatchKey>> typeBranches = scope .();
+					for (let branch in branches)
+						if (branch.Value.MatchType == spanType && !branch.Value.Flags.HasFlag(.Params) && !branch.Value.Flags.HasFlag(.This))
+							typeBranches.Add(branch);
+					EmitTrieBranches<T>(positionIndex, typeBranches, candidates, parameters, positions, body, dispatchKind, .InputSpan);
+				};
+				let condition = scope $"selectedInputSpanType{stackIndex} == {@spanType.Index}";
+				if (@spanType.Index == 0)
+					chain = writer.If(condition, emitBody);
+				else
+					chain = chain.ElseIf(condition, emitBody);
+			}
+		}
+
 		private static void IterateTrie<T>(int positionIndex, Trie<MatchKey> root, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind)
 		{
 			let stackIndex = positions[positionIndex].LuaStackIndex;
@@ -169,12 +213,16 @@ namespace LuaTinker.Handlers
 			writer.Line(scope $"matchedOverloadArguments[{positionIndex}] = false;");
 			List<Type> numericTypes = scope .();
 			List<Type> pointerTypes = scope .();
+			List<Type> inputSpanTypes = scope .();
 			List<Trie<MatchKey>> numericBranches = scope .();
 			List<Trie<MatchKey>> otherBranches = scope .();
 			for (let node in root.OrderedChildren)
 			{
 				let param = node.Value;
 				let type = param.MatchType;
+				if (!param.Flags.HasFlag(.This) && !param.Flags.HasFlag(.Params))
+					if (GetSpanElement(type) != null && !inputSpanTypes.Contains(type))
+						inputSpanTypes.Add(type);
 				if (!param.Flags.HasFlag(.This) && type.IsPointer && !pointerTypes.Contains(type))
 					pointerTypes.Add(type);
 				if (!param.Flags.HasFlag(.This) && IsNumericType(type))
@@ -188,10 +236,21 @@ namespace LuaTinker.Handlers
 			}
 			if (pointerTypes.Count > 1)
 				writer.Line(scope $"StackHelper.EnsureUnambiguousNullPointer(lua, {stackIndex}, {argumentPosition});");
-			if (numericTypes.IsEmpty)
-				EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, writer, dispatchKind);
+			delegate void(CodeWriter) emitOrdinaryBranches = scope (body) =>
+			{
+				let otherSelection = inputSpanTypes.Count == 1 ? BranchSelection.SingleInputSpan : BranchSelection.None;
+				if (numericTypes.IsEmpty)
+					EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, body, dispatchKind, otherSelection);
+				else
+					EmitNumericDispatch<T>(positionIndex, numericTypes, numericBranches, otherBranches, candidates, parameters, positions, body, dispatchKind, otherSelection);
+			};
+			if (inputSpanTypes.Count <= 1)
+				emitOrdinaryBranches(writer);
 			else
-				EmitNumericDispatch<T>(positionIndex, numericTypes, numericBranches, otherBranches, candidates, parameters, positions, writer, dispatchKind);
+				writer.If(scope $"lua.Type({stackIndex}) == .Table && !StackHelper.IsArgumentHint(lua, {stackIndex})", scope (body) =>
+				{
+					EmitInputSpanDispatch<T>(positionIndex, root.OrderedChildren, inputSpanTypes, candidates, parameters, positions, body, dispatchKind);
+				}).Else(emitOrdinaryBranches);
 			String expectedTypes = scope .();
 			List<Type> expected = scope .();
 			for (let child in root.OrderedChildren)

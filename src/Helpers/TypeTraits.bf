@@ -7,8 +7,32 @@ namespace LuaTinker.Helpers
 {
 	static
 	{
+		typealias FirstGenericArg<T> = GetGenericArg<T, const 0>.Result;
+
+		public static Type GetSpanElement(Type type)
+		{
+			if (let specialized = type as SpecializedGenericType)
+				if (specialized.UnspecializedType == typeof(Span<>) && specialized.GenericParamCount == 1)
+					return specialized.GetGenericArg(0);
+			return null;
+		}
+
 		struct Yes;
 		struct No;
+
+		struct IsInputSpan<T> where T : var
+		{
+			public typealias Result = comptype(_isInputSpan(typeof(T)));
+
+			[Comptime]
+			private static Type _isInputSpan(Type type)
+			{
+				let element = GetSpanElement(type);
+				if (element != null)
+					return typeof(Yes);
+				return typeof(No);
+			}
+		}
 
 		struct IsIndexable<T, TKey>
 		{
