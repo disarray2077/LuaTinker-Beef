@@ -1,3 +1,5 @@
+local opengl = require("modules.opengl")
+
 local function assert_sdl(value)
     if not value then
         error(string.from_cstr(SDL.GetError()), 2)
@@ -151,7 +153,10 @@ local function run()
     assert_sdl(SDL.GL_MakeCurrent(window, context) == 0)
 
     gl = BeefGL.GL
-    local missing = gl.InitGL()
+    gl.Init(function(proc)
+        return SDL.GL_GetProcAddress(proc)
+    end)
+    local missing = opengl.GetMissingRequiredFunction()
     assert(missing == "", "Missing required OpenGL entry point: " .. missing)
 
     local positionLocation = initShaders()

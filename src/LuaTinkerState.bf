@@ -18,8 +18,15 @@ namespace LuaTinker
 			public this(StringView name) { Name = new .(name); }
 		}
 
+		private struct DelegateRegistration
+		{
+			public function Object(Lua, int32, ITypedAllocator) Factory;
+			public int AllocationSize;
+		}
+
 		private Dictionary<TypeId, ClassRegistration> mClasses = new .() ~ DeleteDictionaryAndValues!(_);
 		private String mLastError = new .() ~ delete _;
+		private Dictionary<TypeId, DelegateRegistration> mDelegates = new .() ~ delete _;
 
 		public bool IsPCall { get; internal set; }
 		public bool HasError => !mLastError.IsEmpty;
@@ -31,6 +38,25 @@ namespace LuaTinker
 
 		public this()
 		{
+		}
+
+		[Inline]
+		internal void RegisterDelegate(Type type, function Object(Lua, int32, ITypedAllocator) factory, int allocationSize)
+			=> mDelegates[type.TypeId] = .() { Factory = factory, AllocationSize = allocationSize };
+
+		[Inline]
+		internal bool IsDelegateRegistered(Type type) => mDelegates.ContainsKey(type.TypeId);
+
+		[Inline]
+		internal int GetDelegateAllocationSize(Type type)
+			=> mDelegates.TryGetValue(type.TypeId, let registration) ? registration.AllocationSize : 0;
+
+		internal Object CreateDelegate(Type type, Lua lua, int32 index, ITypedAllocator allocator)
+		{
+			if (mDelegates.TryGetValue(type.TypeId, let registration))
+				return registration.Factory(lua, index, allocator);
+			SetLastError($"can't convert argument {index} to '{type}' (delegate signature not registered.)");
+			return null;
 		}
 
 		public void RegisterAliveObject(Object obj)

@@ -17,7 +17,7 @@ namespace LuaTinker.StackHelpers
 		public new static void Push(Lua lua, T value)
 		{
 			Type2User.Create(lua, value);
-			lua.CreateTable(0, 4);
+			lua.CreateTable(0, 5);
 			UserdataMetatables.Mark(lua, -1, .Pointer);
 			lua.PushString("__gc");
 			lua.PushCClosure(=> PointerDestructorHandler, 0);
@@ -27,6 +27,9 @@ namespace LuaTinker.StackHelpers
 			lua.RawSet(-3);
 			lua.PushString("__call");
 			lua.PushCClosure(=> FunctionPointerCallHandler<T>, 0);
+			lua.RawSet(-3);
+			lua.PushString("__index");
+			lua.PushCClosure(=> FunctionPointerIndexGetHandler<T>, 0);
 			lua.RawSet(-3);
 			lua.SetMetaTable(-2);
 		}

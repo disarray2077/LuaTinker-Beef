@@ -10,8 +10,7 @@ namespace LuaTinker.Helpers
 		[Comptime]
 		public static bool CanAutoTinkMethod(MethodInfo method)
 		{
-			// Corlib exposes no public function/delegate predicate; inspect its flags without changing corlib visibility.
-			if (method.ReturnType.[Friend]mTypeFlags.HasFlag(.Delegate))
+			if (IsDelegateType(method.ReturnType))
 				return false;
 
 			// Append constructors expose a compiler-generated argument that the
@@ -34,8 +33,7 @@ namespace LuaTinker.Helpers
 						return false;
 				}
 
-				if (paramType.[Friend]mTypeFlags.HasFlag(.Function) ||
-					paramType.[Friend]mTypeFlags.HasFlag(.Delegate))
+				if (IsFunctionType(paramType))
 					return false;
 			}
 			return true;

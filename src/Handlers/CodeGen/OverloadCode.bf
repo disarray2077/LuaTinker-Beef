@@ -116,6 +116,8 @@ namespace LuaTinker.Handlers
 						let competingTypes = hasVoidPointerFallback && type == typeof(void*) ? scope $", pointerTypes{stackIndex}" : "";
 						condition.AppendF($"StackHelper.IsPointerArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()})){competingTypes})");
 					}
+					else if (IsDelegateType(type) && !flags.HasFlag(.This))
+						condition.AppendF($"StackHelper.IsDelegateArgument(lua, {stackIndex}, typeof(comptype({type.GetTypeId()})))");
 					else if (type == typeof(Object))
 					{
 						if (selection == .SingleInputSpan)

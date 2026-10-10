@@ -105,7 +105,7 @@ namespace LuaTinker.Tests
 				assert(api.Twice(21) == 42)
 				assert(api.Twice("text") == 4)
 				assert(api.SetCallback == nil)
-				assert(api.SetDelegate == nil)
+				assert(not pcall(function() api.SetDelegate(function() end) end))
 				assert(api.GetDelegate == nil)
 				assert(api.Change == nil)
 				assert(api.Produce == nil)
