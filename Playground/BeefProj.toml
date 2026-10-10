@@ -13,7 +13,7 @@ BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
 StbImageBeef = {Git = "https://github.com/StbBeef/StbImageBeef?path=/src/StbImageBeef"}
 
 [Configs.Debug.Win64]
-DebugCommandArguments = "sdl_render.lua"
+DebugCommandArguments = "gl_render.lua"
 
 [Configs.Debug.Linux64]
 OtherLinkFlags = "$(LinkFlags) -lSDL2_image -lSDL2_mixer"

@@ -12,10 +12,10 @@ namespace LuaTinker.StackHelpers
 {
 	extension PopDispatch<T> where T : var where IsInputSpan<T>.Result : Yes
 	{
-		public new static mixin Pop(Lua lua, int32 index, LuaType? knownType)
+		public new static mixin Pop(Lua lua, int32 index)
 		{
 			T result = default;
-			let valueType = knownType.HasValue ? knownType.Value : lua.Type(index);
+			let valueType = lua.Type(index);
 			if (valueType == .UserData)
 				result = StackHelper.Pop<T>(lua, index);
 			else

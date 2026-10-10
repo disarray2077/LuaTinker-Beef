@@ -47,9 +47,8 @@ namespace LuaTinker.Helpers
 			[Comptime]
 			private static Type _isInputSpan(Type type)
 			{
-				let element = GetSpanElement(type);
-				if (element != null)
-					return typeof(Yes);
+				if (let specialized = type as SpecializedGenericType)
+					return specialized.UnspecializedType == typeof(Span<>) ? typeof(Yes) : typeof(No);
 				return typeof(No);
 			}
 		}
