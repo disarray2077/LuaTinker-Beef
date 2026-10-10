@@ -1,11 +1,16 @@
 using System;
 using System.IO;
+using System.Collections;
+using BeefGL.Helpers;
 using KeraLua;
 
 namespace LuaTinker.Playground;
 
 static class Program
 {
+    [Inline]
+    private static IntPtr ToIntPtr(float* pointer) => (void*)pointer;
+
     public static int Main(String[] args)
     {
         StringView scriptPath = args.Count > 0 ? args[0] : "Playground/sdl_render.lua";
@@ -20,6 +25,11 @@ static class Program
         lua.Encoding = System.Text.Encoding.UTF8;
         let tinker = scope LuaTinker(lua);
         SDLBindings.Register(tinker, lua);
+        OpenGLBindings.Register(tinker);
+        tinker.AddClass<String>("StringBuilder");
+        tinker.AddClassCtor<String>();
+        tinker.AutoTinkClass<List<float>, const "FloatList">();
+        tinker.AddMethod<function IntPtr(float*)>("ToIntPtr", => ToIntPtr);
         lua.PushString(scriptPath);
         lua.SetGlobal("PlaygroundScript");
 
