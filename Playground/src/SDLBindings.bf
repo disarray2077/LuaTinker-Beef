@@ -20,11 +20,6 @@ struct SDLExportExclusions : IMethodExclusionProvider
 
         for (let method in type.GetMethods(.Public | .DeclaredOnly))
         {
-            if (method.Name.StartsWith("GL_"))
-            {
-                excluded.Add(method.Name);
-                continue;
-            }
             if (scanned)
             {
                 if (!method.HasCustomAttribute<LinkNameAttribute>())
@@ -49,7 +44,9 @@ struct SDLExportExclusions : IMethodExclusionProvider
              "DestroyWindow", "DestroyRenderer", "DestroyTexture", "PushEvent", "PollEvent",
              "SetRenderDrawColor", "RenderClear", "RenderPresent", "RenderFillRect",
              "RenderDrawRect", "RenderDrawLine", "RenderCopy", "RenderSetLogicalSize",
-             "QueryTexture", "SetTextureBlendMode", "SetTextureColorMod", "SetTextureAlphaMod":
+             "QueryTexture", "SetTextureBlendMode", "SetTextureColorMod", "SetTextureAlphaMod",
+             "GL_CreateContext", "GL_MakeCurrent", "GL_DeleteContext",
+             "GL_SetAttribute", "GL_SwapWindow", "GL_GetProcAddress":
             return true;
         default:
             return false;
@@ -126,6 +123,8 @@ static class SDLBindings
         tinker.AddNamespaceEnum<SDL.BlendMode>("SDL2.SDL");
         tinker.AddNamespaceEnum<SDL.EventType>("SDL2.SDL");
         tinker.AddNamespaceEnum<SDL.Keycode>("SDL2.SDL");
+        tinker.AddNamespaceEnum<SDL.SDL_GLAttr>("SDL2.SDL");
+        tinker.AddNamespaceEnum<SDL.SDL_GLProfile>("SDL2.SDL", typed: true);
         tinker.AddNamespaceEnum<SDL.WindowEventID>("SDL2.SDL");
         tinker.AddNamespaceEnum<SDL.Scancode>("SDL2.SDL");
         tinker.AddNamespaceEnum<SDL.KeyMod>("SDL2.SDL", typed: true);

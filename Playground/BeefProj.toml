@@ -9,6 +9,7 @@ corlib = "*"
 KeraLua = "*"
 LuaTinker = "*"
 SDL2 = "*"
+BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
 
 [Configs.Debug.Win64]
 DebugCommandArguments = "sdl_render.lua"
