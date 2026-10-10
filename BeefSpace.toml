@@ -13,6 +13,7 @@ KeraLua = {Path = "../KeraLua-Beef"}
 "LuaTinker.GameSample" = {Path = "GameSample"}
 "LuaTinker.Playground" = {Path = "Playground"}
 BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
+StbImageBeef = {Git = "https://github.com/StbBeef/StbImageBeef?path=/src/StbImageBeef"}
 SDL2 = "*"
 
 [Configs.Debug.Win64]

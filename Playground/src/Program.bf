@@ -8,13 +8,11 @@ namespace LuaTinker.Playground;
 
 static class Program
 {
-    [Inline]
-    private static IntPtr ToIntPtr(float* pointer) => (void*)pointer;
-
     public static int Main(String[] args)
     {
         String scriptPath = scope .();
         Path.GetFullPath(args.Count > 0 ? args[0] : "Playground/sdl_render.lua", scriptPath);
+
         String script = scope .();
         if (File.ReadAllText(scriptPath, script) case .Err(let error))
         {
@@ -37,12 +35,17 @@ static class Program
         let lua = scope Lua(true);
         lua.Encoding = System.Text.Encoding.UTF8;
         let tinker = scope LuaTinker(lua);
+
         SDLBindings.Register(tinker, lua);
+        ImageBindings.Register(tinker, lua);
+        AudioBindings.Register(tinker);
         OpenGLBindings.Register(tinker);
+
         tinker.AddClass<String>("StringBuilder");
         tinker.AddClassCtor<String>();
         tinker.AutoTinkClass<List<float>, const "FloatList">();
-        tinker.AddMethod<function IntPtr(float*)>("ToIntPtr", => ToIntPtr);
+        tinker.AutoTinkClass<List<uint8>, const "UInt8List">();
+        tinker.AddMethod<function IntPtr(float*)>("ToIntPtr", (pointer) => (void*)pointer); // sad...
         lua.PushString(scriptPath);
         lua.SetGlobal("PlaygroundScript");
 
@@ -51,6 +54,7 @@ static class Program
             Console.Error.WriteLine(lua.ToString(-1, .. scope .()));
             return 1;
         }
+
         return 0;
     }
 }

@@ -13,6 +13,8 @@ namespace LuaTinker.Wrappers
 	{
 		function TVar(T this) mGetFunc;
 		function void(T this, TVar) mSetFunc;
+		function TVar(T) mStaticGetFunc;
+		function void(T, TVar) mStaticSetFunc;
 
 		public this(function TVar(T this) getFunc, function void(T this, TVar) setFunc)
 		{
@@ -22,13 +24,16 @@ namespace LuaTinker.Wrappers
 
 		public this(function TVar(T) getFunc, function void(T, TVar) setFunc)
 		{
-			mGetFunc = (.)(void*)getFunc;
-			mSetFunc = (.)(void*)setFunc;
+			// Previously, we reused the instance function pointer for static methods by casting it
+			// to the corresponding instance signature. However, static and instance methods can use
+			// different calling conventions for struct return values, making the cast brittle.
+			mStaticGetFunc = getFunc;
+			mStaticSetFunc = setFunc;
 		}
 
 		public override void Get(Lua lua)
 		{
-			if (mGetFunc == null)
+			if (mGetFunc == null && mStaticGetFunc == null)
 			{
 				let tinkerState = lua.TinkerState;
 				tinkerState.SetLastError("this property is write-only");
@@ -42,12 +47,15 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));
+			if (mStaticGetFunc != null)
+				StackHelper.Push(lua, mStaticGetFunc(StackHelper.Pop!<T>(lua, 1)));
+			else
+				StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));
 		}
 
 		public override void Set(Lua lua)
 		{
-			if (mSetFunc == null)
+			if (mSetFunc == null && mStaticSetFunc == null)
 			{
 				let tinkerState = lua.TinkerState;
 				tinkerState.SetLastError("this property is read-only");
@@ -61,7 +69,10 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
+			if (mStaticSetFunc != null)
+				mStaticSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
+			else
+				mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
 		}
 	}
 }

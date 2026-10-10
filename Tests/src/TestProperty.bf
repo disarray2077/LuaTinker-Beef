@@ -6,6 +6,37 @@ namespace LuaTinker.Tests
 {
 	static class TestProperty
 	{
+		class TextHolder
+		{
+			public append String Text = .(32);
+			public this() { Text.Set("initial"); }
+			public StringView Read() => Text;
+			public void Write(StringView value) { Text.Set(value); }
+		}
+
+		[Test]
+		public static void TestStructReturningPropertyFunctions()
+		{
+			let lua = scope Lua(true);
+			LuaTinker tinker = scope .(lua);
+			tinker.AddClass<TextHolder>("TextHolder");
+			tinker.AddClassCtor<TextHolder>();
+			tinker.AddClassProperty<TextHolder, StringView>("StaticText",
+				(self) => self.Text, (self, value) => self.Write(value));
+			tinker.AddClassProperty<TextHolder, StringView>("MethodText",
+				(function StringView(TextHolder this)) => TextHolder.Read,
+				(function void(TextHolder this, StringView)) => TextHolder.Write);
+			if (lua.DoString("""
+				local holder = TextHolder()
+				assert(holder.StaticText == "initial")
+				holder.StaticText = "static setter"
+				assert(holder.MethodText == "static setter")
+				holder.MethodText = "method setter"
+				assert(holder.StaticText == "method setter")
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
 		[Test]
 		public static void Test()
 		{

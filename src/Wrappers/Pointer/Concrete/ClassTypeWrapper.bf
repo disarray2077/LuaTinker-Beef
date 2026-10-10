@@ -96,6 +96,8 @@ namespace LuaTinker.Wrappers
 		[Inline]
 		public override Type Type => typeof(T);
 
+		public override bool TryTakeOwnership(LuaTinkerState tinkerState) => true;
+
 		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
 			obj = ClassInstance;
