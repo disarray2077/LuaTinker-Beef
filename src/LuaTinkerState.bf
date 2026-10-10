@@ -25,8 +25,8 @@ namespace LuaTinker
 		}
 
 		private Dictionary<TypeId, ClassRegistration> mClasses = new .() ~ DeleteDictionaryAndValues!(_);
-		private String mLastError = new .() ~ delete _;
 		private Dictionary<TypeId, DelegateRegistration> mDelegates = new .() ~ delete _;
+		private String mLastError = new .() ~ delete _;
 
 		public bool IsPCall { get; internal set; }
 		public bool HasError => !mLastError.IsEmpty;
@@ -66,8 +66,7 @@ namespace LuaTinker
 #endif
 		}
 
-		public void RegisterAliveObject<T>(T obj)
-			where T : class, ILuaOwnedObject
+		public void RegisterAliveObject(ILuaOwnedObject obj)
 		{
 			obj.OnAddedToLua(this);
 #if BF_ENABLE_REALTIME_LEAK_CHECK
@@ -82,8 +81,7 @@ namespace LuaTinker
 #endif
 		}
 
-		public void DeregisterAliveObject<T>(T obj)
-			where T : class, ILuaOwnedObject
+		public void DeregisterAliveObject(ILuaOwnedObject obj)
 		{
 			obj.OnRemovedFromLua(this);
 #if BF_ENABLE_REALTIME_LEAK_CHECK

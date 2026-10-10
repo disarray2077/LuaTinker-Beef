@@ -37,7 +37,6 @@ static class OpenGLBindings
         tinker.AddNamespaceEnum<PixelStoreParameter>("BeefGL.GL");
 
         tinker.RegisterDelegate<delegate void*(String)>();
-
         tinker.AddNamespaceMethod<function void(delegate void*(String))>("BeefGL.GL", "Init", => GL.Init<delegate void*(String)>);
     }
 }

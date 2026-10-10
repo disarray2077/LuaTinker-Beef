@@ -44,6 +44,8 @@ namespace LuaTinker
 			AddNumericCast<double>("double");
 			AddNullPointerHint();
 			AddOwnedValues();
+			mLua.PushCClosure(=> TakeOwnershipHandler, 0);
+			mLua.SetGlobal("take_ownership");
 		}
 
 		public ~this()
@@ -1107,5 +1109,12 @@ namespace LuaTinker
 		[Inline]
 		public void SetNumber(StringView name, double number)
 			=> SetValue(name, number);
+
+		/// Allows Lua functions to be passed as call-scoped delegates of this signature.
+		public void RegisterDelegate<D>() where D : Delegate
+		{
+			LuaDelegateAdapter<D>.ValidateSignature();
+			mTinkerState.RegisterDelegate(typeof(D), => LuaDelegateAdapter<D>.Create, LuaDelegateAdapter<D>.StorageSize);
+		}
 	}
 }

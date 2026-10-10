@@ -4,6 +4,8 @@ using System.Reflection;
 
 namespace LuaTinker.Wrappers
 {
+	using internal LuaTinker;
+
 	public sealed class ClassInstanceWrapper<T> : PointerWrapperBase
 		where T : var, class
 	{
@@ -136,6 +138,15 @@ namespace LuaTinker.Wrappers
 		} 
 
 		public override Type Type => typeof(T);
+
+		public override bool TryTakeOwnership(LuaTinkerState tinkerState)
+		{
+			if (OwnsPointer)
+				return true;
+			OwnsPointer = true;
+			tinkerState.RegisterAliveObject(this);
+			return true;
+		}
 
 		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
