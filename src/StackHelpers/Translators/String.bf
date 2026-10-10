@@ -9,27 +9,52 @@ namespace LuaTinker.StackHelpers
 {
 	extension StackHelper
 	{
-		[Inline]
-		public static void Push(Lua lua, String val)
+		public static mixin PopAlloc<T>(Lua lua, int32 index, ITypedAllocator alloc)
+			where T : String, class where String : T
 		{
-			lua.PushString(val);
+			PopString(lua, index, alloc)
 		}
 
-		public static StringView? Pop<T>(Lua lua, int32 index)
-			where T : class, String where String : T
+		public static mixin Pop<T>(Lua lua, int32 index)
+			where T : String, class where String : T
 		{
-			if (lua.IsNil(index))
+			SingleAllocator alloc = scope:mixin .(96);
+			PopString(lua, index, alloc)
+		}
+
+		private static String PopString(Lua lua, int32 index, ITypedAllocator alloc)
+		{
+			let valueType = lua.Type(index);
+			if (valueType == .UserData)
 			{
-				return null;
-			}
-			else if (!lua.IsStringOrNumber(index))
-			{
+				let wrapper = User2Type.GetObject(lua, index) as PointerWrapperBase;
+				if (wrapper == null)
+					return default;
+				if (!wrapper.Type.IsValueType && (wrapper.ToObject(alloc, let obj) case .Object))
+				{
+					if (let str = obj as String)
+						return str;
+				}
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"expected 'String' but got '{lua.TypeName(index)}'");
+				luaTinker.SetLastError($"can't convert argument {index} to 'String'");
 				TryThrowError(lua, luaTinker);
 				return default;
 			}
-			return lua.ToStringView(index);
+			else
+			{
+				if (let strView = Pop<String>(lua, index))
+				{
+					let str = new:alloc String();
+					// PCall borrows rooted Lua strings; numeric conversion produces an unrooted temporary.
+					if (valueType == .String && lua.TinkerState.IsPCall)
+						str.Reference(strView);
+					else
+						str.Append(strView);
+					return str;
+				}
+				else
+					return null;
+			}
 		}
 
 		[Inline]

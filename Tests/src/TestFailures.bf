@@ -36,14 +36,14 @@ namespace LuaTinker.Tests
 			let allocator = scope NoAllocationAllocator();
 			var value = 123;
 			Type2User.Create(lua, value);
-			Test.Assert(StackHelper.[Friend]_PopAlloc<String>(lua, -1, allocator) == null);
+			Test.Assert(StackHelper.[Friend]PopString(lua, -1, allocator) == null);
 			Test.Assert(state.GetLastError().Contains("to 'String'"));
 			Test.Assert(lua.GetTop() == 1);
 			lua.Pop(1);
 			state.ClearError();
 
 			Type2User.Create(lua, ref value);
-			Test.Assert(StackHelper.[Friend]_PopAlloc<String>(lua, -1, allocator) == null);
+			Test.Assert(StackHelper.[Friend]PopString(lua, -1, allocator) == null);
 			Test.Assert(state.GetLastError().Contains("to 'String'"));
 			Test.Assert(lua.GetTop() == 1);
 			lua.Pop(1);

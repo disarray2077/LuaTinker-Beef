@@ -1044,11 +1044,11 @@ namespace LuaTinker
 		{
 			Debug.Assert(mLua.GetTop() == 0);
 			mTinkerState.ClearError();
-			let valueType = mLua.GetGlobal(name);
+			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 			// Friend lets this public mixin use the internal dispatch type in the caller's scope.
 #unwarn
-			let values = [Friend]PopDispatch<Span<T>>.Pop!:mixin(mLua, -1, valueType);
+			let values = [Friend]PopDispatch<Span<T>>.Pop!:mixin(mLua, -1);
 			Result<Span<T>, StringView> result = mTinkerState.HasError ? .Err(mTinkerState.GetLastError()) : .Ok(values);
 			result
 		}
