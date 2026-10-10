@@ -13,11 +13,24 @@ static class Program
 
     public static int Main(String[] args)
     {
-        StringView scriptPath = args.Count > 0 ? args[0] : "Playground/sdl_render.lua";
+        String scriptPath = scope .();
+        Path.GetFullPath(args.Count > 0 ? args[0] : "Playground/sdl_render.lua", scriptPath);
         String script = scope .();
         if (File.ReadAllText(scriptPath, script) case .Err(let error))
         {
             Console.Error.WriteLine($"Cannot read {scriptPath}: {error}");
+            return 1;
+        }
+
+        String scriptDirectory = scope .();
+        if (Path.GetDirectoryPath(scriptPath, scriptDirectory) case .Err)
+        {
+            Console.Error.WriteLine($"Cannot get directory for {scriptPath}");
+            return 1;
+        }
+        if (Directory.SetCurrentDirectory(scriptDirectory) case .Err(let directoryError))
+        {
+            Console.Error.WriteLine($"Cannot set working directory to {scriptDirectory}: {directoryError}");
             return 1;
         }
 

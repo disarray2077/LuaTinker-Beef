@@ -30,6 +30,16 @@ namespace LuaTinker.Helpers
 			public typealias Result = comptype(IsFunctionType(typeof(T)) ? typeof(Yes) : typeof(No));
 		}
 
+		// Corlib exposes no public delegate-kind query; use its flag without changing visibility.
+		[Inline]
+		public static bool IsDelegateType(Type type)
+			=> !type.IsGenericParam && type.[Friend]mTypeFlags.HasFlag(.Delegate);
+
+		struct IsDelegate<T> where T : var
+		{
+			public typealias Result = comptype(IsDelegateType(typeof(T)) ? typeof(Yes) : typeof(No));
+		}
+
 		struct IsInputSpan<T> where T : var
 		{
 			public typealias Result = comptype(_isInputSpan(typeof(T)));
