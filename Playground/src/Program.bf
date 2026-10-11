@@ -13,8 +13,13 @@ static class Program
 
     public static int Main(String[] args)
     {
+#if BF_PLATFORM_WASM
+        const String defaultScript = "/templates/sdl_render.lua";
+#else
+        const String defaultScript = "Playground/sdl_render.lua";
+#endif
         String scriptPath = scope .();
-        Path.GetFullPath(args.Count > 0 ? args[0] : "Playground/sdl_render.lua", scriptPath);
+        Path.GetFullPath(args.Count > 0 ? args[0] : defaultScript, scriptPath);
 
 #if !BF_PLATFORM_WASM
         String script = scope .();

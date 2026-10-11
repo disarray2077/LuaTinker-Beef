@@ -45,5 +45,15 @@ try {
 }
 
 # Beef uses its configured EmscriptenPath; keep the same activated SDK in Beef's Wasm settings.
+$shellPath = Join-Path $output 'playground/LuaTinkerPlayground.html'
+# Regenerate the shell even when Beef's incremental build misses template changes.
+if (Test-Path $shellPath) { Remove-Item -LiteralPath $shellPath }
 & $BeefBuild "-workspace=$workspace" '-project=LuaTinker.Playground' -config=Release -platform=wasm32
 if ($LASTEXITCODE) { throw 'Wasm build failed for LuaTinker.Playground.' }
+
+# Keep JavaScript, Wasm, and preloaded data on the same version when browsers cache assets.
+$version = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$shell = [System.IO.File]::ReadAllText($shellPath)
+$shell = $shell -replace 'LuaTinkerPlayground\.js(?:\?v=\d+)?', "LuaTinkerPlayground.js?v=$version"
+$shell = $shell -replace '\?v=(?:__PLAYGROUND_BUILD_VERSION__|\d+)', "?v=$version"
+[System.IO.File]::WriteAllText($shellPath, $shell)

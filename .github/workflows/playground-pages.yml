@@ -1,0 +1,84 @@
+name: Deploy Playground to GitHub Pages
+
+on:
+  push:
+    branches: [main, playground]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playground-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Beef nightly
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path $env:RUNNER_TEMP 'BeefSetup.exe'
+          $beefRoot = Join-Path $env:RUNNER_TEMP 'Beef'
+          Invoke-WebRequest 'https://nightly.beeflang.org/BeefSetup.exe' -OutFile $setup
+          & 7z x $setup "-o$beefRoot" -y
+          if ($LASTEXITCODE) { throw 'Cannot extract Beef nightly.' }
+          Copy-Item "$beefRoot/__user/*" $beefRoot -Recurse -Force
+          "BEEF_ROOT=$beefRoot" >> $env:GITHUB_ENV
+
+      - name: Fetch Beef's Emscripten SDK
+        shell: cmd
+        working-directory: ${{ runner.temp }}/Beef/wasm
+        run: call fetch_wasm.bat
+
+      - name: Configure Emscripten
+        run: |
+          $sdk = "$env:BEEF_ROOT/wasm/emsdk".Replace('\', '/')
+          @"
+          FileVersion = 1
+          [Wasm]
+          EmscriptenPath = "$sdk"
+          "@ | Set-Content "$env:BEEF_ROOT/bin/BeefSettings.toml" -Encoding utf8
+
+      - name: Build Playground
+        shell: cmd
+        run: |
+          call "%BEEF_ROOT%\wasm\emsdk\emsdk_env.bat"
+          if errorlevel 1 exit /b 1
+          pwsh -NoProfile -File scripts\build-wasm.ps1 -Emsdk "%BEEF_ROOT%\wasm\emsdk" -BeefBuild "%BEEF_ROOT%\bin\BeefBuild.exe"
+
+      - name: Prepare site
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = 'build/wasm/playground'
+          $site = 'build/pages'
+          New-Item -ItemType Directory -Force $site | Out-Null
+          Copy-Item "$output/LuaTinkerPlayground.html" "$site/index.html"
+          foreach ($extension in @('js', 'wasm', 'data')) {
+            Copy-Item "$output/LuaTinkerPlayground.$extension" $site
+          }
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4

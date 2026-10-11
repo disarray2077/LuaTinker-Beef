@@ -27,6 +27,11 @@
   <canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
   <p>Use the arrow keys to move. Press Escape to exit. Run starts a fresh session.</p>
   <pre id="output" aria-live="polite"></pre>
+  <script>
+    var Module = {
+      locateFile: (path, prefix) => `${prefix}${path}?v=__PLAYGROUND_BUILD_VERSION__`
+    };
+  </script>
   {{{ SCRIPT }}}
 </body>
 </html>

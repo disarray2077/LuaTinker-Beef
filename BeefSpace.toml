@@ -8,7 +8,6 @@ StartupProject = "LuaTinker.Playground"
 LuaTinker = {Path = "."}
 KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}
 "LuaTinker.Tests" = {Path = "Tests"}
-KeraLua = {Path = "../KeraLua-Beef"}
 "LuaTinker.BasicSample" = {Path = "Sample"}
 "LuaTinker.GameSample" = {Path = "GameSample"}
 "LuaTinker.Playground" = {Path = "Playground"}

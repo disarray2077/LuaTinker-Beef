@@ -1,0 +1,19 @@
+# Build output and downloaded dependencies
+build/
+/GameSample/dist/
+/third_party/
+
+# Local Beef workspace state
+BeefSpace_User.toml
+BeefProj_User.toml
+BeefSpace_Lock*.toml
+
+# Compiler recovery files
+/recovery/
+
+# Tool caches and operating-system files
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
