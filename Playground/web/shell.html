@@ -2,33 +2,130 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>LuaTinker Playground</title>
   <style>
-    :root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; background: #15181f; color: #e8eaf0; }
-    body { max-width: 960px; margin: 24px auto; padding: 0 16px; }
-    header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    h1 { font-size: 24px; margin-right: auto; }
-    button, select { font: inherit; padding: 8px 12px; }
-    #status { display: block; margin: 12px 0; }
-    canvas { display: block; max-width: 100%; margin: auto; background: black; touch-action: none; }
-    #output { min-height: 100px; white-space: pre-wrap; overflow-wrap: anywhere; background: #0c0e13; padding: 12px; }
+    :root { color-scheme: dark; --bg:#0f1117; --panel:#171a22; --panel-alt:#1e2430; --border:#31394a; --text:#e7eaf0; --muted:#9aa4b5; --accent:#f0b85a; --danger:#ef6b73; font: 14px/1.45 system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-width: 0; overflow-x: hidden; background: var(--bg); color: var(--text); }
+    button, select, input { font: inherit; }
+    button, select, input[type=file] { min-height: 44px; }
+    button { padding: 8px 13px; color: var(--text); background: var(--panel-alt); border: 1px solid var(--border); border-radius: 7px; cursor: pointer; }
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    button:disabled, select:disabled { opacity: .48; cursor: not-allowed; }
+    .primary { color: #211706; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+    .danger { color: var(--danger); }
+    #app { height: var(--app-height, 100dvh); min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+    header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 64px; padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+    header h1 { font-size: 18px; letter-spacing: .02em; margin: 0; white-space: nowrap; }
+    #status { color: var(--muted); margin-right: auto; }
+    #status[data-state=failed], .error { color: var(--danger); }
+    .run-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+    .run-tools label { color: var(--muted); }
+    #entry-select { max-width: min(270px, 48vw); color: var(--text); background: var(--panel-alt); border: 1px solid var(--border); border-radius: 7px; padding: 0 8px; }
+    #mobile-tabs { display: none; }
+    .workbench { display: grid; grid-template-columns: 240px minmax(360px,1fr) minmax(360px,1fr); flex: 1; min-height: 0; min-width: 0; }
+    .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); border-right: 1px solid var(--border); }
+    .pane:last-child { border-right: 0; }
+    .pane h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; margin: 0; color: var(--muted); }
+    .pane-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); min-height: 60px; }
+    .pane-header h2 { margin-right: auto; }
+    .pane-header button { padding-inline: 10px; }
+    #file-list { overflow: auto; flex: 1; padding: 8px; margin: 0; list-style: none; }
+    #file-list li { position: relative; list-style: none; }
+    #file-list .tree-children { margin: 0 0 0 12px; padding: 0 0 0 12px; border-left: 1px solid var(--border); }
+    #file-list .tree-children > li::before { content: ''; position: absolute; left: -12px; top: 17px; width: 11px; border-top: 1px solid var(--border); }
+    #file-list button { width: 100%; text-align: left; border: 1px solid transparent; border-radius: 5px; background: none; overflow-wrap: anywhere; }
+    #file-list .file-row { display: flex; align-items: center; gap: 4px; }
+    #file-list .file-row > button:first-child { flex: 1; min-width: 0; }
+    #file-list .reset-file { flex: none; width: auto; padding: 6px; color: var(--accent); font-size: 12px; }
+    #file-list button[aria-current=true] { background: var(--panel-alt); border-color: var(--accent); }
+    #file-list button[data-folder=true] { color: var(--accent); font-weight: 600; }
+    #file-list button[data-entry=true]::after { content: ' · entry'; color: var(--accent); font-size: 11px; }
+    .file-tools { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
+    #upload-files, #upload-folder-files { display: none; }
+    #editor-panel { background: var(--panel-alt); }
+    #editor-wrap { display: flex; flex: 1; min-width: 0; min-height: 0; background: #121720; font: 16px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    #editor-wrap[hidden] { display: none; }
+    #editor-gutter { flex: none; overflow: hidden; padding: 18px 10px 18px 12px; border-right: 1px solid var(--border); color: var(--muted); text-align: right; white-space: pre; user-select: none; pointer-events: none; }
+    #editor { flex: 1; min-width: 0; min-height: 0; width: 100%; resize: none; background: transparent; color: var(--text); border: 0; padding: 18px; font: inherit; tab-size: 4; white-space: pre; overflow: auto; }
+    #editor::placeholder { color: var(--muted); }
+    #binary-message { padding: 20px; color: var(--muted); }
+    #save-status { padding: 8px 12px; color: var(--muted); border-top: 1px solid var(--border); min-height: 36px; }
+    #save-status.error { color: var(--danger); }
+    #preview-panel { background: #10141c; }
+    .canvas-wrap { min-height: 0; flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 12px; }
+    #canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; touch-action: none; }
+    #output { flex: 0 1 32%; min-height: 110px; margin: 0; overflow: auto; border-top: 1px solid var(--border); padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    #output .error { color: var(--danger); }
+    #output a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+    #output a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    dialog { width: min(440px, calc(100vw - 32px)); max-height: calc(var(--app-height, 100dvh) - 32px); overflow: auto; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px; box-shadow: 0 18px 70px #000b; }
+    dialog::backdrop { background: #000a; }
+    dialog h2 { margin: 0 0 12px; font-size: 18px; }
+    dialog p { margin: 0 0 14px; color: var(--muted); }
+    dialog input { width: 100%; min-height: 44px; background: var(--panel-alt); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 16px; }
+    #dialog-error { min-height: 22px; margin: 8px 0; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    @media (max-width: 999px) {
+      header { padding: 6px 10px; gap: 4px 10px; }
+      header h1 { font-size: 16px; }
+      #status { font-size: 12px; }
+      .run-tools { width: 100%; display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; gap: 6px; }
+      #entry-select { width: 100%; max-width: none; }
+      .run-tools button { padding-inline: 10px; }
+      #mobile-tabs { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--panel); border-bottom: 1px solid var(--border); }
+      #mobile-tabs button { border: 0; border-radius: 0; background: none; }
+      #mobile-tabs button[aria-selected=true] { color: var(--accent); box-shadow: inset 0 -3px var(--accent); }
+      .workbench { display: block; overflow: hidden; }
+      .pane { height: 100%; border: 0; }
+      .pane:not(.active) { display: none; }
+      .pane-header { padding: 6px 10px; }
+      .canvas-wrap { padding: 8px; }
+      #output { flex-basis: 38%; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>LuaTinker Playground</h1>
-    <label for="demo">Demo</label>
-    <select id="demo"><option value="sdl_render.lua">SDL renderer</option><option value="gl_render.lua">OpenGL</option></select>
-    <button id="run" type="button" disabled>Run</button>
-    <button id="stop" type="button" disabled>Stop</button>
-  </header>
-  <span id="status" role="status">Loading…</span>
-  <canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
-  <p>Use the arrow keys to move. Press Escape to exit. Run starts a fresh session.</p>
-  <pre id="output" aria-live="polite"></pre>
+  <div id="app">
+    <header>
+      <h1>LuaTinker Playground</h1><span id="status" role="status">Loading…</span>
+      <div class="run-tools"><label for="entry-select">Entry</label><select id="entry-select" aria-label="Lua entry file"></select><button id="run" class="primary" type="button">Run</button><button id="stop" type="button">Stop</button></div>
+    </header>
+    <nav id="mobile-tabs" role="tablist" aria-label="Workspace panes">
+      <button type="button" role="tab" data-pane="files" aria-controls="files-panel" aria-selected="false">Files</button>
+      <button type="button" role="tab" data-pane="editor" aria-controls="editor-panel" aria-selected="true">Code</button>
+      <button type="button" role="tab" data-pane="preview" aria-controls="preview-panel" aria-selected="false">Run</button>
+    </nav>
+    <main class="workbench">
+      <section id="files-panel" class="pane" role="tabpanel" aria-label="Files">
+        <div class="pane-header"><h2>Files</h2></div>
+        <ul id="file-list"></ul>
+        <div class="file-tools"><button id="new-file" type="button">New file</button><button id="new-folder" type="button">New folder</button><button id="rename-file" type="button">Rename</button><button id="delete-file" class="danger" type="button">Delete</button><button id="upload-button" type="button">Upload files</button><button id="upload-folder-button" type="button">Upload folder</button><button id="download-file" type="button" aria-label="Download selected file">Download</button><button id="reset-examples" type="button">Reset examples</button><input id="upload-files" type="file" multiple aria-label="Upload files"><input id="upload-folder-files" type="file" webkitdirectory multiple aria-label="Upload folder"></div>
+      </section>
+      <section id="editor-panel" class="pane active" role="tabpanel" aria-label="Code">
+        <div class="pane-header"><h2 id="editor-title">Code</h2><button id="undo" type="button" aria-label="Undo to previous run snapshot" disabled>Undo</button><button id="redo" type="button" aria-label="Redo run snapshot" disabled>Redo</button><button id="indent" type="button">Indent</button><button id="outdent" type="button">Outdent</button></div>
+        <div id="editor-wrap">
+          <div id="editor-gutter" aria-hidden="true"><div id="editor-lines"></div></div>
+          <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="File editor" placeholder="Select or create a file"></textarea>
+        </div>
+        <div id="binary-message" hidden>Binary file — download or replace it from Files.</div>
+        <div id="save-status" role="status"></div>
+      </section>
+      <section id="preview-panel" class="pane" role="tabpanel" aria-label="Run preview">
+        <div class="pane-header"><h2>Preview</h2></div>
+        <div class="canvas-wrap"><canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="0" width="640" height="480"></canvas></div>
+        <div id="output" role="log" aria-live="polite" aria-label="Console output"></div>
+      </section>
+    </main>
+  </div>
+  <dialog id="workspace-dialog" aria-labelledby="dialog-title">
+    <form method="dialog"><h2 id="dialog-title"></h2><p id="dialog-message"></p><input id="dialog-path" aria-label="File path" autocomplete="off"><p id="dialog-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" id="dialog-cancel">Cancel</button><button type="submit" class="primary" id="dialog-confirm">Confirm</button></div></form>
+  </dialog>
   <script>
     var Module = {
+      canvas: document.getElementById('canvas'),
       locateFile: (path, prefix) => `${prefix}${path}?v=__PLAYGROUND_BUILD_VERSION__`
     };
   </script>
