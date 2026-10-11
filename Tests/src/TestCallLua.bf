@@ -44,5 +44,21 @@ namespace LuaTinker.Tests
 			Test.Assert(tinker.Call<int, ?>("TestRetPlus", (13, (char32)22)) == 55);
 			Test.Assert(tinker.Call<int, ?>("TestLotsOfArgs", (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)) == 55);
 		}
+
+		[Test]
+		public static void TestEval()
+		{
+			let lua = scope Lua(true);
+			lua.Encoding = System.Text.Encoding.UTF8;
+			LuaTinker tinker = scope .(lua);
+
+			Test.Assert(tinker.Eval<int>("return 42").Get() == 42);
+			let pair = tinker.Eval<(int, int)>("return 7, 8").Get();
+			Test.Assert(pair.0 == 7 && pair.1 == 8);
+			Test.Assert(tinker.Eval("value = 9") case .Ok);
+			Test.Assert(tinker.Eval<int>("return (") case .Err);
+			Test.Assert(tinker.Eval<int>("error('eval failed')") case .Err);
+			Test.Assert(lua.GetTop() == 0);
+		}
 	}
 }

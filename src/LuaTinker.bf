@@ -813,6 +813,23 @@ namespace LuaTinker
 				return .Err(mTinkerState.GetLastError());
 			val
 		}
+
+		[Comptime]
+		private static void EmitRValPops<RVal>() where RVal : var
+		{
+			let type = typeof(RVal);
+			let code = scope String();
+
+			if (type.IsTuple)
+			{
+				for (let field in type.GetFields(.DeclaredOnly))
+					code.AppendF($"result.{field.Name} = TryTinker!(StackHelper.Pop<comptype({field.FieldType.GetTypeId()})>(mLua, {@field.Index - type.FieldCount}));\n");
+			}
+			else if (type != typeof(void))
+				code.Append("result = TryTinker!(StackHelper.Pop<RVal>(mLua, -1));\n");
+
+			Compiler.MixinRoot(code);
+		}
 		
 		/// Calls a global Lua function with no arguments and expects no return value.
 		/// @param name The name of the global Lua function to call.
@@ -863,14 +880,16 @@ namespace LuaTinker
 			}
 
 			Debug.Assert(mLua.GetTop() == 0);
-			const int32 results = typeof(RVal) == typeof(void) ? 0 : 1;
+			defer mLua.SetTop(0);
 			mTinkerState.ClearError();
 			
 			mLua.GetGlobal(name);
 			if (mLua.IsFunction(-1))
 			{
+				let resultCount = typeof(RVal) == typeof(void) ? 0 : typeof(RVal).IsTuple ? typeof(RVal).FieldCount : 1;
+
 				int argc = EmitCallPushes<Args>();
-				if (mLua.PCall((.)argc, results, 0) != .OK)
+				if (mLua.PCall((.)argc, (.)resultCount, 0) != .OK)
 				{
 					mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
 					return .Err(mTinkerState.GetLastError());
@@ -882,17 +901,47 @@ namespace LuaTinker
 				return .Err(mTinkerState.GetLastError());
 			}
 
-			if (results == 1)
+			RVal result = default;
+			EmitRValPops<RVal>();
+			return .Ok(result);
+		}
+
+		/// Evaluates a Lua chunk and expects no return values.
+		/// @param chunk The Lua source to evaluate.
+		/// @return A result indicating success or an error message.
+		[Inline]
+		public Result<void, StringView> Eval(StringView chunk)
+			=> Eval<void>(chunk);
+
+		/// Evaluates a Lua chunk and converts its return values to the requested type.
+		/// @where RVal The expected return type. Use `void` for no return values or a tuple for multiple values.
+		/// @param chunk The Lua source to evaluate.
+		/// @return A result containing the converted return value(s) or an error message.
+		public Result<RVal, StringView> Eval<RVal>(StringView chunk)
+			where RVal : var
+		{
+			RequireGetValueResultType<RVal>();
+
+			Debug.Assert(mLua.GetTop() == 0);
+			defer mLua.SetTop(0);
+			mTinkerState.ClearError();
+
+			if (mLua.LoadString(chunk) != .OK)
 			{
-				defer mLua.Pop(1);
-				return .Ok(TryTinker!(StackHelper.Pop<RVal>(mLua, -1)));
+				mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
+				return .Err(mTinkerState.GetLastError());
 			}
 
-			// TODO: Support for tuples
+			let resultCount = typeof(RVal) == typeof(void) ? 0 : typeof(RVal).IsTuple ? typeof(RVal).FieldCount : 1;
+			if (mLua.PCall(0, (.)resultCount, 0) != .OK)
+			{
+				mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
+				return .Err(mTinkerState.GetLastError());
+			}
 
-			// TODO: Remove the #unwarn when the compiler bug is solved.
-#unwarn // COMPILER-BUG: The compiler thinks that this return is unreachable.
-			return .Ok(default);
+			RVal result = default;
+			EmitRValPops<RVal>();
+			return .Ok(result);
 		}
 
 		/// Finds and pushes the parent table of a dot-separated path onto the Lua stack.
