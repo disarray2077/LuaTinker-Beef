@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LuaTinker Playground</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; background: #15181f; color: #e8eaf0; }
+    body { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    h1 { font-size: 24px; margin-right: auto; }
+    button, select { font: inherit; padding: 8px 12px; }
+    #status { display: block; margin: 12px 0; }
+    canvas { display: block; max-width: 100%; margin: auto; background: black; touch-action: none; }
+    #output { min-height: 100px; white-space: pre-wrap; overflow-wrap: anywhere; background: #0c0e13; padding: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LuaTinker Playground</h1>
+    <label for="demo">Demo</label>
+    <select id="demo"><option value="sdl_render.lua">SDL renderer</option><option value="gl_render.lua">OpenGL</option></select>
+    <button id="run" type="button" disabled>Run</button>
+    <button id="stop" type="button" disabled>Stop</button>
+  </header>
+  <span id="status" role="status">Loading…</span>
+  <canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
+  <p>Use the arrow keys to move. Press Escape to exit. Run starts a fresh session.</p>
+  <pre id="output" aria-live="polite"></pre>
+  {{{ SCRIPT }}}
+</body>
+</html>

@@ -1,5 +1,5 @@
 FileVersion = 1
-ExtraPlatforms = ["Linux32", "Linux64"]
+ExtraPlatforms = ["Linux32"]
 
 [Workspace]
 StartupProject = "LuaTinker.Playground"
@@ -18,10 +18,52 @@ SDL2 = "*"
 
 [Configs.Debug.Win64]
 AllocStackTraceDepth = 5
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
+
+[Configs.Debug.wasm32]
+AllocType = "CRT"
+EnableObjectDebugFlags = false
+EmitObjectAccessCheck = false
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}, "LuaTinker.BasicSample" = {Enabled = false}, "LuaTinker.GameSample" = {Enabled = false}}
+
+[Configs.Debug.Linux64]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
 
 [Configs.Release_O0.Win64]
 LTOType = "None"
-ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Config = "Release"}, KeraLua = {Config = "Release"}, "LuaTinker.BasicSample" = {Config = "Release"}}
+ConfigSelections = {LuaTinker = {Config = "Release"}, "LuaTinker.Tests" = {Enabled = false, Config = "Release"}, KeraLua = {Config = "Release"}, "LuaTinker.BasicSample" = {Config = "Release"}}
+
+[Configs.Release_O0.Linux64]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
+
+[Configs.Release_O0.wasm32]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}, "LuaTinker.BasicSample" = {Enabled = false}, "LuaTinker.GameSample" = {Enabled = false}}
 
 [Configs.Test.Win64]
 AllocStackTraceDepth = 5
+ConfigSelections = {"LuaTinker.BasicSample" = {Enabled = false}, "LuaTinker.GameSample" = {Enabled = false}, "LuaTinker.Playground" = {Enabled = false}}
+
+[Configs.Test.Linux64]
+ConfigSelections = {"LuaTinker.BasicSample" = {Enabled = false}, "LuaTinker.GameSample" = {Enabled = false}, "LuaTinker.Playground" = {Enabled = false}}
+
+[Configs.Release.wasm32]
+EmitDebugInfo = "No"
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}, "LuaTinker.BasicSample" = {Enabled = false}, "LuaTinker.GameSample" = {Enabled = false}}
+
+[Configs.Release.Win64]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
+
+[Configs.Release.Linux64]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
+
+[Configs.Paranoid.Win64]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
+
+[Configs.Paranoid.Linux64]
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}}
+
+[Configs.Paranoid.wasm32]
+AllocType = "CRT"
+EnableObjectDebugFlags = false
+EmitObjectAccessCheck = false
+ConfigSelections = {"LuaTinker.Tests" = {Enabled = false}, "LuaTinker.BasicSample" = {Enabled = false}, "LuaTinker.GameSample" = {Enabled = false}}

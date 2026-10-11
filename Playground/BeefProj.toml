@@ -20,3 +20,8 @@ OtherLinkFlags = "$(LinkFlags) -lSDL2_image -lSDL2_mixer"
 
 [Configs.Release.Linux64]
 OtherLinkFlags = "$(LinkFlags) -lSDL2_image -lSDL2_mixer"
+
+[Configs.Release.wasm32]
+TargetDirectory = "$(WorkspaceDir)/build/wasm/playground"
+TargetName = "LuaTinkerPlayground.html"
+OtherLinkFlags = "$(LinkFlags) $(WorkspaceDir)/build/wasm/liblua54.a -sUSE_SDL=2 --use-port=sdl2_image:formats=png,jpg --use-port=sdl2_mixer -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1048576 -sASSERTIONS=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=callMain,wasmTable --shell-file $(WorkspaceDir)/Playground/web/shell.html --preload-file $(WorkspaceDir)/Playground/sdl_render.lua@/templates/sdl_render.lua --preload-file $(WorkspaceDir)/Playground/gl_render.lua@/templates/gl_render.lua --preload-file $(WorkspaceDir)/Playground/modules@/templates/modules --pre-js $(WorkspaceDir)/Playground/web/playground.js"

@@ -81,7 +81,7 @@ local function linkProgram(vertexShader, fragmentShader)
 end
 
 local function initShaders()
-    local glsl = "#version 330 core\n"
+    local glsl = WASM and "#version 300 es\n" or "#version 330 core\n"
     local vertexSource = glsl .. [[
 layout(location = 0) in vec2 localPosition;
 uniform vec2 position;
@@ -89,7 +89,7 @@ void main() {
     gl_Position = vec4(localPosition + position, 0.0, 1.0);
 }
 ]]
-    local fragmentSource = glsl .. [[
+    local fragmentSource = glsl .. (WASM and "precision highp float;\n" or "") .. [[
 out vec4 fragmentColor;
 void main() {
     fragmentColor = vec4(0.95, 0.7, 0.25, 1.0);
@@ -143,8 +143,9 @@ local function run()
     local width, height = 640, 480
     local attr = SDL.SDL_GLAttr
     assert_sdl(SDL.GL_SetAttribute(attr.GL_CONTEXT_MAJOR_VERSION, int32.cast(3)) == 0)
-    assert_sdl(SDL.GL_SetAttribute(attr.GL_CONTEXT_MINOR_VERSION, int32.cast(3)) == 0)
-    assert_sdl(SDL.GL_SetAttribute(attr.GL_CONTEXT_PROFILE_MASK, SDL.SDL_GLProfile.GL_CONTEXT_PROFILE_CORE) == 0)
+    assert_sdl(SDL.GL_SetAttribute(attr.GL_CONTEXT_MINOR_VERSION, int32.cast(WASM and 0 or 3)) == 0)
+    assert_sdl(SDL.GL_SetAttribute(attr.GL_CONTEXT_PROFILE_MASK,
+        WASM and SDL.SDL_GLProfile.GL_CONTEXT_PROFILE_ES or SDL.SDL_GLProfile.GL_CONTEXT_PROFILE_CORE) == 0)
 
     window = assert_sdl(SDL.CreateWindow("LuaTinker OpenGL", SDL.WindowPos.Centered, SDL.WindowPos.Centered,
         width, height, SDL.WindowFlags.OpenGL | SDL.WindowFlags.Shown))

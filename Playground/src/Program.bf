@@ -8,17 +8,22 @@ namespace LuaTinker.Playground;
 
 static class Program
 {
+    private static Lua sLua;
+    private static LuaTinker sTinker;
+
     public static int Main(String[] args)
     {
         String scriptPath = scope .();
         Path.GetFullPath(args.Count > 0 ? args[0] : "Playground/sdl_render.lua", scriptPath);
 
+#if !BF_PLATFORM_WASM
         String script = scope .();
         if (File.ReadAllText(scriptPath, script) case .Err(let error))
         {
             Console.Error.WriteLine($"Cannot read {scriptPath}: {error}");
             return 1;
         }
+#endif
 
         String scriptDirectory = scope .();
         if (Path.GetDirectoryPath(scriptPath, scriptDirectory) case .Err)
@@ -32,10 +37,38 @@ static class Program
             return 1;
         }
 
-        let lua = scope Lua(true);
-        lua.Encoding = System.Text.Encoding.UTF8;
-        let tinker = scope LuaTinker(lua);
+        sLua = new Lua(true);
+        sLua.Encoding = System.Text.Encoding.UTF8;
+        sTinker = new LuaTinker(sLua);
+        Register(sTinker, sLua);
 
+        sLua.PushString(scriptPath);
+        sLua.SetGlobal("PlaygroundScript");
+
+#if BF_PLATFORM_WASM
+        return RunBrowser();
+#else
+        defer { Dispose(); }
+        if (sLua.DoString(script, scriptPath))
+        {
+            Console.Error.WriteLine(sLua.ToString(-1, .. scope .()));
+            return 1;
+        }
+
+        return 0;
+#endif
+    }
+
+    private static void Dispose()
+    {
+        delete sTinker;
+        delete sLua;
+        sTinker = null;
+        sLua = null;
+    }
+
+    private static void Register(LuaTinker tinker, Lua lua)
+    {
         SDLBindings.Register(tinker, lua);
         ImageBindings.Register(tinker, lua);
         AudioBindings.Register(tinker);
@@ -46,15 +79,5 @@ static class Program
         tinker.AutoTinkClass<List<float>, const "FloatList">();
         tinker.AutoTinkClass<List<uint8>, const "UInt8List">();
         tinker.AddMethod<function IntPtr(float*)>("ToIntPtr", (pointer) => (void*)pointer); // sad...
-        lua.PushString(scriptPath);
-        lua.SetGlobal("PlaygroundScript");
-
-        if (lua.DoString(script, scriptPath))
-        {
-            Console.Error.WriteLine(lua.ToString(-1, .. scope .()));
-            return 1;
-        }
-
-        return 0;
     }
 }
