@@ -31,6 +31,28 @@ static class Program
         if (!Initialize(scriptPath))
             return 1;
         defer { Dispose(); }
+
+		// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
+		// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
+		if (sLua.DoString("""
+		    local counter = 0
+		    local originalSwap = SDL.GL_SwapWindow
+
+		    SDL.GL_SwapWindow = function(...)
+		        counter = counter + 1
+
+		        if counter % 100 == 0 then
+		            collectgarbage("step", 0)
+		        end
+
+		        return originalSwap(...)
+		    end
+		    """))
+		{
+		    Console.Error.WriteLine(sLua.ToString(-1, .. scope .()));
+		    return 1;
+		}
+
         if (sLua.DoString(script, scriptPath))
         {
             Console.Error.WriteLine(sLua.ToString(-1, .. scope .()));

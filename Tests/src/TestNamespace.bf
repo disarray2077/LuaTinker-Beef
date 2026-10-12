@@ -40,6 +40,9 @@ namespace LuaTinker.Tests
 			tinker.AddNamespaceVar<TestNamespace, const "Current">("Callbacks", "current");
 			tinker.SetValue<function int32(int32)>("otherCallback", (value) => value);
 			if (lua.DoString("""
+				assert(getmetatable(Callbacks.current) == getmetatable(Callbacks.current))
+				assert(getmetatable(Callbacks.current) ~= getmetatable(otherCallback))
+				assert(otherCallback(23) == 23)
 				assert(Callbacks.current.IsNull)
 				assert(not pcall(function() Callbacks.current(ref.uint32(0)) end))
 				"""))
@@ -52,7 +55,8 @@ namespace LuaTinker.Tests
 				assert(not pcall(function() savedCallback.IsNull = true end))
 				local cell = ref.uint32(0)
 				assert(Callbacks.current(cell) == 11 and cell.value == 7)
-				assert(not pcall(function() Callbacks.current(1) end))
+				assert(Callbacks.current(1) == 11)
+				assert(not pcall(function() Callbacks.current(-1) end))
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 

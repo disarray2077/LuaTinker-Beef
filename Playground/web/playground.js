@@ -1,6 +1,6 @@
 if (typeof window !== 'undefined') {
   (() => {
-    const names = ['sdl_render.lua', 'gl_render.lua'];
+    const names = ['sdl_render.lua', 'gl_render.lua', 'rope/main.lua', 'breakout/main.lua'];
     let assets = [];
     const $ = (id) => document.getElementById(id);
     const editor = $('editor');
@@ -284,22 +284,30 @@ if (typeof window !== 'undefined') {
     }
     function setMeta(store, key, value) { store.put({ key, value }); }
     async function load() {
-      templateRecords();
+      const seeds = templateRecords();
       state.db = await openDb();
       const meta = await getAll('meta');
       const values = Object.fromEntries(meta.map(({ key, value }) => [key, value]));
-      if (!values.initialized) {
-        const seeds = templateRecords();
-        await tx(['files', 'meta'], 'readwrite', (transaction) => {
-          const files = transaction.objectStore('files');
-          for (const record of seeds) files.put(record);
-          const store = transaction.objectStore('meta');
+      const existing = new Map((await getAll('files')).map((record) => [record.path, record]));
+      // Earlier workspaces did not record which templates had already been offered.
+      const packagedFiles = new Set(values.packagedFiles || (values.initialized
+        ? ['sdl_render.lua', 'gl_render.lua', 'modules/opengl.lua', 'modules/decoded_image.lua'] : []));
+      await tx(['files', 'meta'], 'readwrite', (transaction) => {
+        const files = transaction.objectStore('files');
+        for (const record of seeds) {
+          if (packagedFiles.has(record.path) || existing.has(record.path)) continue;
+          if (parentPaths(record.path).some((parent) => existing.has(parent) && !isFolder(existing.get(parent)))) continue;
+          files.add(record);
+        }
+        const store = transaction.objectStore('meta');
+        setMeta(store, 'packagedFiles', seeds.map(({ path }) => path));
+        if (!values.initialized) {
           setMeta(store, 'initialized', true);
           setMeta(store, 'entry', names[0]);
           setMeta(store, 'selected', names[0]);
           setMeta(store, 'activePane', 'editor');
-        });
-      }
+        }
+      });
       state.writable = true;
       await refresh();
     }
@@ -815,6 +823,7 @@ if (typeof window !== 'undefined') {
         setMeta(meta, 'entry', names[0]);
         setMeta(meta, 'selected', names[0]);
         setMeta(meta, 'activePane', 'editor');
+        setMeta(meta, 'packagedFiles', seeds.map(({ path }) => path));
       });
       state.files = new Map(seeds.map((record) => [record.path, record]));
       histories.clear();

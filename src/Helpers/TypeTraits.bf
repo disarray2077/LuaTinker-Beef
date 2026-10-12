@@ -20,6 +20,15 @@ namespace LuaTinker.Helpers
 		struct Yes;
 		struct No;
 
+		struct IsNumericPointer<T> where T : var
+		{
+			public typealias Result = comptype(GetResult(typeof(T)));
+
+			[Comptime]
+			private static Type GetResult(Type type)
+				=> type.IsPointer && IsNumericType(RemovePtr(type)) ? typeof(Yes) : typeof(No);
+		}
+
 		// Type has no public function-kind query; inspect its flag without relaxing corlib visibility.
 		[Inline]
 		public static bool IsFunctionType(Type type)

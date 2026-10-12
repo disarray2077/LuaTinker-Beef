@@ -222,10 +222,10 @@ if gl and program and program ~= 0 then
 end
 if gl and vertexArray and vertexArray ~= 0 then
     gl.glBindVertexArray(0)
-    gl.glDeleteVertexArrays(1, ref.uint32(vertexArray))
+    gl.glDeleteVertexArrays(1, vertexArray)
 end
 if gl and buffer and buffer ~= 0 then
-    gl.DeleteBuffers(1, ref.uint32(buffer))
+    gl.DeleteBuffers(1, buffer)
 end
 if gl then
     for _, shader in ipairs(shaders) do

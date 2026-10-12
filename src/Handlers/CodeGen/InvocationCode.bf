@@ -18,6 +18,8 @@ namespace LuaTinker.Handlers
 		private static void EmitDecodedArgument(LuaParameter parameter, StringView stackIndex, bool variadicStorage, String code)
 		{
 			let typeCode = scope $"comptype({parameter.DecodedType.GetTypeId()})";
+			let mixinSuffix = variadicStorage ? ":invocation" : "";
+
 			if (parameter.Mode != .Value)
 			{
 				code.Append(parameter.Mode == .Ref ? "ref " : "out ");
@@ -25,11 +27,11 @@ namespace LuaTinker.Handlers
 			}
 			else if (IsHintableType(parameter.DecodedType))
 			{
-				code.AppendF($"StackHelper.PopHinted<{typeCode}>(lua, {stackIndex})");
+				code.AppendF($"StackHelper.PopHinted!{mixinSuffix}<{typeCode}>(lua, {stackIndex})");
 			}
 			else
 			{
-				code.AppendF($"StackHelper.Pop!{variadicStorage ? "::" : ""}<{typeCode}>(lua, {stackIndex})");
+				code.AppendF($"StackHelper.Pop!{mixinSuffix}<{typeCode}>(lua, {stackIndex})");
 			}
 		}
 
@@ -81,44 +83,52 @@ namespace LuaTinker.Handlers
 
 		internal static void EmitCallable(MethodInfo method, List<LuaParameter> parameters, int parameterStart, int parameterCount, bool annotateTypes, CodeWriter writer)
 		{
-			let returnType = method.ReturnType;
-			if (parameterCount > 0 && parameters[parameterStart + parameterCount - 1].IsVariadic)
-				EmitVariadicStorage(parameters[parameterStart + parameterCount - 1], false, writer);
-
-			let invocation = scope String();
-			if (returnType != typeof(void))
+			let variadic = parameterCount > 0 && parameters[parameterStart + parameterCount - 1].IsVariadic;
+			delegate void(CodeWriter) emitBody = scope (body) =>
 			{
-				if (annotateTypes)
-					invocation.AppendF($"var/*{returnType}*/ ret = ");
-				else
-					invocation.Append("var ret = ");
-			}
+				let returnType = method.ReturnType;
+				if (variadic)
+					EmitVariadicStorage(parameters[parameterStart + parameterCount - 1], false, body);
 
-			bool returnsRef = false;
-			if (let returnRefType = returnType as RefType)
-			{
-				switch (returnRefType.RefKind)
+				let invocation = scope String();
+				if (returnType != typeof(void))
 				{
-				case .Ref:
-					invocation.Append("ref ");
-					returnsRef = true;
-				default:
-					Runtime.FatalError(scope $"Not implemented {returnRefType.RefKind}!");
+					if (annotateTypes)
+						invocation.AppendF($"var/*{returnType}*/ ret = ");
+					else
+						invocation.Append("var ret = ");
 				}
-			}
-			invocation.Append("func(");
-			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
-			{
-				if (parameter.IsVariadic)
-					invocation.Append("params extraArgs");
-				else
-					EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, invocation);
-				if (@parameter.Index != parameterCount - 1)
-					invocation.Append(", ");
-			}
-			invocation.Append(");");
-			writer.Line(invocation);
-			EmitCallableReturn(returnType, returnsRef, writer);
+
+				bool returnsRef = false;
+				if (let returnRefType = returnType as RefType)
+				{
+					switch (returnRefType.RefKind)
+					{
+					case .Ref:
+						invocation.Append("ref ");
+						returnsRef = true;
+					default:
+						Runtime.FatalError(scope $"Not implemented {returnRefType.RefKind}!");
+					}
+				}
+				invocation.Append("func(");
+				for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+				{
+					if (parameter.IsVariadic)
+						invocation.Append("params extraArgs");
+					else
+						EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, invocation);
+					if (@parameter.Index != parameterCount - 1)
+						invocation.Append(", ");
+				}
+				invocation.Append(");");
+				body.Line(invocation);
+				EmitCallableReturn(returnType, returnsRef, body);
+			};
+			if (variadic)
+				writer.Block("invocation:", emitBody);
+			else
+				emitBody(writer);
 		}
 
 		private static void EmitTypedCall<T>(MethodInfo method, List<LuaParameter> parameters, int parameterStart, int parameterCount, CodeWriter writer)
@@ -177,44 +187,51 @@ namespace LuaTinker.Handlers
 		{
 			let lastParameter = parameterStart + parameterCount - 1;
 			bool variadic = parameterCount > 0 && parameters[lastParameter].IsVariadic;
-			if (variadic)
-				EmitVariadicStorage(parameters[lastParameter], true, writer);
-			// Decode before allocation so failed arguments cannot finalize an uninitialized owned value.
-			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+			delegate void(CodeWriter) emitBody = scope (body) =>
 			{
-				if (parameter.IsVariadic)
-					continue;
-				let argument = scope String();
-				argument.AppendF($"{(parameter.Mode == .Ref ? "ref var" : "let")} constructorArgument{@parameter.Index} = ");
-				EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, argument);
-				argument.Append(";");
-				writer.Line(argument);
-			}
-			bool isClass = typeof(T).IsObject;
-			if (!isClass)
-				writer.Line("let wrapper = new:alloc ValueTypeWrapper<T>();");
-			let creation = scope String();
-			if (isClass)
-				creation.Append("let wrapper = new:alloc ClassTypeWrapper<T>(");
-			else
-				creation.Append("*wrapper.ValuePointer = .(");
-			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
-			{
-				if (variadic && @parameter.Index == parameterCount - 1)
-					creation.Append("params extraArgs");
+				if (variadic)
+					EmitVariadicStorage(parameters[lastParameter], true, body);
+				// Decode before allocation so failed arguments cannot finalize an uninitialized owned value.
+				for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+				{
+					if (parameter.IsVariadic)
+						continue;
+					let argument = scope String();
+					argument.AppendF($"{(parameter.Mode == .Ref ? "ref var" : "let")} constructorArgument{@parameter.Index} = ");
+					EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, argument);
+					argument.Append(";");
+					body.Line(argument);
+				}
+				bool isClass = typeof(T).IsObject;
+				if (!isClass)
+					body.Line("let wrapper = new:alloc ValueTypeWrapper<T>();");
+				let creation = scope String();
+				if (isClass)
+					creation.Append("let wrapper = new:alloc ClassTypeWrapper<T>(");
 				else
-					creation.AppendF($"{(parameter.Mode == .Ref ? "ref " : "")}constructorArgument{@parameter.Index}");
-				if (@parameter.Index != parameterCount - 1)
-					creation.Append(", ");
-			}
-			creation.Append(");");
-			writer.Line(creation);
-			writer.Line(scope $"""
-				lua.TinkerState.RegisterAliveObject(wrapper);
-				lua.TinkerState.PushClassMetatable<T>(lua);
-				lua.SetMetaTable(-2);
-				return 1;
-				""");
+					creation.Append("*wrapper.ValuePointer = .(");
+				for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+				{
+					if (variadic && @parameter.Index == parameterCount - 1)
+						creation.Append("params extraArgs");
+					else
+						creation.AppendF($"{(parameter.Mode == .Ref ? "ref " : "")}constructorArgument{@parameter.Index}");
+					if (@parameter.Index != parameterCount - 1)
+						creation.Append(", ");
+				}
+				creation.Append(");");
+				body.Line(creation);
+				body.Line(scope $"""
+					lua.TinkerState.RegisterAliveObject(wrapper);
+					lua.TinkerState.PushClassMetatable<T>(lua);
+					lua.SetMetaTable(-2);
+					return 1;
+					""");
+			};
+			if (variadic)
+				writer.Block("invocation:", emitBody);
+			else
+				emitBody(writer);
 		}
 	}
 }

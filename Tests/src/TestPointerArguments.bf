@@ -5,12 +5,23 @@ namespace LuaTinker.Tests
 {
 	class TestPointerArguments
 	{
+		public struct OpaqueHandle;
+
 		public static class PointerAPI
 		{
 			public static int32 Select(void* value) => 200 + *(uint8*)value;
 			public static int32 Select(uint8* value) => 100 + *value;
 			public static int32 Select(uint32* value) => 300 + (int32)*value;
 			public static int32 ReadByte(uint8* value) => *value;
+			public static int32 ReadInt32(int32* value) => *value;
+			public static float ReadFloat(float* value) => *value;
+			public static int32 Sum(params Span<int32*> values)
+			{
+				int32 sum = 0;
+				for (let value in values)
+					sum += *value;
+				return sum;
+			}
 			public static int32 ReadVoid(void* value) => *(uint8*)value;
 			public static char8* ErrorText() => "native error";
 			public static int32 CStringLength(char8* text) => text == null ? -1 : (int32)StringView(text).Length;
@@ -27,6 +38,87 @@ namespace LuaTinker.Tests
 		{
 			public int32 Length;
 			public this(char8* text) { Length = PointerAPI.CStringLength(text); }
+		}
+
+		public struct NumericPointerConstruction
+		{
+			public int32 Value;
+			public this(int32* value) { Value = *value; }
+			public int32 Add(int32* value) => Value + *value;
+		}
+
+		[Test]
+		public static void TestNumericPointerArguments()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AutoTinkClass<PointerAPI>();
+			tinker.AutoTinkClass<NumericPointerConstruction>();
+			tinker.AddMethod<function uint32(uint32*)>("ReadWord", (value) => *value);
+			tinker.AddMethod<delegate float(float*)>("ReadFloat", new (value) => *value);
+			if (lua.DoString("""
+				local api = LuaTinker.Tests.TestPointerArguments.PointerAPI
+				assert(api.ReadByte(37) == 37)
+				assert(api.Select(37) == 137)
+				assert(api.Select(256) == 556)
+				assert(api.ReadInt32(-9) == -9)
+				assert(api.ReadFloat(1.5) == 1.5)
+				assert(ReadWord(4294967295) == 4294967295)
+				assert(ReadFloat(2.5) == 2.5)
+				assert(NumericPointerConstruction(11):Add(7) == 18)
+				assert(api.Sum(2, 5, 11) == 18)
+				assert(api.Sum() == 0)
+				assert(not pcall(function() api.ReadByte(256) end))
+				assert(not pcall(function() ReadWord(-1) end))
+				assert(not pcall(function() api.ReadInt32(1.5) end))
+				assert(not pcall(function() ReadFloat(1e40) end))
+				assert(not pcall(function() api.ReadVoid(7) end))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
+		public static void TestOpaquePointerArguments()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AddMethod<function bool(OpaqueHandle*)>("IsNullHandle", (value) => value == null);
+			if (lua.DoString("""
+				assert(IsNullHandle(nil))
+				assert(IsNullHandle(nullptr.void))
+				assert(not pcall(function() IsNullHandle(7) end))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
+		public static void TestNumericPointerTemporaryAndCellWrites()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AddMethod<function int32(int32*, int32*)>("WritePointers", (left, right) =>
+				{
+					*left += 10;
+					*right += 20;
+					return *left + *right;
+				});
+			tinker.AddMethod<function void(ref int32)>("WriteRef", (value) => { value = 42; });
+			tinker.AddMethod<function void(out int32)>("WriteOut", (value) => { value = 7; });
+			if (lua.DoString("""
+				number = 3
+				assert(WritePointers(number, 5) == 38)
+				local cell = ref.int32(4)
+				assert(WritePointers(cell, 5) == 39)
+				assert(cell.value == 14)
+				WriteRef(cell)
+				assert(cell.value == 42)
+				WriteOut(cell)
+				assert(cell.value == 7)
+				assert(not pcall(function() WriteRef(3) end))
+				assert(not pcall(function() WriteOut(3) end))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+			Test.Assert(tinker.GetValue<int32*>("number") case .Err);
 		}
 
 		[Test]

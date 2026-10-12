@@ -1,7 +1,5 @@
 using System;
-using System.Collections;
 using KeraLua;
-using SDL2;
 
 namespace LuaTinker.Playground;
 
@@ -9,7 +7,7 @@ namespace LuaTinker.Playground;
 extension Program
 {
     private static Lua sThread;
-    private static List<SDL.SDL_GLContext> sGLContexts = new .() ~ delete _;
+    private static int sCancellationKey;
 
     private function void FrameCallback();
 
@@ -29,14 +27,33 @@ extension Program
         if (!Initialize(StringView(path)))
             return 1;
 
-        // Track contexts so an interrupted script does not leave them behind between runs.
-        sTinker.AddNamespaceMethod<function SDL.SDL_GLContext(SDL.Window*)>("SDL2.SDL", "GL_CreateContext", => CreateGLContext);
-        sTinker.AddNamespaceMethod<function void(SDL.SDL_GLContext)>("SDL2.SDL", "GL_DeleteContext", => DeleteGLContext);
-
         sLua.PushBoolean(true);
         sLua.SetGlobal("WASM");
 
-        if (sLua.DoString("SDL.Delay = function() coroutine.yield() end"))
+        if (sLua.LoadString("""
+            local cancellation = ...
+            local yield = coroutine.yield
+
+            local function resumeYield(...)
+                if select(1, ...) == cancellation then
+                    error(cancellation, 0)
+                end
+                return ...
+            end
+
+            coroutine.yield = function(...)
+                return resumeYield(yield(...))
+            end
+            SDL.Delay = function() coroutine.yield() end
+            """) != .OK)
+        {
+            Console.Error.WriteLine(sLua.ToString(-1, .. scope .()));
+            PlaygroundStop();
+            return 1;
+        }
+
+        sLua.PushLightUserData(&sCancellationKey);
+        if (sLua.PCall(1, 0, 0) != .OK)
         {
             Console.Error.WriteLine(sLua.ToString(-1, .. scope .()));
             PlaygroundStop();
@@ -53,20 +70,6 @@ extension Program
 
         emscripten_set_main_loop(=> BrowserFrame, 0, 0);
         return 0;
-    }
-
-    private static SDL.SDL_GLContext CreateGLContext(SDL.Window* window)
-    {
-        let context = SDL.GL_CreateContext(window);
-        if (context != default)
-            sGLContexts.Add(context);
-        return context;
-    }
-
-    private static void DeleteGLContext(SDL.SDL_GLContext context)
-    {
-        sGLContexts.Remove(context);
-        SDL.GL_DeleteContext(context);
     }
 
     private static void BrowserFrame()
@@ -90,26 +93,30 @@ extension Program
     {
         emscripten_cancel_main_loop();
 
+        // SDL disconnects its playback node without clearing the callback; queued events can see a later run's audio.
+        emscripten_run_script("""
+            var audioNode = Module['SDL2']?.audio?.scriptProcessorNode;
+            if (audioNode) audioNode.onaudioprocess = null;
+            """);
+
         if (sThread != null)
         {
+            if (sThread.Status == .Yield)
+            {
+                // Resume at the yield point so the script's protected call reaches its cleanup.
+                sThread.PushLightUserData(&sCancellationKey);
+                let status = sThread.Resume(sLua, 1, let results);
+                if (status == .OK || status == .Yield)
+                    sThread.Pop(results);
+                else if (sThread.Type(-1) != .LightUserData || sThread.ToUserData(-1) != &sCancellationKey)
+                    Console.Error.WriteLine(sThread.ToString(-1, .. scope .()));
+            }
             delete sThread;
             sThread = null;
             sLua.Pop(1);
         }
 
         Dispose();
-
-        for (let context in sGLContexts)
-            SDL.GL_DeleteContext(context);
-        sGLContexts.Clear();
-
-        // Stop cannot resume the script's normal cleanup after its last yield.
-        while (SDLMixer.QuerySpec(let frequency, let format, let channels) > 0)
-            SDLMixer.CloseAudio();
-
-        SDLMixer.Quit();
-        SDLImage.Quit();
-        SDL.Quit();
     }
 }
 #endif

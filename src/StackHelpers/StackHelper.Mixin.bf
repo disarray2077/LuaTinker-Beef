@@ -15,6 +15,29 @@ namespace LuaTinker.StackHelpers
 		{
 			StackHelper.Pop<T>(lua, index)
 		}
+
+		public static mixin PopHinted(Lua lua, int32 index)
+		{
+			StackHelper.PopHinted<T>(lua, index)
+		}
+	}
+
+	extension PopDispatch<T> where T : var, struct* where IsNumericPointer<T>.Result : Yes
+	{
+		public new static mixin PopHinted(Lua lua, int32 index)
+		{
+			T result = default;
+			if (lua.Type(index) == .Number)
+			{
+				// The pointee must survive until the enclosing binding call completes.
+				RemovePtr<T>[] temporary = scope:mixin RemovePtr<T>[1](?);
+				temporary[0] = StackHelper.Pop<RemovePtr<T>>(lua, index);
+				result = (T)temporary.Ptr;
+			}
+			else
+				result = StackHelper.PopHinted<T>(lua, index);
+			result
+		}
 	}
 
 	extension StackHelper
@@ -25,6 +48,14 @@ namespace LuaTinker.StackHelpers
 			// Friend lets this public mixin use the internal dispatch type in the caller's scope.
 #unwarn
 			([Friend]PopDispatch<T>.Pop!:mixin(lua, index))
+		}
+
+		public static mixin PopHinted<T>(Lua lua, int32 index)
+			where T : var
+		{
+			// Friend lets this public mixin use the internal dispatch type in the caller's scope.
+#unwarn
+			([Friend]PopDispatch<T>.PopHinted!:mixin(lua, index))
 		}
 	}
 }

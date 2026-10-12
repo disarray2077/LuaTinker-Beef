@@ -1,6 +1,7 @@
 using System;
 using KeraLua;
 using LuaTinker.Wrappers;
+using LuaTinker.Helpers;
 
 namespace LuaTinker.StackHelpers
 {
@@ -22,6 +23,8 @@ namespace LuaTinker.StackHelpers
 			let valueType = lua.Type(index);
 			if (valueType == .Nil)
 				return true;
+			if (valueType == .Number && IsNumericType(pointerType.UnderlyingType))
+				return IsNumericArgument(lua, index, pointerType.UnderlyingType);
 			if (valueType == .String && pointerType == typeof(char8*))
 				return true;
 			let wrapper = User2Type.TryGetTypePtr<PointerWrapperBase>(lua, index);

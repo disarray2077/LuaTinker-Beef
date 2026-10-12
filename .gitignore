@@ -3,6 +3,9 @@ build/
 /GameSample/dist/
 /third_party/
 
+# Local-only Playground example
+/Playground/spacegame/
+
 # Local Beef workspace state
 BeefSpace_User.toml
 BeefProj_User.toml

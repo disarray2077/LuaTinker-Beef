@@ -14,23 +14,31 @@ namespace LuaTinker.StackHelpers
 	// the INumeric Push overload. Send them to callable userdata, not Lua integers.
 	extension NumericDispatch<T> where T : var, struct, INumeric where IsFunction<T>.Result : Yes
 	{
+		private static uint8 sFunctionPointerMetatableKey;
+
 		public new static void Push(Lua lua, T value)
 		{
 			Type2User.Create(lua, value);
-			lua.CreateTable(0, 5);
-			UserdataMetatables.Mark(lua, -1, .Pointer);
-			lua.PushString("__gc");
-			lua.PushCClosure(=> PointerDestructorHandler, 0);
-			lua.RawSet(-3);
-			lua.PushString("__tostring");
-			lua.PushCClosure(=> PointerToStringHandler, 0);
-			lua.RawSet(-3);
-			lua.PushString("__call");
-			lua.PushCClosure(=> FunctionPointerCallHandler<T>, 0);
-			lua.RawSet(-3);
-			lua.PushString("__index");
-			lua.PushCClosure(=> FunctionPointerIndexGetHandler<T>, 0);
-			lua.RawSet(-3);
+			if (lua.RawGetByHashCode(LuaRegistry.Index, &sFunctionPointerMetatableKey) != .Table)
+			{
+				lua.Pop(1);
+				lua.CreateTable(0, 5);
+				UserdataMetatables.Mark(lua, -1, .Pointer);
+				lua.PushString("__gc");
+				lua.PushCClosure(=> PointerDestructorHandler, 0);
+				lua.RawSet(-3);
+				lua.PushString("__tostring");
+				lua.PushCClosure(=> PointerToStringHandler, 0);
+				lua.RawSet(-3);
+				lua.PushString("__call");
+				lua.PushCClosure(=> FunctionPointerCallHandler<T>, 0);
+				lua.RawSet(-3);
+				lua.PushString("__index");
+				lua.PushCClosure(=> FunctionPointerIndexGetHandler<T>, 0);
+				lua.RawSet(-3);
+				lua.PushValue(-1);
+				lua.RawSetByHashCode(LuaRegistry.Index, &sFunctionPointerMetatableKey);
+			}
 			lua.SetMetaTable(-2);
 		}
 
