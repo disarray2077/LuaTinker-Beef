@@ -5,6 +5,7 @@ using System.Reflection;
 using LuaTinker.Helpers;
 
 using internal LuaTinker.Handlers;
+using internal LuaTinker.Helpers;
 
 namespace LuaTinker.Handlers
 {
@@ -81,14 +82,14 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		internal static void EmitCallable(MethodInfo method, List<LuaParameter> parameters, int parameterStart, int parameterCount, bool annotateTypes, CodeWriter writer)
+		internal static void EmitCallable(MethodInfo method, Span<LuaParameter> parameters, bool annotateTypes, CodeWriter writer, StringView target = "func")
 		{
-			let variadic = parameterCount > 0 && parameters[parameterStart + parameterCount - 1].IsVariadic;
+			let variadic = !parameters.IsEmpty && parameters[^1].IsVariadic;
 			delegate void(CodeWriter) emitBody = scope (body) =>
 			{
 				let returnType = method.ReturnType;
 				if (variadic)
-					EmitVariadicStorage(parameters[parameterStart + parameterCount - 1], false, body);
+					EmitVariadicStorage(parameters[^1], false, body);
 
 				let invocation = scope String();
 				if (returnType != typeof(void))
@@ -111,14 +112,14 @@ namespace LuaTinker.Handlers
 						Runtime.FatalError(scope $"Not implemented {returnRefType.RefKind}!");
 					}
 				}
-				invocation.Append("func(");
-				for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+				invocation.AppendF($"{target}(");
+				for (let parameter in parameters)
 				{
 					if (parameter.IsVariadic)
 						invocation.Append("params extraArgs");
 					else
 						EmitDecodedArgument(parameter, scope $"{parameter.LuaStackIndex}", false, invocation);
-					if (@parameter.Index != parameterCount - 1)
+					if (@parameter.Index != parameters.Length - 1)
 						invocation.Append(", ");
 				}
 				invocation.Append(");");
@@ -129,30 +130,6 @@ namespace LuaTinker.Handlers
 				writer.Block("invocation:", emitBody);
 			else
 				emitBody(writer);
-		}
-
-		private static void EmitTypedCall<T>(MethodInfo method, List<LuaParameter> parameters, int parameterStart, int parameterCount, CodeWriter writer)
-		{
-			let methodParams = scope String();
-			for (let parameter in parameters.GetRange(parameterStart, parameterCount))
-			{
-				if (!methodParams.IsEmpty)
-					methodParams.Append(", ");
-				if (parameter.Role == .This)
-				{
-					methodParams.Append("T this");
-					continue;
-				}
-				if (parameter.IsVariadic)
-					methodParams.Append("params ");
-				if (parameter.Mode == .Ref)
-					methodParams.Append("ref ");
-				else if (parameter.Mode == .Out)
-					methodParams.Append("out ");
-				methodParams.AppendF($"comptype({parameter.DeclaredType.GetTypeId()})/*{parameter.DeclaredType}*/");
-			}
-			writer.Line(scope $"function comptype({method.ReturnType.GetTypeId()})({methodParams}) func = => T.{method.Name};");
-			EmitCallable(method, parameters, parameterStart, parameterCount, false, writer);
 		}
 
 		[Comptime]
@@ -173,26 +150,36 @@ namespace LuaTinker.Handlers
 						""");
 				}
 				bool variadic = parameters[parameters.Count - 1].IsVariadic;
-				let requiredCount = method.ParamCount - (variadic ? 1 : 0);
-				writer.If(scope $"lua.GetTop() {variadic ? "<" : "!="} {requiredCount}", scope $"""
-					lua.TinkerState.SetLastError($"expected '{requiredCount - (hasThisParameter ? 1 : 0)}' arguments but got '{{lua.GetTop() - {hasThisParameter ? 1 : 0}}}'");
+				let fixedCount = GetFixedParameterCount(method);
+				let requiredCount = GetRequiredParameterCount(method);
+				let expectedCount = scope String();
+				for (int count = requiredCount; count <= fixedCount; count++)
+				{
+					if (!expectedCount.IsEmpty)
+						expectedCount.Append(count == fixedCount ? " or " : ", ");
+					expectedCount.AppendF($"{count - (hasThisParameter ? 1 : 0)}{(variadic && count == fixedCount ? "+" : "")}");
+				}
+				let invalidCount = variadic ? scope $"lua.GetTop() < {requiredCount}" : scope $"lua.GetTop() < {requiredCount} || lua.GetTop() > {fixedCount}";
+				writer.If(invalidCount, scope $"""
+					lua.TinkerState.SetLastError($"expected '{expectedCount}' arguments but got '{{lua.GetTop() - {hasThisParameter ? 1 : 0}}}'");
 					StackHelper.ThrowError(lua, lua.TinkerState);
 					""");
+				for (int count = requiredCount; count < fixedCount; count++)
+					writer.If(scope $"lua.GetTop() == {count}", scope (body) => EmitCallable(method, parameters.GetRange(0, count), !isDelegate, body));
 			}
-			EmitCallable(method, parameters, 0, parameters.Count, !isDelegate, writer);
+			EmitCallable(method, parameters, !isDelegate, writer);
 		}
 
 
-		internal static void EmitConstruction<T>(List<LuaParameter> parameters, int parameterStart, int parameterCount, CodeWriter writer)
+		internal static void EmitConstruction<T>(Span<LuaParameter> parameters, CodeWriter writer)
 		{
-			let lastParameter = parameterStart + parameterCount - 1;
-			bool variadic = parameterCount > 0 && parameters[lastParameter].IsVariadic;
+			bool variadic = !parameters.IsEmpty && parameters[^1].IsVariadic;
 			delegate void(CodeWriter) emitBody = scope (body) =>
 			{
 				if (variadic)
-					EmitVariadicStorage(parameters[lastParameter], true, body);
+					EmitVariadicStorage(parameters[^1], true, body);
 				// Decode before allocation so failed arguments cannot finalize an uninitialized owned value.
-				for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+				for (let parameter in parameters)
 				{
 					if (parameter.IsVariadic)
 						continue;
@@ -210,13 +197,13 @@ namespace LuaTinker.Handlers
 					creation.Append("let wrapper = new:alloc ClassTypeWrapper<T>(");
 				else
 					creation.Append("*wrapper.ValuePointer = .(");
-				for (let parameter in parameters.GetRange(parameterStart, parameterCount))
+				for (let parameter in parameters)
 				{
-					if (variadic && @parameter.Index == parameterCount - 1)
+					if (variadic && @parameter.Index == parameters.Length - 1)
 						creation.Append("params extraArgs");
 					else
 						creation.AppendF($"{(parameter.Mode == .Ref ? "ref " : "")}constructorArgument{@parameter.Index}");
-					if (@parameter.Index != parameterCount - 1)
+					if (@parameter.Index != parameters.Length - 1)
 						creation.Append(", ");
 				}
 				creation.Append(");");

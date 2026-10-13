@@ -6,6 +6,7 @@ using LuaTinker.Helpers;
 using LuaTinker.StackHelpers;
 
 using internal LuaTinker.Handlers;
+using internal LuaTinker.Helpers;
 
 namespace LuaTinker.Handlers
 {
@@ -302,9 +303,13 @@ namespace LuaTinker.Handlers
 				writer.Line(scope $"// [{method.GetParamType(i).TypeId}] {method.GetParamType(i)} (Flags: {method.GetParamFlags(i)})");
 
 			if (isConstructor)
-				EmitConstruction<T>(parameters, candidate.ParameterStart, candidate.ParameterCount, writer);
+				EmitConstruction<T>(parameters.GetRange(candidate.ParameterStart, candidate.ParameterCount), writer);
 			else
-				EmitTypedCall<T>(method, parameters, candidate.ParameterStart, candidate.ParameterCount, writer);
+			{
+				let target = method.IsStatic ? scope $"T.{method.Name}" : scope $"StackHelper.Pop!<T>(lua, 1).{method.Name}";
+				let thisCount = method.IsStatic ? 0 : 1;
+				EmitCallable(method, parameters.GetRange(candidate.ParameterStart + thisCount, candidate.ParameterCount - thisCount), false, writer, target);
+			}
 		}
 
 		private static void EmitDispatchFailure(List<OverloadCandidate> candidates, List<LuaParameter> parameters, CodeWriter writer, DispatchKind dispatchKind)
@@ -379,6 +384,19 @@ namespace LuaTinker.Handlers
 				candidates.Add(.(method, start, parameters.Count - start));
 			}
 
+			// Insert full signatures first so an exact arity wins over an omitted-default variant.
+			let fullCandidateCount = candidates.Count;
+			for (int i < fullCandidateCount)
+			{
+				let candidate = candidates[i];
+				let method = candidate.Method;
+				let hiddenCount = method.ParamCount - candidate.ParameterCount;
+				let requiredCount = GetRequiredParameterCount(method) - hiddenCount;
+				let fixedCount = GetFixedParameterCount(method) - hiddenCount;
+				for (int count = fixedCount - 1; count >= requiredCount; count--)
+					candidates.Add(.(method, candidate.ParameterStart, count, true));
+			}
+
 			Trie<MatchKey> paramsTrie = scope .();
 			List<SelectorPosition> positions = scope .();
 			BuildOverloadTrie(paramsTrie, candidates, parameters, positions, isConstructor);
@@ -401,7 +419,7 @@ namespace LuaTinker.Handlers
 					topChain.ElseIf("lua.GetTop() == 1", scope (body) =>
 					{
 						body.Line(scope $"// Default constructor for: {candidate.Method}");
-						EmitConstruction<T>(parameters, candidate.ParameterStart, candidate.ParameterCount, body);
+						EmitConstruction<T>(parameters.GetRange(candidate.ParameterStart, candidate.ParameterCount), body);
 					});
 				}
 				else

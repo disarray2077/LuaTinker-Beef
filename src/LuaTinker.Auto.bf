@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Collections;
 using LuaTinker.Helpers;
 
+using internal LuaTinker.Helpers;
+
 namespace LuaTinker.Helpers
 {
 	static
@@ -162,9 +164,9 @@ namespace LuaTinker
 						continue;
 					}
 
-					if (overloads.ContainsKey(method.Name))
+					if (overloads.ContainsKey(method.Name) || GetRequiredParameterCount(method) < GetFixedParameterCount(method))
 					{
-						if (overloads[method.Name] == -1)
+						if (overloads.TryGetValue(method.Name, let count) && count == -1)
 							continue;
 						overloads[method.Name] = -1;
 

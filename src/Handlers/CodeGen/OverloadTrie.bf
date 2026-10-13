@@ -57,7 +57,7 @@ namespace LuaTinker.Handlers
 
 		internal struct SelectorPosition : this(int LuaStackIndex, int DiagnosticIndex);
 
-		internal struct OverloadCandidate : this(MethodInfo Method, int ParameterStart, int ParameterCount);
+		internal struct OverloadCandidate : this(MethodInfo Method, int ParameterStart, int ParameterCount, bool IsShortened = false);
 
 		private static Trie<MatchKey> FindVariadicChild(Trie<MatchKey> node)
 		{
@@ -81,10 +81,13 @@ namespace LuaTinker.Handlers
 				Trie<MatchKey> node = trie;
 				if (candidate.ParameterCount == 0)
 				{
-					if (!isConstructor)
-						Runtime.Assert(!node.IsEnd);
-					node.CandidateIndex = @candidate.Index;
-					node.IsEnd = true;
+					if (!candidate.IsShortened || !node.IsEnd)
+					{
+						if (!isConstructor && !candidate.IsShortened)
+							Runtime.Assert(!node.IsEnd);
+						node.CandidateIndex = @candidate.Index;
+						node.IsEnd = true;
+					}
 					continue;
 				}
 
@@ -97,10 +100,13 @@ namespace LuaTinker.Handlers
 					node = node.Insert(.(matchType, flags));
 					if (@parameter.Index == candidate.ParameterCount - 1)
 					{
-						if (!isConstructor)
-							Runtime.Assert(!node.IsEnd);
-						node.CandidateIndex = @candidate.Index;
-						node.IsEnd = true;
+						if (!candidate.IsShortened || !node.IsEnd)
+						{
+							if (!isConstructor && !candidate.IsShortened)
+								Runtime.Assert(!node.IsEnd);
+							node.CandidateIndex = @candidate.Index;
+							node.IsEnd = true;
+						}
 					}
 				}
 			}

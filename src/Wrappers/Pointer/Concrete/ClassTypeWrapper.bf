@@ -1,6 +1,9 @@
 using System;
 using System.Collections;
 using System.Reflection;
+using LuaTinker.Helpers;
+
+using internal LuaTinker.Helpers;
 
 namespace LuaTinker.Wrappers
 {
@@ -21,15 +24,12 @@ namespace LuaTinker.Wrappers
 			let signatures = scope HashSet<String>();
 			defer { for (let signature in signatures) delete signature; }
 
-			for (let method in typeof(T).GetMethods(.Public | .DeclaredOnly))
+			void EmitConstructor(MethodInfo method, int count)
 			{
-				if (!method.IsConstructor || method.IsStatic || method.GenericArgCount != 0)
-					continue;
-
 				let signature = scope String();
 				let declaration = scope String();
 				let arguments = scope String();
-				for (int i < method.ParamCount)
+				for (int i < count)
 				{
 					let flags = method.GetParamFlags(i);
 					if (flags.HasFlag(.Implicit))
@@ -67,7 +67,7 @@ namespace LuaTinker.Wrappers
 					arguments.AppendF($"arg{i}");
 				}
 				if (signatures.Contains(signature))
-					continue;
+					return;
 				signatures.Add(new String(signature));
 
 				// The wrapper appends the class even when its constructor has no append storage.
@@ -81,6 +81,21 @@ namespace LuaTinker.Wrappers
 				constructors.Append(")\n{\nlet instance = append T(");
 				constructors.Append(arguments);
 				constructors.Append(");\nmData = instance;\nmPtr = Internal.UnsafeCastToPtr(instance);\nmReadOnlyPtr = true;\n}\n");
+			}
+
+			// Full signatures precede shortened wrappers, preserving exact constructor overloads.
+			for (int pass < 2)
+			for (let method in typeof(T).GetMethods(.Public | .DeclaredOnly))
+			{
+				if (!method.IsConstructor || method.IsStatic || method.GenericArgCount != 0)
+					continue;
+
+				let fixedCount = GetFixedParameterCount(method);
+				let requiredCount = GetRequiredParameterCount(method);
+				let firstCount = pass == 0 ? method.ParamCount : fixedCount - 1;
+				let lastCount = pass == 0 ? method.ParamCount : requiredCount;
+				for (int count = firstCount; count >= lastCount; count--)
+					EmitConstructor(method, count);
 			}
 
 			constructors.Append("public ~this()\n{\n");

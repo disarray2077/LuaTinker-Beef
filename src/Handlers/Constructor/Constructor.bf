@@ -28,7 +28,7 @@ namespace LuaTinker.Handlers
 			let writer = scope CodeWriter(code);
 			List<LuaParameter> parameters = scope .();
 			NormalizeDirectConstructorParameters<Args>(parameters);
-			EmitConstruction<T>(parameters, 0, parameters.Count, writer);
+			EmitConstruction<T>(parameters, writer);
 			writer.Finish();
 
 			Compiler.MixinRoot(code);
