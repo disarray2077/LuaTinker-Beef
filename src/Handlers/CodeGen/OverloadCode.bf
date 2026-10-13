@@ -30,6 +30,40 @@ namespace LuaTinker.Handlers
 
 		internal struct ArgumentCountRange : this(int Minimum, int Maximum);
 
+		internal class DispatchContext
+		{
+			// These lists are borrowed and must remain unchanged during traversal.
+			public readonly List<OverloadCandidate> Candidates;
+			public readonly List<LuaParameter> Parameters;
+			public readonly List<SelectorPosition> Positions;
+			public readonly DispatchKind DispatchKind;
+
+			public this(List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, DispatchKind dispatchKind)
+			{
+				Candidates = candidates;
+				Parameters = parameters;
+				Positions = positions;
+				DispatchKind = dispatchKind;
+			}
+		}
+
+		internal struct BranchContext : this(DispatchContext Dispatch, int PositionIndex, ArgumentCountRange ArgumentCounts, bool CanFallback)
+		{
+			[Inline]
+			public int StackIndex => Dispatch.Positions[PositionIndex].LuaStackIndex;
+
+			[Inline]
+			public int DiagnosticIndex => Dispatch.Positions[PositionIndex].DiagnosticIndex;
+
+			[Inline]
+			public static Self ForRoot(DispatchContext dispatch, ArgumentCountRange counts)
+				=> .(dispatch, 0, counts, false);
+
+			[Inline]
+			public Self ForChild(ArgumentCountRange counts, bool canFallback)
+				=> .(Dispatch, PositionIndex + 1, counts, canFallback);
+		}
+
 		private static void EmitArityBranch(ArgumentCountRange argumentCounts, int requiredCount, CodeWriter writer,
 			delegate void(CodeWriter, ArgumentCountRange) emitPresent, delegate void(CodeWriter, ArgumentCountRange) emitMissing = null)
 		{
@@ -62,10 +96,10 @@ namespace LuaTinker.Handlers
 			return .UserData;
 		}
 
-		private static void EmitNumericDispatch<T>(int positionIndex, List<Type> numericTypes, List<Trie<MatchKey>> numericBranches, List<Trie<MatchKey>> otherBranches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, BranchSelection otherSelection, ArgumentCountRange argumentCounts, bool canFallback)
+		private static void EmitNumericDispatch<T>(BranchContext context, List<Type> numericTypes, List<Trie<MatchKey>> numericBranches, List<Trie<MatchKey>> otherBranches, CodeWriter writer, BranchSelection otherSelection)
 		{
-			let stackIndex = positions[positionIndex].LuaStackIndex;
-			let argumentPosition = positions[positionIndex].DiagnosticIndex;
+			let stackIndex = context.StackIndex;
+			let argumentPosition = context.DiagnosticIndex;
 			String types = scope .();
 			for (let type in numericTypes)
 			{
@@ -88,7 +122,7 @@ namespace LuaTinker.Handlers
 					: scope $"selectedNumericType{stackIndex} == {@type.Index}";
 				delegate void(CodeWriter) emitBody = scope (body) =>
 				{
-					EmitTrieBranches<T>(positionIndex, typeBranches, candidates, parameters, positions, body, dispatchKind, .Numeric, argumentCounts, canFallback);
+					EmitTrieBranches<T>(context, typeBranches, body, .Numeric);
 				};
 				if (@type.Index == 0)
 					numericChain = writer.If(condition, emitBody);
@@ -98,7 +132,7 @@ namespace LuaTinker.Handlers
 			if (!otherBranches.IsEmpty)
 				numericChain.Else(scope (body) =>
 				{
-					EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, body, dispatchKind, otherSelection, argumentCounts, canFallback);
+					EmitTrieBranches<T>(context, otherBranches, body, otherSelection);
 				});
 		}
 
@@ -112,9 +146,11 @@ namespace LuaTinker.Handlers
 			});
 		}
 
-		private static void EmitTrieBranches<T>(int positionIndex, List<Trie<MatchKey>> branches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, BranchSelection selection, ArgumentCountRange argumentCounts, bool canFallback)
+		private static void EmitTrieBranches<T>(BranchContext context, List<Trie<MatchKey>> branches, CodeWriter writer, BranchSelection selection)
 		{
-			let stackIndex = positions[positionIndex].LuaStackIndex;
+			let dispatch = context.Dispatch;
+			let isConstructor = dispatch.DispatchKind == .Constructor;
+			let stackIndex = context.StackIndex;
 
 			List<Type> pointerTypes = scope .();
 			for (let branch in branches)
@@ -160,7 +196,7 @@ namespace LuaTinker.Handlers
 						condition.AppendF($"!StackHelper.IsArgumentHint(lua, {stackIndex})");
 					}
 					else if (IsNumericType(type) && !flags.HasFlag(.This))
-						condition.AppendF($"StackHelper.SelectNumeric<comptype({type.GetTypeId()})>(lua, {stackIndex}, {positions[positionIndex].DiagnosticIndex}) == 0");
+						condition.AppendF($"StackHelper.SelectNumeric<comptype({type.GetTypeId()})>(lua, {stackIndex}, {context.DiagnosticIndex}) == 0");
 					else if ((luaType == .UserData || luaType == .String) && flags.HasFlag(.This))
 					{
 						if (stackIndex == 1)
@@ -182,49 +218,49 @@ namespace LuaTinker.Handlers
 				delegate void(CodeWriter) emitBody = scope (body) =>
 				{
 					if (selection != .Committed)
-						body.Line(scope $"matchedOverloadArguments[{positionIndex}] = true;");
-					let childCanFallback = canFallback || @node.Index < branches.Count - 1;
+						body.Line(scope $"matchedOverloadArguments[{context.PositionIndex}] = true;");
+					let childCanFallback = context.CanFallback || @node.Index < branches.Count - 1;
 					if (flags.HasFlag(.This) && stackIndex == 1)
 						EmitReceiverValidation(type, body);
 
 					if (flags.HasFlag(.Params))
-						EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, body, dispatchKind == .Constructor);
+						EmitSelectedOverload<T>(dispatch.Candidates[node.CandidateIndex], dispatch.Parameters, body, isConstructor);
 					else if (!node.Children.IsEmpty)
 					{
 						let variadicChild = FindVariadicChild(node);
 						delegate void(CodeWriter, ArgumentCountRange) emitMissing = null;
 						if (node.IsEnd)
-							emitMissing = scope (terminal, counts) => EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, terminal, dispatchKind == .Constructor);
+							emitMissing = scope (terminal, counts) => EmitSelectedOverload<T>(dispatch.Candidates[node.CandidateIndex], dispatch.Parameters, terminal, isConstructor);
 						else if (variadicChild != null)
-							emitMissing = scope (terminal, counts) => EmitSelectedOverload<T>(candidates[variadicChild.CandidateIndex], parameters, terminal, dispatchKind == .Constructor);
+							emitMissing = scope (terminal, counts) => EmitSelectedOverload<T>(dispatch.Candidates[variadicChild.CandidateIndex], dispatch.Parameters, terminal, isConstructor);
 						else if (!childCanFallback)
 							emitMissing = scope (terminal, counts) => terminal.Line("overloadFailure.Throw(lua);");
-						EmitArityBranch(argumentCounts, stackIndex + 1, body, scope (child, counts) =>
+						EmitArityBranch(context.ArgumentCounts, stackIndex + 1, body, scope (child, counts) =>
 						{
-							IterateTrie<T>(positionIndex + 1, node, candidates, parameters, positions, child, dispatchKind, counts, childCanFallback);
+							IterateTrie<T>(context.ForChild(counts, childCanFallback), node, child);
 						}, emitMissing);
 					}
 					else if (node.IsEnd)
 					{
 						if (selection == .Committed)
 						{
-							if (argumentCounts.Minimum > stackIndex)
+							if (context.ArgumentCounts.Minimum > stackIndex)
 								body.Line("overloadFailure.Throw(lua);");
 							else
 							{
-								if (argumentCounts.Maximum > stackIndex)
+								if (context.ArgumentCounts.Maximum > stackIndex)
 									body.If(scope $"argumentCount != {stackIndex}", "overloadFailure.Throw(lua);");
-								EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, body, dispatchKind == .Constructor);
+								EmitSelectedOverload<T>(dispatch.Candidates[node.CandidateIndex], dispatch.Parameters, body, isConstructor);
 							}
 						}
-						else if (argumentCounts.Minimum <= stackIndex)
+						else if (context.ArgumentCounts.Minimum <= stackIndex)
 						{
-							if (argumentCounts.Maximum == stackIndex)
-								EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, body, dispatchKind == .Constructor);
+							if (context.ArgumentCounts.Maximum == stackIndex)
+								EmitSelectedOverload<T>(dispatch.Candidates[node.CandidateIndex], dispatch.Parameters, body, isConstructor);
 							else
 								body.If(scope $"argumentCount == {stackIndex}", scope (terminal) =>
 								{
-									EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, terminal, dispatchKind == .Constructor);
+									EmitSelectedOverload<T>(dispatch.Candidates[node.CandidateIndex], dispatch.Parameters, terminal, isConstructor);
 								});
 						}
 					}
@@ -244,7 +280,7 @@ namespace LuaTinker.Handlers
 						else
 						{
 							let expectedType = scope $"'{type}'";
-							invalid.Line(scope $"overloadFailure.Record({positions[positionIndex].DiagnosticIndex}, {stackIndex}, {expectedType.Quote(.. scope .())});");
+							invalid.Line(scope $"overloadFailure.Record({context.DiagnosticIndex}, {stackIndex}, {expectedType.Quote(.. scope .())});");
 							invalid.Line("overloadFailure.Throw(lua);");
 						}
 					});
@@ -254,7 +290,7 @@ namespace LuaTinker.Handlers
 					lastBranch = writer.If(condition, emitBody);
 			}
 
-			if (selection != .Committed && !branches.IsEmpty && dispatchKind == .InstanceMethod && stackIndex == 1)
+			if (selection != .Committed && !branches.IsEmpty && dispatch.DispatchKind == .InstanceMethod && stackIndex == 1)
 			{
 				lastBranch.Else("""
 					lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
@@ -263,9 +299,9 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		private static void EmitInputSpanDispatch<T>(int positionIndex, List<Trie<MatchKey>> branches, List<Type> spanTypes, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, ArgumentCountRange argumentCounts, bool canFallback)
+		private static void EmitInputSpanDispatch<T>(BranchContext context, List<Trie<MatchKey>> branches, List<Type> spanTypes, CodeWriter writer)
 		{
-			let stackIndex = positions[positionIndex].LuaStackIndex;
+			let stackIndex = context.StackIndex;
 			String spanCandidates = scope .();
 			for (let spanType in spanTypes)
 			{
@@ -273,7 +309,7 @@ namespace LuaTinker.Handlers
 					spanCandidates.Append(", ");
 				spanCandidates.AppendF($"comptype({GetSpanElement(spanType).GetTypeId()})");
 			}
-			writer.Line(scope $"let selectedInputSpanType{stackIndex} = StackHelper.SelectInputSpan<({spanCandidates})>(lua, {stackIndex}, {positions[positionIndex].DiagnosticIndex});");
+			writer.Line(scope $"let selectedInputSpanType{stackIndex} = StackHelper.SelectInputSpan<({spanCandidates})>(lua, {stackIndex}, {context.DiagnosticIndex});");
 			CodeWriter.ConditionalChain chain = default;
 			for (let spanType in spanTypes)
 			{
@@ -283,7 +319,7 @@ namespace LuaTinker.Handlers
 					for (let branch in branches)
 						if (branch.Value.MatchType == spanType && !branch.Value.Flags.HasFlag(.Params) && !branch.Value.Flags.HasFlag(.This))
 							typeBranches.Add(branch);
-					EmitTrieBranches<T>(positionIndex, typeBranches, candidates, parameters, positions, body, dispatchKind, .InputSpan, argumentCounts, canFallback);
+					EmitTrieBranches<T>(context, typeBranches, body, .InputSpan);
 				};
 				let condition = scope $"selectedInputSpanType{stackIndex} == {@spanType.Index}";
 				if (@spanType.Index == 0)
@@ -293,16 +329,16 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		private static void IterateTrie<T>(int positionIndex, Trie<MatchKey> root, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, ArgumentCountRange argumentCounts, bool canFallback)
+		private static void IterateTrie<T>(BranchContext context, Trie<MatchKey> root, CodeWriter writer)
 		{
-			let stackIndex = positions[positionIndex].LuaStackIndex;
-			let argumentPosition = positions[positionIndex].DiagnosticIndex;
-			if (!canFallback && root.OrderedChildren.Count == 1)
+			let stackIndex = context.StackIndex;
+			let argumentPosition = context.DiagnosticIndex;
+			if (!context.CanFallback && root.OrderedChildren.Count == 1)
 			{
-				EmitTrieBranches<T>(positionIndex, root.OrderedChildren, candidates, parameters, positions, writer, dispatchKind, .Committed, argumentCounts, false);
+				EmitTrieBranches<T>(context, root.OrderedChildren, writer, .Committed);
 				return;
 			}
-			writer.Line(scope $"matchedOverloadArguments[{positionIndex}] = false;");
+			writer.Line(scope $"matchedOverloadArguments[{context.PositionIndex}] = false;");
 			List<Type> numericTypes = scope .();
 			List<Type> pointerTypes = scope .();
 			List<Type> inputSpanTypes = scope .();
@@ -332,16 +368,16 @@ namespace LuaTinker.Handlers
 			{
 				let otherSelection = inputSpanTypes.Count == 1 ? BranchSelection.SingleInputSpan : BranchSelection.None;
 				if (numericTypes.IsEmpty)
-					EmitTrieBranches<T>(positionIndex, otherBranches, candidates, parameters, positions, body, dispatchKind, otherSelection, argumentCounts, canFallback);
+					EmitTrieBranches<T>(context, otherBranches, body, otherSelection);
 				else
-					EmitNumericDispatch<T>(positionIndex, numericTypes, numericBranches, otherBranches, candidates, parameters, positions, body, dispatchKind, otherSelection, argumentCounts, canFallback);
+					EmitNumericDispatch<T>(context, numericTypes, numericBranches, otherBranches, body, otherSelection);
 			};
 			if (inputSpanTypes.Count <= 1)
 				emitOrdinaryBranches(writer);
 			else
 				writer.If(scope $"lua.Type({stackIndex}) == .Table && !StackHelper.IsArgumentHint(lua, {stackIndex})", scope (body) =>
 				{
-					EmitInputSpanDispatch<T>(positionIndex, root.OrderedChildren, inputSpanTypes, candidates, parameters, positions, body, dispatchKind, argumentCounts, canFallback);
+					EmitInputSpanDispatch<T>(context, root.OrderedChildren, inputSpanTypes, body);
 				}).Else(emitOrdinaryBranches);
 			String expectedTypes = scope .();
 			List<Type> expected = scope .();
@@ -355,7 +391,7 @@ namespace LuaTinker.Handlers
 					expectedTypes.Append(" or ");
 				expectedTypes.AppendF($"'{type}'");
 			}
-			writer.If(scope $"!matchedOverloadArguments[{positionIndex}]",
+			writer.If(scope $"!matchedOverloadArguments[{context.PositionIndex}]",
 				scope $"overloadFailure.Record({argumentPosition}, {stackIndex}, {expectedTypes.Quote(.. scope .())});");
 		}
 
@@ -519,6 +555,7 @@ namespace LuaTinker.Handlers
 			if (requiresMatchTracking)
 				writer.Line(scope $"bool[{positions.Count}] matchedOverloadArguments = .();");
 
+			let dispatch = scope DispatchContext(candidates, parameters, positions, dispatchKind);
 			delegate void(CodeWriter, ArgumentCountRange) emitEmpty = null;
 			let variadicChild = FindVariadicChild(paramsTrie);
 			let emptyNode = paramsTrie.IsEnd ? paramsTrie : variadicChild;
@@ -526,7 +563,7 @@ namespace LuaTinker.Handlers
 				emitEmpty = scope (body, counts) => EmitSelectedOverload<T>(candidates[emptyNode.CandidateIndex], parameters, body, isConstructor);
 			EmitArityBranch(argumentCounts, isConstructor ? 2 : 1, writer, scope (body, counts) =>
 			{
-				IterateTrie<T>(0, paramsTrie, candidates, parameters, positions, body, dispatchKind, counts, false);
+				IterateTrie<T>(BranchContext.ForRoot(dispatch, counts), paramsTrie, body);
 			}, emitEmpty);
 
 			if (requiresMatchTracking)
