@@ -43,14 +43,9 @@ namespace LuaTinker.Handlers
 			let declarationCode = scope $"comptype({element.GetTypeId()})/*{element}*/";
 
 			if (construction)
-			{
-				writer.Line(scope $"""
-					let top = lua.GetTop();
-					let extraArgsCount = top >= {parameter.LuaStackIndex} ? top - {parameter.LuaStackIndex} + 1 : 0;
-					""");
-			}
+				writer.Line(scope $"let extraArgsCount = argumentCount >= {parameter.LuaStackIndex} ? argumentCount - {parameter.LuaStackIndex} + 1 : 0;");
 			else
-				writer.Line(scope $"int extraArgsCount = lua.GetTop() - {parameter.LuaStackIndex - 1};");
+				writer.Line(scope $"int extraArgsCount = argumentCount - {parameter.LuaStackIndex - 1};");
 			writer.Line(scope $"{declarationCode}[] extraArgs = scope {declarationCode}[extraArgsCount] (?);");
 			let elementExpression = scope String();
 			EmitDecodedArgument(parameter, scope $"i + {parameter.LuaStackIndex}", true, elementExpression);
@@ -141,6 +136,7 @@ namespace LuaTinker.Handlers
 				writer.Line("Debug.Assert(lua.GetTop() == 0);");
 			else
 			{
+				writer.Line("let argumentCount = lua.GetTop();");
 				bool hasThisParameter = parameters[0].Role == .This;
 				if (hasThisParameter)
 				{
@@ -159,13 +155,19 @@ namespace LuaTinker.Handlers
 						expectedCount.Append(count == fixedCount ? " or " : ", ");
 					expectedCount.AppendF($"{count - (hasThisParameter ? 1 : 0)}{(variadic && count == fixedCount ? "+" : "")}");
 				}
-				let invalidCount = variadic ? scope $"lua.GetTop() < {requiredCount}" : scope $"lua.GetTop() < {requiredCount} || lua.GetTop() > {fixedCount}";
-				writer.If(invalidCount, scope $"""
-					lua.TinkerState.SetLastError($"expected '{expectedCount}' arguments but got '{{lua.GetTop() - {hasThisParameter ? 1 : 0}}}'");
-					StackHelper.ThrowError(lua, lua.TinkerState);
-					""");
+				if (!variadic || requiredCount > 0)
+				{
+					let invalidCount = variadic ? scope $"argumentCount < {requiredCount}"
+						: requiredCount == fixedCount ? scope $"argumentCount != {requiredCount}"
+						: requiredCount == 0 ? scope $"argumentCount > {fixedCount}"
+						: scope $"argumentCount < {requiredCount} || argumentCount > {fixedCount}";
+					writer.If(invalidCount, scope $"""
+						lua.TinkerState.SetLastError($"expected '{expectedCount}' arguments but got '{{argumentCount - {hasThisParameter ? 1 : 0}}}'");
+						StackHelper.ThrowError(lua, lua.TinkerState);
+						""");
+				}
 				for (int count = requiredCount; count < fixedCount; count++)
-					writer.If(scope $"lua.GetTop() == {count}", scope (body) => EmitCallable(method, parameters.GetRange(0, count), !isDelegate, body));
+					writer.If(scope $"argumentCount == {count}", scope (body) => EmitCallable(method, parameters.GetRange(0, count), !isDelegate, body));
 			}
 			EmitCallable(method, parameters, !isDelegate, writer);
 		}

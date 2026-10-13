@@ -78,6 +78,16 @@ namespace LuaTinker.Handlers
 				});
 		}
 
+		private static void EmitReceiverValidation(Type type, CodeWriter writer)
+		{
+			writer.If(scope $"!User2Type.IsObjectTypeCompatible(lua, 1, typeof(comptype({type.GetTypeId()}))) && StackHelper.EnsureValidMetaTable<comptype({type.GetTypeId()})>(lua, 1) == .OkUnregisteredType", scope (invalid) =>
+			{
+				let message = scope $"can't convert argument 0 to '{type}'";
+				invalid.Line(scope $"lua.TinkerState.SetLastError({message.Quote(.. scope .())});");
+				invalid.Line("StackHelper.ThrowError(lua, lua.TinkerState);");
+			});
+		}
+
 		private static void EmitTrieBranches<T>(int positionIndex, List<Trie<MatchKey>> branches, List<OverloadCandidate> candidates, List<LuaParameter> parameters, List<SelectorPosition> positions, CodeWriter writer, DispatchKind dispatchKind, BranchSelection selection)
 		{
 			let stackIndex = positions[positionIndex].LuaStackIndex;
@@ -147,21 +157,14 @@ namespace LuaTinker.Handlers
 				{
 					body.Line(scope $"matchedOverloadArguments[{positionIndex}] = true;");
 					if (flags.HasFlag(.This) && stackIndex == 1)
-					{
-						body.If(scope $"!User2Type.IsObjectTypeCompatible(lua, {stackIndex}, typeof(comptype({type.GetTypeId()}))) && StackHelper.EnsureValidMetaTable<comptype({type.GetTypeId()})>(lua, 1) == .OkUnregisteredType", scope (invalid) =>
-						{
-							let message = scope $"can't convert argument 0 to '{type}'";
-							invalid.Line(scope $"lua.TinkerState.SetLastError({message.Quote(.. scope .())});");
-							invalid.Line("StackHelper.ThrowError(lua, lua.TinkerState);");
-						});
-					}
+						EmitReceiverValidation(type, body);
 
 					if (flags.HasFlag(.Params))
 						EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, body, dispatchKind == .Constructor);
 					else if (!node.Children.IsEmpty)
 					{
 						let variadicChild = FindVariadicChild(node);
-						let childChain = body.If(scope $"lua.GetTop() >= {stackIndex + 1}", scope (child) =>
+						let childChain = body.If(scope $"argumentCount >= {stackIndex + 1}", scope (child) =>
 						{
 							IterateTrie<T>(positionIndex + 1, node, candidates, parameters, positions, child, dispatchKind);
 						});
@@ -178,7 +181,7 @@ namespace LuaTinker.Handlers
 					}
 					else if (node.IsEnd)
 					{
-						body.If(scope $"lua.GetTop() < {stackIndex + 1}", scope (terminal) =>
+						body.If(scope $"argumentCount == {stackIndex}", scope (terminal) =>
 						{
 								EmitSelectedOverload<T>(candidates[node.CandidateIndex], parameters, terminal, dispatchKind == .Constructor);
 						});
@@ -312,7 +315,7 @@ namespace LuaTinker.Handlers
 			}
 		}
 
-		private static void EmitDispatchFailure(List<OverloadCandidate> candidates, List<LuaParameter> parameters, CodeWriter writer, DispatchKind dispatchKind)
+		private static void EmitArityCheck(List<OverloadCandidate> candidates, List<LuaParameter> parameters, CodeWriter writer, DispatchKind dispatchKind)
 		{
 			let implicitArgumentCount = dispatchKind == .StaticMethod ? 0 : 1;
 			List<int> fixedArgumentCounts = scope .();
@@ -336,34 +339,55 @@ namespace LuaTinker.Handlers
 					if (count >= variadicMinimum)
 						@count.RemoveFast();
 
-			String validArgumentCount = scope .();
+			if (variadicMinimum >= 0 && implicitArgumentCount == 0)
+			{
+				// Fixed arities can fill the gap below the variadic range.
+				int firstVariadicCount = variadicMinimum;
+				for (let count in fixedArgumentCounts.Reversed)
+				{
+					if (count != firstVariadicCount - 1)
+						break;
+					firstVariadicCount--;
+				}
+				if (firstVariadicCount == 0)
+					return;
+			}
+
+			String invalidArgumentCount = scope .();
 			String expectedArgumentCounts = scope .();
 			for (let count in fixedArgumentCounts)
 			{
 				if (@count.Index > 0)
 				{
-					validArgumentCount.Append(" || ");
+					invalidArgumentCount.Append(" && ");
 					expectedArgumentCounts.Append(@count.Index == fixedArgumentCounts.Count - 1 && variadicMinimum < 0 ? " or " : ", ");
 				}
-				validArgumentCount.AppendF($"lua.GetTop() == {count + implicitArgumentCount}");
+				invalidArgumentCount.AppendF($"argumentCount != {count + implicitArgumentCount}");
 				expectedArgumentCounts.AppendF($"{count}");
 			}
 			if (variadicMinimum >= 0)
 			{
-				if (!validArgumentCount.IsEmpty)
+				if (!invalidArgumentCount.IsEmpty)
 				{
-					validArgumentCount.Append(" || ");
+					invalidArgumentCount.Append(" && ");
 					expectedArgumentCounts.Append(" or ");
 				}
-				validArgumentCount.AppendF($"lua.GetTop() >= {variadicMinimum + implicitArgumentCount}");
+				invalidArgumentCount.AppendF($"argumentCount < {variadicMinimum + implicitArgumentCount}");
 				expectedArgumentCounts.AppendF($"{variadicMinimum}+");
 			}
-			writer.If(validArgumentCount, "overloadFailure.Throw(lua);");
-			let actualArgumentCount = implicitArgumentCount == 0 ? "lua.GetTop()" : "lua.GetTop() - 1";
-			writer.Line(scope $"""
-				lua.TinkerState.SetLastError($"expected '{expectedArgumentCounts}' arguments but got '{{{actualArgumentCount}}}'");
-				StackHelper.ThrowError(lua, lua.TinkerState);
-				""");
+			writer.If(invalidArgumentCount, scope (body) =>
+			{
+				if (dispatchKind == .InstanceMethod)
+					body.If("argumentCount == 0 || !User2Type.IsLuaTinkerPointerUserdata(lua, 1)", """
+						lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+						StackHelper.ThrowError(lua, lua.TinkerState);
+						""");
+				let actualArgumentCount = implicitArgumentCount == 0 ? "argumentCount" : "argumentCount - 1";
+				body.Line(scope $"""
+					lua.TinkerState.SetLastError($"expected '{expectedArgumentCounts}' arguments but got '{{{actualArgumentCount}}}'");
+					StackHelper.ThrowError(lua, lua.TinkerState);
+					""");
+			});
 		}
 
 		internal static void EmitOverloads<T>(List<MethodInfo> methods, CodeWriter writer, DispatchKind dispatchKind)
@@ -400,11 +424,30 @@ namespace LuaTinker.Handlers
 			Trie<MatchKey> paramsTrie = scope .();
 			List<SelectorPosition> positions = scope .();
 			BuildOverloadTrie(paramsTrie, candidates, parameters, positions, isConstructor);
+			writer.Line("let argumentCount = lua.GetTop();");
+			EmitArityCheck(candidates, parameters, writer, dispatchKind);
+
+			let parameterlessNode = dispatchKind == .InstanceMethod && paramsTrie.OrderedChildren.Count == 1
+				? paramsTrie.OrderedChildren[0] : paramsTrie;
+			if (parameterlessNode.IsEnd && parameterlessNode.Children.IsEmpty)
+			{
+				if (dispatchKind == .InstanceMethod)
+				{
+					writer.If("!User2Type.IsLuaTinkerPointerUserdata(lua, 1)", """
+						lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
+						StackHelper.ThrowError(lua, lua.TinkerState);
+						""");
+					EmitReceiverValidation(parameterlessNode.Value.MatchType, writer);
+				}
+				EmitSelectedOverload<T>(candidates[parameterlessNode.CandidateIndex], parameters, writer, isConstructor);
+				return;
+			}
+
 			writer.Line(scope $"""
 				OverloadFailure overloadFailure = .();
 				bool[{positions.Count}] matchedOverloadArguments = .();
 				""");
-			let topChain = writer.If(isConstructor ? "lua.GetTop() >= 2" : "lua.GetTop() >= 1", scope (body) =>
+			let topChain = writer.If(isConstructor ? "argumentCount >= 2" : "argumentCount >= 1", scope (body) =>
 			{
 				IterateTrie<T>(0, paramsTrie, candidates, parameters, positions, body, dispatchKind);
 			});
@@ -416,7 +459,7 @@ namespace LuaTinker.Handlers
 				if (isConstructor)
 				{
 					// Handle the case for a constructor with no arguments (e.g., MyClass()).
-					topChain.ElseIf("lua.GetTop() == 1", scope (body) =>
+					topChain.ElseIf("argumentCount == 1", scope (body) =>
 					{
 						body.Line(scope $"// Default constructor for: {candidate.Method}");
 						EmitConstruction<T>(parameters.GetRange(candidate.ParameterStart, candidate.ParameterCount), body);
@@ -429,19 +472,12 @@ namespace LuaTinker.Handlers
 			{
 				let candidate = candidates[variadicChild.CandidateIndex];
 				if (isConstructor)
-					topChain.ElseIf("lua.GetTop() == 1", scope (body) => EmitSelectedOverload<T>(candidate, parameters, body, true));
+					topChain.ElseIf("argumentCount == 1", scope (body) => EmitSelectedOverload<T>(candidate, parameters, body, true));
 				else
 					topChain.Else(scope (body) => EmitSelectedOverload<T>(candidate, parameters, body, false));
 			}
-			else if (dispatchKind == .InstanceMethod)
-			{
-				topChain.Else("""
-					lua.TinkerState.SetLastError("no class at first argument. (forgot ':' expression ?)");
-					StackHelper.ThrowError(lua, lua.TinkerState);
-					""");
-			}
 
-			EmitDispatchFailure(candidates, parameters, writer, dispatchKind);
+			writer.Line("overloadFailure.Throw(lua);");
 		}
 	}
 }

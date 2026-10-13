@@ -24,6 +24,8 @@ namespace LuaTinker.Tests
 			public static int Arity(int first, int second) => 2;
 			public static int Arity(int first) => 1;
 			public static int Arity(int first, int second, int third, int fourth) => 4;
+			public static int GappedArity(uint8 value) => 1;
+			public static int GappedArity(uint32 value, int second, int third) => 3;
 			public static int Zero() => 9;
 			public static int Zero(int32 value) => value;
 			public static int Zero(params Span<int32> values) => 99;
@@ -144,6 +146,20 @@ namespace LuaTinker.Tests
 				assert(not ok and err:find("expected '0 or 1' arguments but got '2'", 1, true), tostring(err))
 				ok, err = pcall(function() target:InstanceSum() end)
 				assert(not ok and err:find("expected '1+' arguments but got '0'", 1, true), tostring(err))
+				"""))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
+		public static void TestArityValidationPrecedesTypeSelection()
+		{
+			let lua = scope Lua(true);
+			LuaTinker tinker = scope .(lua);
+			tinker.AddNamespace("Target");
+			tinker.AddNamespaceMethod<Target, const "GappedArity">("Target");
+			if (lua.DoString("""
+				local ok, err = pcall(function() Target.GappedArity(1, 2) end)
+				assert(not ok and err:find("expected '1 or 3' arguments but got '2'", 1, true), tostring(err))
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}
