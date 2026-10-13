@@ -1,273 +1,330 @@
-# LuaTinker-Beef
+<p align="center">
+  <img src="docs/logo.svg" alt="LuaTinker-Beef" width="560">
+</p>
 
-A powerful, compile-time binding library for integrating **BeefLang** with **Lua**, inspired by [LuaTinker](https://github.com/zupet/LuaTinker) and [NLua](https://github.com/NLua/NLua).
-
-LuaTinker-Beef allows you to seamlessly call Lua functions from Beef and expose Beef types, methods, and variables to your Lua scripts. Its core philosophy is to perform all binding work at **compile-time**, completely avoiding the overhead of runtime reflection.
+[Beef](https://www.beeflang.org/) bindings for Lua, inspired by [LuaTinker](https://github.com/zupet/LuaTinker) and [NLua](https://github.com/NLua/NLua) but with heavy use of compile-time code generation. Expose Beef types and functions to Lua, and call Lua from Beef with almost no runtime reflection.
 
 ## Key Features
 
--   **Compile-Time Generation**: No reflection means fast startup and minimal runtime overhead.
--   **Automatic & Manual Binding**: Quickly bind entire classes with `AutoTinkClass` or manually specify every function, property, and field for fine-grained control.
--   **Seamless Interop**: Call Lua functions from Beef and vice-versa with natural syntax.
-    -   **Dynamic Overload Resolution**: Function overloads are also supported! LuaTinker will attempt to call the correct function overload at run-time based on the provided arguments.
--   **Rich Type Support**: Bind classes, structs, methods, properties, fields, enums, and indexers.
--   **Inheritance**: Correctly handles class and struct inheritance hierarchies.
+- Beef-Lua interaction made [simple](#quick-start).
+- Compile-time [binding generation](#binding).
+    - Binding can be [fully automatic or manual](#binding).
+- Bidirectional [function calls](#function-calls) between `Beef` and `Lua`.
+- Fully compatible with `Lua` coroutines and threads
+- First-class support for key `Beef` language features:
+    - [Overload resolution](#automatic-binding).
+    - [Variadic arguments](#automatic-binding).
+    - [Inheritance](#inheritance).
+    - [Collection indexers](#indexers).
+    - [Boxed value types](#boxed-values).
+- Frictionless `Beef` interop:
+    - Tables can be used as [Beef spans](#span-conversion).
+    - Lua callbacks can be used as [Beef delegates](#lua-callbacks-as-beef-delegates).
+    - Numeric and enum overloads can be easily [disambiguated](#numeric-and-enum-arguments).
 
-## Important Notes
-
--   This library is under active development, and the API may change.
--   It is strongly recommended to use the latest **Beef nightly release** for the best compatibility.
+> [!WARNING]
+> LuaTinker-Beef is experimental and under active development. APIs and behavior may change.
+> Use the latest Beef nightly release for compiler compatibility.
 
 ## Dependencies
 
-This library requires [KeraLua-Beef](https://github.com/disarray2077/KeraLua-Beef).
--   For Lua 5.1 or LuaJIT, use [KeraLua51-Beef](https://github.com/disarray2077/KeraLua51-Beef) instead.
+### Library
+
+- [KeraLua-Beef](https://github.com/disarray2077/KeraLua-Beef) for Lua 5.4.
+- For Lua 5.1 or LuaJIT, use [KeraLua51-Beef](https://github.com/disarray2077/KeraLua51-Beef) instead.
+
+### GameSample and Playground
+
+GameSample and Playground use Beef's bundled SDL2 bindings for windows and input, [BeefGL](https://github.com/disarray2077/BeefGL) for rendering, and SDL2_mixer for audio. Playground also uses [StbImageBeef](https://github.com/StbBeef/StbImageBeef) and SDL2_image to load images.
+
+The browser version of Playground is built with Emscripten through [scripts/build-wasm.ps1](scripts/build-wasm.ps1).
 
 ## Quick Start
 
-This example demonstrates binding Beef's `System.IO.File` and `System.String` classes to Lua, allowing a Lua script to read a file and format a string.
+Create a Lua state, register a Beef type, and exchange values with a script:
 
 ```cs
-using System;
-using System.IO;
-using KeraLua;
-
-void RunExample()
+public static void Main()
 {
     let lua = scope Lua(true);
     lua.Encoding = System.Text.Encoding.UTF8;
+    let tinker = scope LuaTinker(lua);
 
-    LuaTinker tinker = scope .(lua);
+    tinker.AutoTinkClass<System.String, const "StringBuilder">();
+    tinker.SetValue("name", "Ada");
+    tinker.SetValue("score", 10);
 
-    // Automatically expose public members of these classes to Lua
-    tinker.AutoTinkClass<System.IO.File>();
-    tinker.AutoTinkClass<System.String, const "StringBuilder">(); // Rename String to StringBuilder in Lua
+    if (tinker.Eval("""
+        message = StringBuilder()
+        message:Append("Hello, ")
+        message:Append(name)
+        print(message) -- Hello, Ada
 
-    // Create a temporary file for the example
-    File.WriteAllText("test_tmp.txt", "All works!");
-    defer File.Delete("test_tmp.txt");
+        score = score + 5
+        player = { name = name, score = score }
 
-    // Execute a Lua script that uses the bound Beef classes
-    let result = lua.DoString(
-        @"""
-        -- Create a new String (exposed as StringBuilder) instance
-        outString = StringBuilder()
-
-        -- Call a static Beef method from Lua
-        System.IO.File.ReadAllText("test_tmp.txt", outString, false)
-
-        -- Use the instance to format a new string
-        string = StringBuilder()
-        string:AppendF("Test '{}'", outString)
-        
-        -- Print the result
-        print(string) -- outputs: Test 'All works!'
-        """
-    );
-
-    if (result)
+        function add(a, b)
+            return a + b
+        end
+        """) case .Err(let error))
     {
-        Console.WriteLine($"Lua Error: {lua.ToString(-1, .. scope .())}");
+        Console.WriteLine(error);
+        return;
     }
+
+    // Read a global, evaluate an expression, and call a Lua function.
+    Console.WriteLine(tinker.GetValue<int>("score").Get());        // 15
+    Console.WriteLine(tinker.Eval<int>("return score * 2").Get()); // 30
+    Console.WriteLine(tinker.Call<int, ?>("add", (2, 3)).Get());   // 5
+
+    // Read and modify a Lua table from Beef.
+    if (tinker.GetTable!("player") case .Ok(var player))
+    {
+        Console.WriteLine(player.GetValue<StringView>("name").Get()); // Ada
+        player.SetValue("score", 25);
+    }
+
+    Console.WriteLine(tinker.Eval<int>("return player.score").Get()); // 25
 }
 ```
 
-## Features in Detail
+## Binding
 
-Here are examples of the core features, adapted from the project's test suite.
+### Automatic Binding
 
-### 1. Automatic Class Binding (`AutoTinkClass`)
+`AutoTinkClass` makes a Beef type's supported public members available in Lua. Here, registering `String` lets the script construct a Beef string, call its `Append` overloads, and print it through `Console`.
 
-The easiest way to expose a Beef type to Lua. It automatically binds public constructors, methods, properties, and fields.
+> [!NOTE]
+> Parent hierarchies, enums, and constant fields still need explicit registration. However, this may change in the future.
 
-**Beef Code:**
 ```cs
-let lua = scope Lua(true);
-LuaTinker tinker = scope .(lua);
-
-// Expose System.Console and String
 tinker.AutoTinkClass<System.Console>();
-tinker.AutoTinkClass<System.String>();
+tinker.AutoTinkClass<System.String, const "StringBuilder">();
 ```
 
-**Lua Script:**
 ```lua
--- Create an instance of the bound class
-str = String()
-
--- Call instance methods
-str:Append("Hello, ")
-str:Append("Lua!")
-
--- Call a static method
-System.Console.WriteLine(str) -- Outputs: Hello, Lua!
+local text = StringBuilder()
+text:Append("Hello, ")
+text:Append("LuaTinker", 0, 3) -- Uses the offset and length overload.
+text:AppendF(" from {}!", "Beef")
+System.Console.WriteLine(text) -- Hello, Lua from Beef!
 ```
 
-### 2. Manual Binding
+### Manual Binding
 
-For full control, you can bind classes and their members individually.
+`AddClass` registers a type, and you choose which members to expose. For `Vector2`, the bindings below give Lua a constructor, access to the coordinates, and a method to calculate the squared length.
 
-**Beef Code:**
 ```cs
 public struct Vector2
 {
     public float x, y;
-    public this(float x, float y) { this.x = x; this.y = y; }
-    public float GetMagnitude() => x * x + y * y;
+
+    public this(float x, float y)
+    {
+        this.x = x;
+        this.y = y;
+    }
+
+    public float LengthSquared() => x * x + y * y;
 }
 
-// ...
-
-let lua = scope Lua(true);
-LuaTinker tinker = scope .(lua);
-
-// Register the class itself
+// Register the type, its constructor, fields, and a method.
 tinker.AddClass<Vector2>();
-// Register a constructor: new(float, float)
 tinker.AddClassCtor<Vector2, (float, float)>();
-// Register a field
-tinker.AddClassVar<Vector2, const "x">();
+tinker.AddClassVar<Vector2, const "x">(); // The field itself is registered, not just its current value.
 tinker.AddClassVar<Vector2, const "y">();
-// Register a method
-tinker.AddClassMethod<Vector2, function float(Vector2 this)>("GetMagnitude", => Vector2.GetMagnitude);
+tinker.AddClassMethod<Vector2, function float(Vector2 this)>(
+    "LengthSquared", => Vector2.LengthSquared);
 ```
 
-**Lua Script:**
 ```lua
--- Create an instance using the bound constructor
-vec = Vector2(3, 4)
-
--- Access and modify member variables
-print(vec.x) -- outputs: 3
+local vec = Vector2(3, 4)
+print(vec.x) -- 3
 vec.y = 5
-
--- Call a bound method
-print(vec:GetMagnitude()) -- outputs: 34 (3*3 + 5*5)
+print(vec:LengthSquared()) -- 34
 ```
 
-### 3. Calling Lua Functions from Beef
+### Function Calls
 
-You can execute global Lua functions directly from your Beef code and retrieve the results.
+`AddMethod` exposes the Beef addition function as Lua's `Add`. The script uses it to define `AddThenDouble`, which Beef then calls through `Call`. LuaTinker converts the arguments and results between Lua numbers and the `int32` type.
 
-**Lua Script:**
-```lua
-var = 20
-
-function TestRetPlus(a, b)
-    return var + a + b
-end
-```
-
-**Beef Code:**
 ```cs
-let result = tinker.Call<int, ?>("TestRetPlus", (13, (char32)22));
-if (result case .Ok(let val))
+tinker.AddMethod<function int32(int32, int32)>(
+    "Add", (left, right) => left + right);
+
+if (tinker.Eval("""
+    function AddThenDouble(a, b)
+        return Add(a, b) * 2
+    end
+
+    print(Add(2, 3)) -- Lua calls Beef: 5.
+    """) case .Err(let error))
 {
-    // val will be 55 (20 + 13 + 22)
-    Test.Assert(val == 55);
+    Console.WriteLine(error);
+    return;
 }
+
+// Beef calls Lua, which calls Beef again.
+if (tinker.Call<int32, ?>("AddThenDouble", (4, 6)) case .Ok(let result))
+    Console.WriteLine(result); // 20
 ```
 
-### 4. Accessing Lua Global Variables
+Lua can return several values from one call. A Beef tuple receives them together, with a type for each result:
 
-Get and set global variables in the Lua state from Beef.
-
-**Beef Code:**
 ```cs
-let lua = scope Lua(true);
-LuaTinker tinker = scope .(lua);
+let pair = tinker.Eval<(int, bool)>("return 7, true").Get();
+Console.WriteLine(pair.0); // 7
+Console.WriteLine(pair.1); // True
+```
 
-// Set global variables in Lua from Beef
-tinker.SetValue("my_name", "LuaTinker-Beef");
-tinker.SetValue("version", 1.0);
+### Inheritance
 
-// Run Lua code that uses them
-lua.DoString("print(my_name .. ' v' .. version)");
+Once `MyBase` and `MyTest` are registered, `AddClassParent` connects them in Lua. A `MyTest` instance can then access the inherited field `a` alongside its own field `b`.
 
-// Get a global variable from Lua
-if (tinker.GetValue<StringView>("my_name") case .Ok(let name))
+```cs
+class MyBase
 {
-    Test.Assert(name == "LuaTinker-Beef");
+    public int a = 15;
 }
-```
 
-### 5. Binding Inheritance
+class MyTest : MyBase
+{
+    public int b = 14;
+}
 
-Expose class or struct inheritance hierarchies to Lua.
-
-**Beef Code:**
-```cs
-class MyBase { public int a = 15; }
-class MyTest : MyBase { public int b = 14; }
-
-// ...
-
+// Register both types and link the child to its parent.
 tinker.AddClass<MyBase>();
 tinker.AddClassVar<MyBase, const "a">();
 
 tinker.AddClass<MyTest>();
 tinker.AddClassCtor<MyTest>();
-tinker.AddClassParent<MyTest, MyBase>(); // Link child to parent
+tinker.AddClassParent<MyTest, MyBase>();
 tinker.AddClassVar<MyTest, const "b">();
 ```
 
-**Lua Script:**
 ```lua
-test = MyTest()
-print(test.a) -- outputs: 15 (from MyBase)
-print(test.b) -- outputs: 14 (from MyTest)
+local test = MyTest()
+print(test.a) -- 15, inherited from MyBase.
+print(test.b) -- 14
 ```
 
-### 6. Binding Indexers (for `List` and `Dictionary`)
+### Indexers
 
-Expose collection indexers, allowing `[]` access in Lua.
+`AddClassIndexer` lets Lua read and write a Beef collection through `[]`. For this `System.Collections.List<float>`, `list[0]` reads the first element and assigning `list[1]` changes the original list's second element.
 
-**Beef Code:**
 ```cs
-List<float> testList = scope .() { 1.0f, 2.0f, 3.0f };
-tinker.AddMethod<delegate List<float>()>("GetList", new () => testList);
+List<float> values = scope .() { 1.0f, 2.0f, 3.0f };
+tinker.AddMethod<delegate List<float>()>("GetList", new () => values);
 
 tinker.AddClass<List<float>>("FloatList");
 tinker.AddClassIndexer<List<float>, int>();
 ```
 
-**Lua Script:**
 ```lua
-list = GetList()
-print(list[0]) -- outputs: 1.0
-list[1] = 99.0 -- Modify the value in the Beef list
-print(list[1]) -- outputs: 99.0
+local list = GetList()
+print(list[0]) -- 1.0
+list[1] = 99.0
+print(list[1]) -- 99.0
 ```
 
-### 7. Working with Lua Tables
+### Boxed Values
 
-You can get a Lua table as a `LuaTable` object in Beef to inspect or modify its contents.
+A value type can cross into Lua while boxed in an `Object`. The same Beef function can receive an existing box or a value constructed in Lua, then unbox it to calculate the vector's squared length.
 
-**Lua Script:**
-```lua
-player_data = {
-    name = "Player One",
-    score = 12345,
-    is_active = true
-}
-```
-
-**Beef Code:**
 ```cs
-if (tinker.GetTable!("player_data") case .Ok(var table))
-{
-    // Read values from the table
-    Test.Assert(table.GetValue<StringView>("name").Get() == "Player One");
-    Test.Assert(table.GetValue<int>("score").Get() == 12345);
+tinker.AddClass<Vector2>();
+tinker.AddClassCtor<Vector2, (float, float)>();
 
-    // Write a new value to the table
-    table.SetValue("score", 99999);
+Object boxedVector = scope box Vector2(3, 4);
+tinker.SetValue("vector", boxedVector);
+
+tinker.AddMethod<function float(Object)>(
+    "LengthSquared", (value) => ((Vector2)value).LengthSquared());
+
+tinker.Eval("""
+    print(LengthSquared(vector)) -- 25
+    print(LengthSquared(Vector2(5, 12))) -- 169
+    """).Get();
+```
+
+### Span Conversion
+
+Lua sequences can be passed to Beef functions taking `Span<T>`. The script below supplies three scores, which LuaTinker copies into a span for `Sum` to add together.
+
+```cs
+tinker.AddMethod<function int32(Span<int32>)>("Sum", (values) =>
+{
+    int32 total = 0;
+    for (let value in values)
+        total += value;
+    return total;
+});
+
+tinker.Eval("""
+    scores = {10, 20, 30}
+    print(Sum(scores)) -- 60
+    """).Get();
+```
+
+To work with the same sequence directly in Beef, use `GetSpan!`. Its copied storage lasts for the calling scope:
+
+```cs
+if (tinker.GetSpan!<int32>("scores") case .Ok(let scores))
+{
+    for (let score in scores)
+        Console.WriteLine(score); // 10, then 20, then 30.
 }
+```
+
+### Lua Callbacks as Beef Delegates
+
+`RegisterDelegate` lets a Lua function fill a Beef delegate parameter for the duration of the call. Here, `Apply` calls the supplied Lua function with `21` and returns its result.
+
+```cs
+tinker.RegisterDelegate<delegate int32(int32)>();
+tinker.AddMethod<function int32(delegate int32(int32), int32)>(
+    "Apply", (callback, value) => callback(value));
+
+tinker.Eval("""
+    print(Apply(function(value)
+        return value * 2
+    end, 21)) -- 42
+    """).Get();
+```
+
+### Numeric and Enum Arguments
+
+Numeric casts let Lua choose the Beef parameter type when numeric and enum overloads compete. Here, `int32.cast(2)` selects the multiplier overload, while the typed `Difficulty` constants and casts select the difficulty overload.
+
+```cs
+public enum Difficulty
+{
+    Normal = 1,
+    Hard = 2
+}
+
+public static class Rewards
+{
+    public static int32 Bonus(int64 dummy) => 0;
+    public static int32 Bonus(int32 multiplier) => 10 * multiplier;
+    public static int32 Bonus(Difficulty difficulty) =>
+        difficulty == .Hard ? 50 : 10;
+}
+
+tinker.AddEnum<Difficulty>("Difficulty", true); // Register typed enum constants.
+tinker.AddNamespace("Rewards");
+tinker.AddNamespaceMethod<Rewards, const "Bonus">("Rewards");
+```
+
+```lua
+print(Rewards.Bonus(int32.cast(2))) -- 20
+print(Rewards.Bonus(Difficulty.Hard)) -- 50
+print(Rewards.Bonus(Difficulty.cast(1))) -- 10
 ```
 
 ## Contributing
 
-Contributions are highly encouraged! Feel free to open an issue to report a bug or suggest a feature, or submit a pull request with your improvements.
+Contributions are welcome! Feel free to open an issue to report a bug or suggest a feature, or submit a pull request with your improvements.
 
 ## License
 

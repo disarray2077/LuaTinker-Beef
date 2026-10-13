@@ -30,7 +30,6 @@ namespace LuaTinker.Tests
 			}
 		}
 
-		[Reflect(.All)]
 		public class VariadicConstruction
 		{
 			public int Value;

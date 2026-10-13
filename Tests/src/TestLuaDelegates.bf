@@ -8,7 +8,6 @@ namespace LuaTinker.Tests;
 
 class TestLuaDelegates
 {
-	[Reflect(.All)]
 	public static class Target
 	{
 		public static int32 Apply(delegate int32(int32) callback, int32 value) => callback(value);

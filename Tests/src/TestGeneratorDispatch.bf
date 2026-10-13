@@ -5,7 +5,6 @@ namespace LuaTinker.Tests
 {
 	class TestGeneratorDispatch
 	{
-		[Reflect(.All)]
 		class Target
 		{
 			public int Value = 10;
