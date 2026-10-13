@@ -17,7 +17,7 @@ static class Program
         // The browser starts individual Lua sessions through PlaygroundStart.
         return 0;
 #else
-        const String defaultScript = "Playground/sdl_render.lua";
+        const String defaultScript = "Playground/dist/sdl_render.lua";
         String scriptPath = scope .();
         Path.GetFullPath(args.Count > 0 ? args[0] : defaultScript, scriptPath);
 
