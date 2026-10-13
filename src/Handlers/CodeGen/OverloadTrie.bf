@@ -59,6 +59,16 @@ namespace LuaTinker.Handlers
 
 		internal struct OverloadCandidate : this(MethodInfo Method, int ParameterStart, int ParameterCount, bool IsShortened = false);
 
+		private static bool RequiresMatchTracking(Trie<MatchKey> node)
+		{
+			if (node.OrderedChildren.Count > 1)
+				return true;
+			for (let child in node.OrderedChildren)
+				if (RequiresMatchTracking(child))
+					return true;
+			return false;
+		}
+
 		private static Trie<MatchKey> FindVariadicChild(Trie<MatchKey> node)
 		{
 			for (let child in node.OrderedChildren)

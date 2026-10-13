@@ -16,6 +16,8 @@ namespace LuaTinker.Tests
 			public static int CatchAll(int32 value) => 4;
 			public static int Specific(String value) => 5;
 			public static int Specific(Object value) => 6;
+			public static int Fallback(String first, bool second, int32 third) => 1;
+			public static int Fallback(Object first, String second, bool third) => 2;
 			public static int Nullable(String value) => 7;
 			public static int Nullable(Target value) => 8;
 			public static int SingleMethod(uint32 value, bool enabled) => (int)value;
@@ -53,6 +55,7 @@ namespace LuaTinker.Tests
 			tinker.AddNamespaceMethod<Target, const "FloatingFirst">("Target");
 			tinker.AddNamespaceMethod<Target, const "CatchAll">("Target");
 			tinker.AddNamespaceMethod<Target, const "Specific">("Target");
+			tinker.AddNamespaceMethod<Target, const "Fallback">("Target");
 			tinker.AddNamespaceMethod<Target, const "Nullable">("Target");
 			tinker.AddNamespaceMethod<Target, const "Zero">("Target");
 			tinker.AddNamespaceMethod<Target, const "Tuple">("Target");
@@ -66,6 +69,8 @@ namespace LuaTinker.Tests
 				assert(Target.CatchAll(3) == 4)
 				assert(Target.Specific('text') == 5)
 				assert(Target.Specific(false) == 6)
+				assert(Target.Fallback('text', true, 7) == 1)
+				assert(Target.Fallback('text', 'other', true) == 2)
 				assert(Target.Nullable(nil) == 7)
 				local target = Target()
 				assert(Target.Nullable(target) == 8)
@@ -95,6 +100,7 @@ namespace LuaTinker.Tests
 			tinker.AddNamespaceMethod<Target, const "SingleMethod">("Target");
 			tinker.AddNamespaceMethod<Target, const "Zero">("Target");
 			tinker.AddNamespaceMethod<Target, const "Nullable">("Target");
+			tinker.AddNamespaceMethod<Target, const "Fallback">("Target");
 			tinker.AddClassMethod<Target, const "SingleInstance">();
 			if (lua.DoString("""
 				assert(Target.SingleMethod(7, true) == 7)
@@ -105,6 +111,8 @@ namespace LuaTinker.Tests
 				ok, err = pcall(function() Target.SingleMethod(7) end)
 				assert(not ok and err:find("expected '2' arguments but got '1'", 1, true), tostring(err))
 				assert(not pcall(function() Target.SingleMethod(7, true, false) end))
+				ok, err = pcall(function() Target.Fallback('text', true, false) end)
+				assert(not ok and err:find("expected 'int32' at argument 3 but got 'boolean'", 1, true), tostring(err))
 				local target = Target()
 				assert(target:SingleInstance(2) == 12)
 				ok, err = pcall(function() target:SingleInstance(false) end)
