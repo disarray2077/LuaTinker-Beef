@@ -16,30 +16,11 @@ namespace LuaTinker.StackHelpers
 	{
 		private static uint8 sFunctionPointerMetatableKey;
 
+		[Inline]
 		public new static void Push(Lua lua, T value)
 		{
 			Type2User.Create(lua, value);
-			if (lua.RawGetByHashCode(LuaRegistry.Index, &sFunctionPointerMetatableKey) != .Table)
-			{
-				lua.Pop(1);
-				lua.CreateTable(0, 5);
-				UserdataMetatables.Mark(lua, -1, .Pointer);
-				lua.PushString("__gc");
-				lua.PushCClosure(=> PointerDestructorHandler, 0);
-				lua.RawSet(-3);
-				lua.PushString("__tostring");
-				lua.PushCClosure(=> PointerToStringHandler, 0);
-				lua.RawSet(-3);
-				lua.PushString("__call");
-				lua.PushCClosure(=> FunctionPointerCallHandler<T>, 0);
-				lua.RawSet(-3);
-				lua.PushString("__index");
-				lua.PushCClosure(=> FunctionPointerIndexGetHandler<T>, 0);
-				lua.RawSet(-3);
-				lua.PushValue(-1);
-				lua.RawSetByHashCode(LuaRegistry.Index, &sFunctionPointerMetatableKey);
-			}
-			lua.SetMetaTable(-2);
+			StackHelper.SetFunctionPointer(lua, &sFunctionPointerMetatableKey, => FunctionPointerCallHandler<T>);
 		}
 
 		public new static T Pop(Lua lua, int32 index)

@@ -10,7 +10,7 @@ using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker.StackHelpers
 {
-	internal struct NumericDispatch<T> where T : var, struct, INumeric
+	internal static struct NumericDispatch<T> where T : var, struct, INumeric
 	{
 		[Inline]
 		public static void Push(Lua lua, T value) => lua.PushInteger((int64)value);

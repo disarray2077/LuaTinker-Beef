@@ -11,7 +11,7 @@ namespace LuaTinker.Handlers
 {
 	static
 	{
-		public static int32 FunctionPointerIndexGetHandler<F>(lua_State L) where F : var, struct
+		public static int32 FunctionPointerIndexGetHandler(lua_State L)
 		{
 			let lua = Lua.FromIntPtr(L);
 			if (lua.Type(2) != .String || lua.ToStringView(2) != "IsNull")
@@ -19,14 +19,13 @@ namespace LuaTinker.Handlers
 				lua.PushNil();
 				return 1;
 			}
-			let wrapper = User2Type.TryGetTypePtr<ValueTypeWrapper<F>>(lua, 1);
+			let wrapper = User2Type.TryGetTypePtr<PointerWrapperBase>(lua, 1);
 			if (wrapper == null)
 			{
 				lua.TinkerState.SetLastError("can't get function pointer property. (not a LuaTinker object.)");
 				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
-#unwarn
-			lua.PushBoolean(*wrapper.ValuePointer == null);
+			lua.PushBoolean(*(void**)wrapper.Ptr == null);
 			return 1;
 		}
 

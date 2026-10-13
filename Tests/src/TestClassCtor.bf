@@ -20,6 +20,7 @@ namespace LuaTinker.Tests
 
 			if (lua.DoString(
 				@"""
+				assert(tostring(StringBuilder) == "<constructor for System.String>")
 				str = StringBuilder("Hello ")
 				str:AppendF("'{}'", "LuaTinker")
 				assert(str:str() == "Hello 'LuaTinker'")
@@ -49,6 +50,7 @@ namespace LuaTinker.Tests
 			tinker.AddClassCtor<VariadicConstruction>();
 			tinker.AddClassVar<VariadicConstruction, const "Value">();
 			if (lua.DoString("""
+				assert(tostring(VariadicConstruction) == "<constructor for LuaTinker.Tests.TestClassCtor.VariadicConstruction>")
 				assert(VariadicConstruction().Value == 0)
 				assert(VariadicConstruction(1, 2, 3).Value == 6)
 				assert(not pcall(function() VariadicConstruction(1, 'bad') end))

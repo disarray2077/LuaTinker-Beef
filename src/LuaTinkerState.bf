@@ -110,19 +110,28 @@ namespace LuaTinker
 			return mLastError;
 		}
 
-		public bool IsClassRegistered<T>()
+		[Inline]
+		public bool IsClassRegistered<T>() => IsClassRegistered(typeof(T));
+
+		public bool IsClassRegistered(Type type)
 		{
-			return mClasses.ContainsKey(typeof(T).TypeId);
+			return mClasses.ContainsKey(type.TypeId);
 		}
 
-		public StringView GetClassName<T>()
+		[Inline]
+		public StringView GetClassName<T>() => GetClassName(typeof(T));
+
+		public StringView GetClassName(Type type)
 		{
-			if (mClasses.TryGetValue(typeof(T).TypeId, let registration))
+			if (mClasses.TryGetValue(type.TypeId, let registration))
 				return .(registration.Name);
 			Runtime.FatalError("GetClassName() failed");
 		}
 
-		internal bool TryRegisterClass<T>(StringView name)
+		[Inline]
+		internal bool TryRegisterClass<T>(StringView name) => TryRegisterClass(name, typeof(T));
+
+		internal bool TryRegisterClass(StringView name, Type type)
 		{
 			for (let registration in mClasses.Values)
 			{
@@ -132,18 +141,21 @@ namespace LuaTinker
 					return false;
 				}
 			}
-			if (IsClassRegistered<T>())
+			if (IsClassRegistered(type))
 			{
 				SetLastError($"can't register class '{name}' (type already registered.)");
 				return false;
 			}
-			mClasses.Add(typeof(T).TypeId, new ClassRegistration(name));
+			mClasses.Add(type.TypeId, new ClassRegistration(name));
 			return true;
 		}
+		
+		[Inline]
+		internal void StoreClassMetatable<T>(Lua lua) => StoreClassMetatable(lua, typeof(T));
 
-		internal void StoreClassMetatable<T>(Lua lua)
+		internal void StoreClassMetatable(Lua lua, Type type)
 		{
-			let registration = mClasses[typeof(T).TypeId];
+			let registration = mClasses[type.TypeId];
 			lua.PushValue(-1);
 			lua.RawSetByHashCode(LuaRegistry.Index, Internal.UnsafeCastToPtr(registration));
 		}
@@ -160,8 +172,5 @@ namespace LuaTinker
 			}
 			return lua.RawGetByHashCode(LuaRegistry.Index, Internal.UnsafeCastToPtr(registration));
 		}
-
-		[Inline]
-		internal bool IsClassRegistered(Type type) => mClasses.ContainsKey(type.TypeId);
 	}
 }

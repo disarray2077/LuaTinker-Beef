@@ -35,7 +35,7 @@ namespace LuaTinker
 			mVariableUserdataAllocator = .(lua, .Variable);
 			mIndexerUserdataAllocator = .(lua, .Indexer);
 
-			mTinkerState = lua.TinkerState;
+			mTinkerState = lua.GetOrCreateTinkerState();
 			AddCStringConversion();
 			StackHelper.RegisterArgumentHintMetatable(mLua);
 			AddNumericCast<int32>("int32");
@@ -273,7 +273,8 @@ namespace LuaTinker
 				mLua.PushCClosure(=> DynamicCreatorHandler<T>, 0);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> ConstructorToStringHandler<T>, 0);
+				mLua.PushString(scope $"<constructor for {typeof(T)}>");
+				mLua.PushCClosure(=> ConstructorToStringHandler, 1);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -293,7 +294,8 @@ namespace LuaTinker
 				mLua.PushCClosure(=> CreatorLayer<T, Args>, 0);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> ConstructorToStringHandler<T>, 0);
+				mLua.PushString(scope $"<constructor for {typeof(T)}>");
+				mLua.PushCClosure(=> ConstructorToStringHandler, 1);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}

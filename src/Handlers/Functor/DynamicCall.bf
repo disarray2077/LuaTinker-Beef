@@ -30,6 +30,9 @@ namespace LuaTinker.Handlers
 
 			for (let method in type.GetMethods(.Public))
 			{
+				if (method.Name != Name || method.IsStatic != IsStatic)
+					continue;
+
 				if (method.IsConstructor || method.IsDestructor || method.Name.Contains("$") || method.IsMixin || !method.IsPublic)
 					continue;
 
@@ -58,11 +61,10 @@ namespace LuaTinker.Handlers
 					method.Name.StartsWith("set__"))
 					continue;
 
-				if (IsStatic != method.IsStatic)
+				if (!CanAutoTinkMethod(method))
 					continue;
 
-				if (method.Name == Name && CanAutoTinkMethod(method))
-					methods.Add(method);
+				methods.Add(method);
 			}
 		}
 		

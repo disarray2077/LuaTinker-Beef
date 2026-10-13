@@ -31,7 +31,6 @@ namespace LuaTinker
 			mKind = kind;
 		}
 
-		[Inline]
 		public void* AllocTyped(Type type, int size, int align)
 		{
 #if BF_ENABLE_OBJECT_DEBUG_FLAGS
@@ -48,7 +47,6 @@ namespace LuaTinker
 			return Alloc(size, align);
 		}
 
-		[Inline]
 		public void* Alloc(int size, int align)
 		{
 			Debug.Assert(size >= 0 && align > 0 && size <= int32.MaxValue - sizeof(Header) - align);

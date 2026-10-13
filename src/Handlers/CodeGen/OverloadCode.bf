@@ -214,7 +214,9 @@ namespace LuaTinker.Handlers
 						condition.Insert(0, scope $"(lua.Type({stackIndex}) == .Table && !StackHelper.IsArgumentHint(lua, {stackIndex})) || ");
 				}
 
+#if LUATINKER_CODEGEN_COMMENTS
 				writer.Line(scope $"// {type.GetFullName(.. scope .())} (Flags: {flags})");
+#endif
 				delegate void(CodeWriter) emitBody = scope (body) =>
 				{
 					if (selection != .Committed)
@@ -398,6 +400,7 @@ namespace LuaTinker.Handlers
 		internal static void EmitSelectedOverload<T>(OverloadCandidate candidate, List<LuaParameter> parameters, CodeWriter writer, bool isConstructor)
 		{
 			let method = candidate.Method;
+#if LUATINKER_CODEGEN_COMMENTS
 			writer.Line(scope $"""
 				// {method}
 				// [{typeof(T).TypeId}] {typeof(T)}
@@ -405,6 +408,7 @@ namespace LuaTinker.Handlers
 				""");
 			for (int i < method.ParamCount)
 				writer.Line(scope $"// [{method.GetParamType(i).TypeId}] {method.GetParamType(i)} (Flags: {method.GetParamFlags(i)})");
+#endif
 
 			if (isConstructor)
 				EmitConstruction<T>(parameters.GetRange(candidate.ParameterStart, candidate.ParameterCount), writer);

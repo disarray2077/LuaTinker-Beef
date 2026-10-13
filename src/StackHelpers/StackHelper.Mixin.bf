@@ -9,7 +9,7 @@ namespace LuaTinker.StackHelpers
 {
 	// PopDispatch works around a limitation in Beef: conditional generic constraints work reliably for types, but not individual methods.
 	// Placing Run on a generic type lets us use a conditional type extension to replace its implementation.
-	internal struct PopDispatch<T> where T : var
+	internal static struct PopDispatch<T> where T : var
 	{
 		public static mixin Pop(Lua lua, int32 index)
 		{

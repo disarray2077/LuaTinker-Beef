@@ -18,10 +18,18 @@ namespace KeraLua
 				let main = MainThread;
 				if (main != this)
 					return main.TinkerState;
-				if (mTinkerState == null)
-					mTinkerState = new .();
 				return mTinkerState;
 			}
+		}
+
+		internal LuaTinkerState GetOrCreateTinkerState()
+		{
+			let main = MainThread;
+			if (main != this)
+				return main.TinkerState;
+			if (mTinkerState == null)
+				mTinkerState = new .();
+			return mTinkerState;
 		}
 
 		private static int __counter = 0;

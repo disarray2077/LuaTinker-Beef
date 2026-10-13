@@ -40,7 +40,11 @@ namespace LuaTinker.Handlers
 		{
 			Debug.Assert(parameter.VariadicElementType != null);
 			let element = parameter.VariadicElementType;
+#if LUATINKER_CODEGEN_COMMENTS
 			let declarationCode = scope $"comptype({element.GetTypeId()})/*{element}*/";
+#else
+			let declarationCode = scope $"comptype({element.GetTypeId()})";
+#endif
 
 			if (construction)
 				writer.Line(scope $"let extraArgsCount = argumentCount >= {parameter.LuaStackIndex} ? argumentCount - {parameter.LuaStackIndex} + 1 : 0;");
@@ -89,10 +93,14 @@ namespace LuaTinker.Handlers
 				let invocation = scope String();
 				if (returnType != typeof(void))
 				{
+#if LUATINKER_CODEGEN_COMMENTS
 					if (annotateTypes)
 						invocation.AppendF($"var/*{returnType}*/ ret = ");
 					else
 						invocation.Append("var ret = ");
+#else
+					invocation.Append("var ret = ");
+#endif
 				}
 
 				bool returnsRef = false;

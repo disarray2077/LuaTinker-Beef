@@ -244,18 +244,22 @@ namespace LuaTinker.StackHelpers
 		    }
 		}
 
+		[Inline]
 		internal static void GetBestLuaClassName<T>(LuaTinkerState tinkerState, String outString)
+			=> GetBestLuaClassName(tinkerState, typeof(T), outString);
+
+		internal static void GetBestLuaClassName(LuaTinkerState tinkerState, Type type, String outString)
 		{
-			if (tinkerState.IsClassRegistered<T>())
+			if (tinkerState.IsClassRegistered(type))
 			{
-				outString.Append(tinkerState.GetClassName<T>());
+				outString.Append(tinkerState.GetClassName(type));
 				outString.Append(" (");
-				typeof(T).GetFullName(outString);
+				type.GetFullName(outString);
 				outString.Append(")");
 			}
 			else
 			{
-				typeof(T).GetFullName(outString);
+				type.GetFullName(outString);
 			}
 		}
 
@@ -312,15 +316,19 @@ namespace LuaTinker.StackHelpers
 			return result;
 		}
 
+		[Inline]
 		public static EVMTResult EnsureValidMetaTable<T>(Lua lua, int32 index)
+			=> EnsureValidMetaTable(lua, index, typeof(T));
+
+		internal static EVMTResult EnsureValidMetaTable(Lua lua, int32 index, Type expectedType)
 		{
-			let result = ValidateClassMetatable(lua, index, typeof(T));
+			let result = ValidateClassMetatable(lua, index, expectedType);
 			if (result == .Error)
 			{
 				let tinkerState = lua.TinkerState;
 				{
 					// Dispose temporary strings before raising a Lua error.
-					tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<T>(tinkerState, .. scope .())}'");
+					tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName(tinkerState, expectedType, .. scope .())}'");
 				}
 				TryThrowError(lua, tinkerState);
 			}
