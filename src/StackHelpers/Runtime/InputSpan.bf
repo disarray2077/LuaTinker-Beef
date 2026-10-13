@@ -55,7 +55,7 @@ namespace LuaTinker.StackHelpers
 		public static Result<int32, InputSpanFailure> CheckInputSpan<T>(Lua lua, int32 index, LuaType? knownType = null) where T : var
 			=> CheckInputSpan(lua, index, typeof(T), knownType);
 
-		public static Result<int32, InputSpanFailure> CheckInputSpan(Lua lua, int32 index, Type elementType, LuaType? knownType = null, bool checkElements = false)
+		private static Result<int32, InputSpanFailure> CheckInputSpanSequence(Lua lua, int32 index, LuaType? knownType = null)
 		{
 			let originalTop = lua.GetTop();
 			defer lua.SetTop(originalTop);
@@ -96,7 +96,23 @@ namespace LuaTinker.StackHelpers
 						return .Err(.MissingElement((int32)sequenceIndex));
 				}
 			}
-			for (int32 sequenceIndex = 1; sequenceIndex <= (int32)keyCount; sequenceIndex++)
+			return .Ok((int32)keyCount);
+		}
+
+		public static Result<int32, InputSpanFailure> CheckInputSpan(Lua lua, int32 index, Type elementType, LuaType? knownType = null, bool checkElements = false)
+		{
+			let originalTop = lua.GetTop();
+			defer lua.SetTop(originalTop);
+			let tableIndex = lua.AbsIndex(index);
+			int32 count;
+			switch (CheckInputSpanSequence(lua, tableIndex, knownType))
+			{
+			case .Ok(let sequenceCount):
+				count = sequenceCount;
+			case .Err(let failure):
+				return .Err(failure);
+			}
+			for (int32 sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++)
 			{
 				let actualType = lua.RawGetInteger(tableIndex, sequenceIndex);
 				if (IsArgumentHint(lua, -1, actualType))
@@ -106,7 +122,7 @@ namespace LuaTinker.StackHelpers
 					return .Err(.InvalidElement(sequenceIndex, elementType, lua.TypeName(actualType)));
 				lua.Pop(1);
 			}
-			return .Ok((int32)keyCount);
+			return .Ok(count);
 		}
 
 		public static bool IsPlainIntegerInputSpan(Lua lua, int32 index, int32 count)

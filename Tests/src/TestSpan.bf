@@ -218,15 +218,19 @@ namespace LuaTinker.Tests
 			tinker.AutoTinkClass<SpanOverloads>();
 			if (lua.DoString("""
 				local api = LuaTinker.Tests.TestSpan.SpanOverloads
-				assert(api.Select({"alpha"}) == 11)
-				assert(api.Select({4}) == 21)
-				assert(api.Numeric({1}) == 32)
-				assert(api.Numeric({2147483648}) == 132)
-				assert(api.PreferInt({1}) == 32)
-				assert(api.PreferInt({1.5}) == 132)
+				assert(api.Select({"alpha", "beta"}) == 12)
+				assert(api.Select({4, 1}) == 22)
+				assert(api.Numeric({1, 2}) == 32)
+				assert(api.Numeric({1, 2147483648}) == 132)
+				assert(api.PreferInt({1, 2}) == 32)
+				assert(api.PreferInt({1, 1.5}) == 132)
 				local ok, err = pcall(function() api.Select({}) end)
 				assert(not ok and err:find("ambiguous span overload at argument 1", 1, true), tostring(err))
 				assert(not pcall(function() api.OtherNumeric({1}) end))
+				assert(not pcall(function() api.PreferInt({1, 2.0}) end))
+				assert(not pcall(function() api.Select({[1]=1, [3]=3}) end))
+				assert(not pcall(function() api.Numeric({1, int32.cast(2)}) end))
+				assert(not pcall(function() api.Select({"text", 1}) end))
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}

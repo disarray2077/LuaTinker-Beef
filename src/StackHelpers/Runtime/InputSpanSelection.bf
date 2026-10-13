@@ -45,33 +45,64 @@ namespace LuaTinker.StackHelpers
 
 		public static int32 SelectInputSpan(Lua lua, int32 index, Span<Type> elementTypes, int32 argument)
 		{
-			int32 selected = -1;
+			let matchingTypes = scope bool[elementTypes.Length];
 			int32 matches = 0;
-			InputSpanFailure firstFailure = .None;
+			int32 int32Index = -1;
+			InputSpanFailure failure = .None;
 			for (let elementType in elementTypes)
 			{
 				if (!CanSelectInputSpanElement(elementType))
 				{
-					if (firstFailure case .None)
-						firstFailure = .UnsupportedOverloadElementType(elementType);
+					failure = .UnsupportedOverloadElementType(elementType);
 					continue;
 				}
-				int32 count;
-				switch (CheckInputSpan(lua, index, elementType, checkElements: true))
-				{
-				case .Ok(let sequenceCount):
-					count = sequenceCount;
-				case .Err(let failure):
-					if (firstFailure case .None)
-						firstFailure = failure;
-					continue;
-				}
-				// A nonempty plain-integer sequence prefers int32; empty tables have no preference.
-				if (elementType == typeof(int32) && IsPlainIntegerInputSpan(lua, index, count))
-					return (int32)@elementType.Index;
-				selected = (int32)@elementType.Index;
+				matchingTypes[@elementType.Index] = true;
+				if (elementType == typeof(int32) && int32Index < 0)
+					int32Index = (int32)@elementType.Index;
 				matches++;
 			}
+			if (matches == 0)
+			{
+				failure.SetError(lua.TinkerState);
+				TryThrowError(lua, lua.TinkerState);
+				return -1;
+			}
+			int32 count;
+			switch (CheckInputSpanSequence(lua, index))
+			{
+			case .Ok(let sequenceCount):
+				count = sequenceCount;
+			case .Err(let sequenceFailure):
+				sequenceFailure.SetError(lua.TinkerState);
+				TryThrowError(lua, lua.TinkerState);
+				return -1;
+			}
+			let tableIndex = lua.AbsIndex(index);
+			// A nonempty plain-integer sequence prefers int32; empty tables have no preference.
+			bool preferInt32 = count > 0 && int32Index >= 0;
+			for (int32 sequenceIndex = 1; sequenceIndex <= count && matches > 0; sequenceIndex++)
+			{
+				let actualType = lua.RawGetInteger(tableIndex, sequenceIndex);
+				let isHint = IsArgumentHint(lua, -1, actualType);
+				if (preferInt32 && !IsPlainIntegerArgument(lua, -1))
+					preferInt32 = false;
+				for (let elementType in elementTypes)
+				{
+					if (!matchingTypes[@elementType.Index])
+						continue;
+					if (isHint || (elementType == typeof(String) ? actualType != .String :
+						actualType != .Number || !IsNumericArgument(lua, -1, elementType)))
+					{
+						matchingTypes[@elementType.Index] = false;
+						matches--;
+						failure = isHint ? .ArgumentHintElement(sequenceIndex) :
+							.InvalidElement(sequenceIndex, elementType, lua.TypeName(actualType));
+					}
+				}
+				lua.Pop(1);
+			}
+			if (preferInt32 && matchingTypes[int32Index])
+				return int32Index;
 			if (matches > 1)
 			{
 				lua.TinkerState.SetLastError($"ambiguous span overload at argument {argument}");
@@ -79,10 +110,13 @@ namespace LuaTinker.StackHelpers
 			}
 			if (matches == 0)
 			{
-				firstFailure.SetError(lua.TinkerState);
+				failure.SetError(lua.TinkerState);
 				TryThrowError(lua, lua.TinkerState);
 			}
-			return selected;
+			for (let elementType in elementTypes)
+				if (matchingTypes[@elementType.Index])
+					return (int32)@elementType.Index;
+			return -1;
 		}
 	}
 }
