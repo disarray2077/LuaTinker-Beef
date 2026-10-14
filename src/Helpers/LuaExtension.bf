@@ -38,15 +38,18 @@ namespace KeraLua
         public new LuaStatus PCall(int32 arguments, int32 results, int32 errorFunctionIndex)
         {
 			let tinkerState = TinkerState;
-			let wasProtected = tinkerState.IsPCall;
-			tinkerState.ClearError();
-			tinkerState.IsPCall = true;
-			defer { tinkerState.IsPCall = wasProtected; }
-
-			// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
-			// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
-			if (__counter++ % 100 == 0)
-				defer:: { GarbageCollector(.Step, 0); }
+			let wasProtected = tinkerState?.IsPCall ?? false;
+			if (tinkerState != null)
+			{
+				tinkerState.ClearError();
+				tinkerState.IsPCall = true;
+				defer:: { tinkerState.IsPCall = wasProtected; }
+	
+				// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
+				// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
+				if (__counter++ % 100 == 0)
+					defer:: { GarbageCollector(.Step, 0); }
+			}
 
             return [NoExtension]PCall(arguments, results, errorFunctionIndex);
         }
@@ -59,15 +62,18 @@ namespace KeraLua
             LuaKFunction k)
         {
 			let tinkerState = TinkerState;
-			let wasProtected = tinkerState.IsPCall;
-			tinkerState.ClearError();
-			tinkerState.IsPCall = true;
-			defer { tinkerState.IsPCall = wasProtected; }
-
-			// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
-			// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
-			if (__counter++ % 100 == 0)
-				defer:: { GarbageCollector(.Step, 0); }
+			let wasProtected = tinkerState?.IsPCall ?? false;
+			if (tinkerState != null)
+			{
+				tinkerState.ClearError();
+				tinkerState.IsPCall = true;
+				defer:: { tinkerState.IsPCall = wasProtected; }
+	
+				// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
+				// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
+				if (__counter++ % 100 == 0)
+					defer:: { GarbageCollector(.Step, 0); }
+			}
 
             return [NoExtension]PCallK(arguments, results, errorFunctionIndex, context, k);
         }
@@ -76,15 +82,18 @@ namespace KeraLua
 		public new LuaStatus Resume(Lua from, int32 arguments, out int32 results)
 		{
 			let tinkerState = TinkerState;
-			let wasProtected = tinkerState.IsPCall;
-			tinkerState.ClearError();
-			tinkerState.IsPCall = true;
-			defer { tinkerState.IsPCall = wasProtected; }
-
-			// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
-			// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
-			if (__counter++ % 100 == 0)
-				defer:: { GarbageCollector(.Step, 0); }
+			let wasProtected = tinkerState?.IsPCall ?? false;
+			if (tinkerState != null)
+			{
+				tinkerState.ClearError();
+				tinkerState.IsPCall = true;
+				defer:: { tinkerState.IsPCall = wasProtected; }
+	
+				// TODO: Periodic GC steps work around observed memory growth; the cause is unresolved.
+				// Investigate Lua's accounting of Beef-owned wrapper memory before removing this workaround.
+				if (__counter++ % 100 == 0)
+					defer:: { GarbageCollector(.Step, 0); }
+			}
 
 			return [NoExtension]Resume(from, arguments, out results);
 		}

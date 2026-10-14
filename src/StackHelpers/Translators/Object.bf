@@ -39,7 +39,7 @@ extension StackHelper
 				return obj;
 			case .Error:
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"can't convert argument {index} to 'System.Object'");
+				luaTinker.SetLastError($"can't convert argument {index} to '{GetBestLuaClassName<Object>(luaTinker)}'");
 				TryThrowError(lua, luaTinker);
 				return default;
 			}
@@ -56,7 +56,7 @@ extension StackHelper
 				else
 				{
 					let luaTinker = lua.TinkerState;
-					luaTinker.SetLastError($"can't convert argument {index} to 'System.Object'");
+					luaTinker.SetLastError($"can't convert argument {index} to '{GetBestLuaClassName<Object>(luaTinker)}'");
 					TryThrowError(lua, luaTinker);
 					return default;
 				}
@@ -70,7 +70,7 @@ extension StackHelper
 				return null;
 			default:
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"can't convert argument {index} to 'System.Object'");
+				luaTinker.SetLastError($"can't convert argument {index} to '{GetBestLuaClassName<Object>(luaTinker)}'");
 				TryThrowError(lua, luaTinker);
 				return default;
 			}

@@ -140,8 +140,7 @@ namespace LuaTinker.Handlers
 		{
 			writer.If(scope $"!User2Type.IsObjectTypeCompatible(lua, 1, typeof(comptype({type.GetTypeId()}))) && StackHelper.EnsureValidMetaTable<comptype({type.GetTypeId()})>(lua, 1) == .OkUnregisteredType", scope (invalid) =>
 			{
-				let message = scope $"can't convert argument 0 to '{type}'";
-				invalid.Line(scope $"lua.TinkerState.SetLastError({message.Quote(.. scope .())});");
+				invalid.Line(scope $"lua.TinkerState.SetLastError($\"can't convert argument 0 to '{{StackHelper.GetBestLuaClassName<comptype({type.GetTypeId()})>(lua.TinkerState)}}'\");");
 				invalid.Line("StackHelper.ThrowError(lua, lua.TinkerState);");
 			});
 		}
@@ -281,8 +280,7 @@ namespace LuaTinker.Handlers
 								""");
 						else
 						{
-							let expectedType = scope $"'{type}'";
-							invalid.Line(scope $"overloadFailure.Record({context.DiagnosticIndex}, {stackIndex}, {expectedType.Quote(.. scope .())});");
+							invalid.Line(scope $"overloadFailure.Record({context.DiagnosticIndex}, {stackIndex}, typeof(comptype({type.GetTypeId()})));");
 							invalid.Line("overloadFailure.Throw(lua);");
 						}
 					});
@@ -381,20 +379,20 @@ namespace LuaTinker.Handlers
 				{
 					EmitInputSpanDispatch<T>(context, root.OrderedChildren, inputSpanTypes, body);
 				}).Else(emitOrdinaryBranches);
-			String expectedTypes = scope .();
 			List<Type> expected = scope .();
-			for (let child in root.OrderedChildren)
-			{
-				let type = child.Value.MatchType;
-				if (expected.Contains(type))
-					continue;
-				expected.Add(type);
-				if (!expectedTypes.IsEmpty)
-					expectedTypes.Append(" or ");
-				expectedTypes.AppendF($"'{type}'");
-			}
+			CollectExpectedTypes(root, expected);
+			String typeCodes = scope .();
+			for (let type in expected)
+				typeCodes.AppendF($", typeof(comptype({type.GetTypeId()}))");
 			writer.If(scope $"!matchedOverloadArguments[{context.PositionIndex}]",
-				scope $"overloadFailure.Record({argumentPosition}, {stackIndex}, {expectedTypes.Quote(.. scope .())});");
+				scope $"overloadFailure.Record({argumentPosition}, {stackIndex}{typeCodes});");
+		}
+
+		private static void CollectExpectedTypes(Trie<MatchKey> node, List<Type> expected)
+		{
+			for (let child in node.OrderedChildren)
+				if (!expected.Contains(child.Value.MatchType))
+					expected.Add(child.Value.MatchType);
 		}
 
 		internal static void EmitSelectedOverload<T>(OverloadCandidate candidate, List<LuaParameter> parameters, CodeWriter writer, bool isConstructor)
@@ -501,6 +499,16 @@ namespace LuaTinker.Handlers
 			return argumentCounts;
 		}
 
+		private static int GetMaxExpectedTypeCount(Trie<MatchKey> node)
+		{
+			List<Type> expected = scope .();
+			CollectExpectedTypes(node, expected);
+			int maximum = expected.Count;
+			for (let child in node.OrderedChildren)
+				maximum = Math.Max(maximum, GetMaxExpectedTypeCount(child));
+			return maximum;
+		}
+
 		internal static void EmitOverloads<T>(List<MethodInfo> methods, CodeWriter writer, DispatchKind dispatchKind)
 		{
 			bool isConstructor = dispatchKind == .Constructor;
@@ -554,7 +562,7 @@ namespace LuaTinker.Handlers
 				return;
 			}
 
-			writer.Line("OverloadFailure overloadFailure = .();");
+			writer.Line(scope $"OverloadFailure<const {GetMaxExpectedTypeCount(paramsTrie)}> overloadFailure = .();");
 			let requiresMatchTracking = RequiresMatchTracking(paramsTrie);
 			if (requiresMatchTracking)
 				writer.Line(scope $"bool[{positions.Count}] matchedOverloadArguments = .();");

@@ -4,8 +4,10 @@ using System.Collections;
 using System.Reflection;
 using KeraLua;
 using LuaTinker.Wrappers;
+using LuaTinker.StackHelpers;
 
 using internal KeraLua;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker
 {
@@ -55,7 +57,7 @@ namespace LuaTinker
 		{
 			if (mDelegates.TryGetValue(type.TypeId, let registration))
 				return registration.Factory(lua, index, allocator);
-			SetLastError($"can't convert argument {index} to '{type}' (delegate signature not registered.)");
+			SetLastError($"can't convert argument {index} to '{StackHelper.GetBestLuaClassName(this, type)}' (delegate signature not registered.)");
 			return null;
 		}
 

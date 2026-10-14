@@ -122,7 +122,7 @@ namespace LuaTinker.Tests
 				ok, err = pcall(function() Target.Zero(false) end)
 				assert(not ok and err:find("expected 'int32' at argument 1 but got 'boolean'", 1, true), tostring(err))
 				ok, err = pcall(function() Target.Nullable(false) end)
-				assert(not ok and err:find("expected 'System.String' or 'LuaTinker.Tests.TestGeneratorDispatch.Target' at argument 1", 1, true), tostring(err))
+				assert(not ok and err:find("expected 'System.String' or 'Target (LuaTinker.Tests.TestGeneratorDispatch.Target)' at argument 1", 1, true), tostring(err))
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}

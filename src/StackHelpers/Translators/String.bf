@@ -114,10 +114,7 @@ namespace LuaTinker.StackHelpers
 			{
 				// We want an unregistered class, the supplied value is also unregistered but it isn't a compatible wrapper.
 				let tinkerState = lua.TinkerState;
-				{
-					// Set error in a different scope to make sure the temporary strings destructors run before throwing the error.
-					tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<StringBuilder>(tinkerState, .. scope .())}'");
-				}
+				tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<StringBuilder>(tinkerState)}'");
 				TryThrowError(lua, tinkerState);
 				return default;
 			}

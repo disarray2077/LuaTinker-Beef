@@ -29,7 +29,7 @@ namespace LuaTinker.StackHelpers
 			if (!CanRepresentInteger(typeof(T), value))
 			{
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"number is out of range for the type '{typeof(T)}'");
+				luaTinker.SetLastError($"number is out of range for the type '{StackHelper.GetBestLuaClassName<T>(luaTinker)}'");
 				StackHelper.TryThrowError(lua, luaTinker);
 				return default;
 			}
@@ -88,7 +88,7 @@ namespace LuaTinker.StackHelpers
 			if (!CanRepresentFloating(typeof(T), numericValue))
 			{
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"number is out of range for the type '{typeof(T)}'");
+				luaTinker.SetLastError($"number is out of range for the type '{StackHelper.GetBestLuaClassName<T>(luaTinker)}'");
 				TryThrowError(lua, luaTinker);
 				return default;
 			}

@@ -238,7 +238,7 @@ namespace LuaTinker
 		{
 			if (mTinkerState.IsClassRegistered<T>())
 				return true;
-			mTinkerState.SetLastError($"can't bind class '{typeof(T)}' (class not registered.)");
+			mTinkerState.SetLastError($"can't bind class '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}' (class not registered.)");
 			Debug.Assert(false, mTinkerState.GetLastError());
 			StackHelper.TryThrowError(mLua, mTinkerState);
 			return false;
@@ -1008,7 +1008,7 @@ namespace LuaTinker
 
 			if (mLua.IsNil(-1) || !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}'");
 				return .Err(mTinkerState.GetLastError());
 			}
 
@@ -1028,7 +1028,7 @@ namespace LuaTinker
 
 			if (!mLua.IsNil(-1) && !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}'");
 				return .Err(mTinkerState.GetLastError());
 			}
 
@@ -1048,7 +1048,7 @@ namespace LuaTinker
 
 			if (!mLua.IsNil(-1) && !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}'");
 				return .Err(mTinkerState.GetLastError());
 			}
 
@@ -1075,7 +1075,8 @@ namespace LuaTinker
 
 			if (mLua.IsNil(-1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to 'System.String'");
+				// Allow this public mixin to use the internal helper in the caller's scope.
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.[Friend]GetBestLuaClassName<String>(mTinkerState)}'");
 				result = .Err(mTinkerState.GetLastError());
 			}
 			else

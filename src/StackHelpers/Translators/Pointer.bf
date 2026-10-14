@@ -26,10 +26,7 @@ namespace LuaTinker.StackHelpers
 					return pointerWrapper.Ptr;
 
 			let tinkerState = lua.TinkerState;
-			{
-				// Dispose the scoped class-name string before raising the Lua error.
-				tinkerState.SetLastError($"can't convert argument {index} to 'ptr {GetBestLuaClassName(tinkerState, expectedType, .. scope .())}'");
-			}
+			tinkerState.SetLastError($"can't convert argument {index} to 'ptr {GetBestLuaClassName(tinkerState, expectedType)}'");
 			TryThrowError(lua, tinkerState);
 			return default;
 		}

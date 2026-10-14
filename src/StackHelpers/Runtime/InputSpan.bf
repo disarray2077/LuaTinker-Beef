@@ -2,6 +2,7 @@ using System;
 using KeraLua;
 
 using internal KeraLua;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker.StackHelpers
 {
@@ -24,7 +25,7 @@ namespace LuaTinker.StackHelpers
 			switch (this)
 			{
 			case .UnsupportedOverloadElementType(let elementType):
-				state.SetLastError($"unsupported Span overload element type '{elementType}'");
+				state.SetLastError($"unsupported Span overload element type '{StackHelper.GetBestLuaClassName(state, elementType)}'");
 			case .ArgumentHint:
 				state.SetLastError("argument hint cannot bind to a fixed input Span");
 			case .NotTable(let actualTypeName):
@@ -42,7 +43,7 @@ namespace LuaTinker.StackHelpers
 			case .ArgumentHintElement(let sequenceIndex):
 				state.SetLastError($"argument hint is not a Span element (sequence index {sequenceIndex})");
 			case .InvalidElement(let sequenceIndex, let elementType, let actualTypeName):
-				state.SetLastError($"invalid Span element at sequence index {sequenceIndex}: expected '{elementType}' but got '{actualTypeName}'");
+				state.SetLastError($"invalid Span element at sequence index {sequenceIndex}: expected '{StackHelper.GetBestLuaClassName(state, elementType)}' but got '{actualTypeName}'");
 			case .None:
 				state.SetLastError("invalid input Span");
 			}

@@ -106,10 +106,7 @@ namespace LuaTinker.StackHelpers
 		private static void SetValueConversionError(Lua lua, int32 index, Type expectedType, bool isReference = false)
 		{
 			let state = lua.TinkerState;
-			{
-				// Dispose the temporary type-name string before raising a Lua error.
-				state.SetLastError($"can't convert argument {index} to '{isReference ? "ref " : ""}{GetBestLuaClassName(state, expectedType, .. scope .())}'");
-			}
+			state.SetLastError($"can't convert argument {index} to '{isReference ? "ref " : ""}{GetBestLuaClassName(state, expectedType)}'");
 			TryThrowError(lua, state);
 		}
 	}

@@ -26,7 +26,7 @@ namespace LuaTinker.Handlers
 				}
 				if (!valid || !CanRepresentFloating(typeof(T), floatingValue))
 				{
-					lua.TinkerState.SetLastError($"invalid floating-point cast to '{typeof(T)}'");
+					lua.TinkerState.SetLastError($"invalid floating-point cast to '{StackHelper.GetBestLuaClassName<T>(lua.TinkerState)}'");
 					StackHelper.ThrowError(lua, lua.TinkerState);
 				}
 				StackHelper.PushNumericArgumentHint(lua, typeof(T), floatingValue);
@@ -42,7 +42,7 @@ namespace LuaTinker.Handlers
 			}
 			if (!valid || !CanRepresentInteger(typeof(T), value))
 			{
-				lua.TinkerState.SetLastError($"invalid integer cast to '{typeof(T)}'");
+				lua.TinkerState.SetLastError($"invalid integer cast to '{StackHelper.GetBestLuaClassName<T>(lua.TinkerState)}'");
 				StackHelper.ThrowError(lua, lua.TinkerState);
 			}
 			StackHelper.PushNumericArgumentHint(lua, typeof(T), value);

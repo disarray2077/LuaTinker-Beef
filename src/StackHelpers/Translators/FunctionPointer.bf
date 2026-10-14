@@ -29,7 +29,7 @@ namespace LuaTinker.StackHelpers
 				return default;
 			if (let wrapper = User2Type.TryGetTypePtr<ValueTypeWrapper<T>>(lua, index))
 				return *wrapper.ValuePointer;
-			lua.TinkerState.SetLastError($"can't convert argument {index} to '{typeof(T)}'");
+			lua.TinkerState.SetLastError($"can't convert argument {index} to '{StackHelper.GetBestLuaClassName<T>(lua.TinkerState)}'");
 			StackHelper.TryThrowError(lua, lua.TinkerState);
 			return default;
 		}

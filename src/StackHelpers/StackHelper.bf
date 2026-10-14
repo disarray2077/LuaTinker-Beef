@@ -3,6 +3,7 @@ using KeraLua;
 using System.Diagnostics;
 using LuaTinker.Wrappers;
 
+using internal System;
 using internal KeraLua;
 using internal LuaTinker;
 using internal LuaTinker.StackHelpers;
@@ -244,12 +245,18 @@ namespace LuaTinker.StackHelpers
 		    }
 		}
 
+		private static LazyTLS<String> sClassNameBuffer = new .() ~ delete _;
+		
+		/// The returned view is valid until the next call on the same thread.
 		[Inline]
-		internal static void GetBestLuaClassName<T>(LuaTinkerState tinkerState, String outString)
-			=> GetBestLuaClassName(tinkerState, typeof(T), outString);
+		internal static StringView GetBestLuaClassName<T>(LuaTinkerState tinkerState)
+			=> GetBestLuaClassName(tinkerState, typeof(T));
 
-		internal static void GetBestLuaClassName(LuaTinkerState tinkerState, Type type, String outString)
+		/// The returned view is valid until the next call on the same thread.
+		internal static StringView GetBestLuaClassName(LuaTinkerState tinkerState, Type type)
 		{
+			let outString = sClassNameBuffer.Value;
+			outString.Clear();
 			if (tinkerState.IsClassRegistered(type))
 			{
 				outString.Append(tinkerState.GetClassName(type));
@@ -261,6 +268,7 @@ namespace LuaTinker.StackHelpers
 			{
 				type.GetFullName(outString);
 			}
+			return .(outString);
 		}
 
 		public enum EVTResult
@@ -326,10 +334,7 @@ namespace LuaTinker.StackHelpers
 			if (result == .Error)
 			{
 				let tinkerState = lua.TinkerState;
-				{
-					// Dispose temporary strings before raising a Lua error.
-					tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName(tinkerState, expectedType, .. scope .())}'");
-				}
+				tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName(tinkerState, expectedType)}'");
 				TryThrowError(lua, tinkerState);
 			}
 			return result;

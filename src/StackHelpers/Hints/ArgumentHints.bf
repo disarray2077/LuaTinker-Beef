@@ -88,7 +88,7 @@ namespace LuaTinker.StackHelpers
 				String hintName = scope .();
 				AppendArgumentTypeName(lua, index, hintName);
 				if (expectedType != null)
-					lua.TinkerState.SetLastError($"expected '{expectedType}' at argument {index} but got '{hintName}'");
+					lua.TinkerState.SetLastError($"expected '{GetBestLuaClassName(lua.TinkerState, expectedType)}' at argument {index} but got '{hintName}'");
 				else
 					lua.TinkerState.SetLastError($"'{hintName}' cannot bind to an ordinary value parameter");
 			}

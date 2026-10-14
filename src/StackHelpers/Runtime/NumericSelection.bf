@@ -31,7 +31,6 @@ namespace LuaTinker.StackHelpers
 
 				let count = candidateType.FieldCount;
 				String candidates = scope .();
-				String names = scope .();
 				int32 int32Index = -1;
 				for (let field in candidateType.GetFields(.DeclaredOnly))
 				{
@@ -39,13 +38,11 @@ namespace LuaTinker.StackHelpers
 					if (@field.Index > 0)
 					{
 						candidates.Append(", ");
-						names.Append(", ");
 					}
 					if (type == typeof(int32))
 						int32Index = @field.Index;
 					let isEnumLike = type.IsEnum || type.IsTypedPrimitive;
 					candidates.AppendF($".(typeof(comptype({type.GetTypeId()})), {isEnumLike ? "true" : "false"})");
-					names.Append((scope $"{type}").Quote(.. scope .()));
 				}
 				Compiler.MixinRoot(scope $"""
 					static NumericCandidate[{count}] candidates = .({candidates});
@@ -53,8 +50,7 @@ namespace LuaTinker.StackHelpers
 					let selected = SelectNumeric(lua, index, candidates, {int32Index}, matchingTypes, let ambiguous);
 					if (ambiguous)
 					{{
-						static StringView[{count}] numericTypeNames = .({names});
-						ThrowNumericAmbiguity(lua, argument, numericTypeNames, matchingTypes);
+						ThrowNumericAmbiguity(lua, argument, candidates, matchingTypes);
 					}}
 					return selected;
 					""");
@@ -132,20 +128,20 @@ namespace LuaTinker.StackHelpers
 		}
 
 		[NoReturn]
-		private static void ThrowNumericAmbiguity(Lua lua, int32 argument, Span<StringView> typeNames, Span<bool> matchingTypes)
+		private static void ThrowNumericAmbiguity(Lua lua, int32 argument, Span<NumericCandidate> candidates, Span<bool> matchingTypes)
 		{
 			let state = lua.TinkerState;
 			state.SetLastError($"ambiguous numeric overload at argument {argument} (");
 			let message = state.GetLastError();
 			bool first = true;
-			for (let typeName in typeNames)
+			for (let candidate in candidates)
 			{
-				if (!matchingTypes[@typeName.Index])
+				if (!matchingTypes[@candidate.Index])
 					continue;
 				if (!first)
 					message.Append(" or ");
 				message.Append('\'');
-				message.Append(typeName);
+				message.Append(GetBestLuaClassName(state, candidate.Type));
 				message.Append('\'');
 				first = false;
 			}
