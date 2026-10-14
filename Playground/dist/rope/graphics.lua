@@ -7,6 +7,7 @@ local opengl = require('modules.opengl')
 local Game = require('game')
 local levels = require('levels')
 local canvas = require('canvas')
+local controls = require('controls')
 
 local PI = math.pi
 local min, max, floor, sqrt, sin, cos = math.min, math.max, math.floor, math.sqrt, math.sin, math.cos
@@ -20,7 +21,6 @@ local ring = canvas.ring
 local line = canvas.line
 local star = canvas.star
 local textCentered = canvas.textCentered
-local textRight = canvas.textRight
 local text = canvas.text
 
 local window, context, gl
@@ -67,7 +67,6 @@ local function drawFrog(game)
         local ex, ey = f.x + 14 * side, f.y - 16
         circle(ex, ey, 10, color(255,255,255), 20)
         circle(ex + lookX * 4, ey + lookY * 4, 5, color(20,20,20), 12)
-        if game.state == "lost" then line(ex - 10, ey - 14, ex + 10, ey + 10 * side, 3, color(30,90,40)) end
     end
 
     if game.state == "lost" then
@@ -109,25 +108,28 @@ local function drawHUD(game)
     end
     
     text(112, 49, 2, string.format("BEST %d/3", game.best[game.level]), color(255,255,255,160))
-    textRight(W - 16, 14, 2, "OPENGL 3.3", color(180,220,255))
-    textRight(W - 16, 40, 2, "R RESTART   1-5 LEVEL   ESC QUIT", color(255,255,255,140))
-    textCentered(W / 2, H - 26, 2, "DRAG TO CUT ROPES - CLICK THE BUBBLE TO POP IT", color(255,255,255,120))
+    textCentered(W / 2, H - 26, 2, "DRAG TO CUT ROPES - TAP A BUBBLE TO POP IT", color(255,255,255,120))
     
-    if game.state == "playing" then
-        return
+    if game.state ~= "playing" then
+        rect(220, 240, 520, 150, color(0,0,0,170))
+        rect(220, 240, 520, 4, color(255,215,60))
+        if game.state == "won" then
+            textCentered(W / 2, 262, 3, "OM NOM IS HAPPY!", color(255,215,60))
+            textCentered(W / 2, 304, 2, string.format("STARS: %d/3", game.starsGot), color(255,255,255))
+        else
+            textCentered(W / 2, 262, 3, "OH NO! THE CANDY IS GONE", color(255,120,120))
+        end
     end
-    
-    rect(220, 240, 520, 150, color(0,0,0,170))
-    rect(220, 240, 520, 4, color(255,215,60))
-    if game.state == "won" then
-        textCentered(W / 2, 262, 3, "OM NOM IS HAPPY!", color(255,215,60))
-        textCentered(W / 2, 304, 2, string.format("STARS: %d/3", game.starsGot), color(255,255,255))
-        local instruction = game.level < #levels and "PRESS N FOR THE NEXT LEVEL" or
-            "ALL LEVELS DONE! PRESS 1-5 TO REPLAY"
-        textCentered(W / 2, 350, 2, instruction, color(255,255,255,200))
-    else
-        textCentered(W / 2, 262, 3, "OH NO! THE CANDY IS GONE", color(255,120,120))
-        textCentered(W / 2, 330, 2, "PRESS R TO RETRY", color(255,255,255,200))
+
+    for _, button in ipairs(controls.buttons) do
+        if controls.visible(button, game) then
+            local selected = button.level == game.level
+            rect(button.x, button.y, button.w, button.h, color(110,140,170))
+            rect(button.x + 2, button.y + 2, button.w - 4, button.h - 4,
+                selected and color(65,100,130) or color(30,45,65))
+            textCentered(button.x + button.w / 2, button.y + 15, 2,
+                controls.label(button, game), color(255,255,255))
+        end
     end
 end
 

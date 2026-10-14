@@ -28,10 +28,30 @@ if (typeof window !== 'undefined') {
     const decoder = new TextDecoder('utf-8', { fatal: true });
     const ordered = () => [...state.files.keys()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()) || a.localeCompare(b));
     const isFolder = (record) => record?.folder === true;
-    const luaFiles = () => ordered().filter((path) =>
-      !isFolder(state.files.get(path)) && path.toLowerCase().endsWith('.lua'));
+    function hasTopLevelReturn(source) {
+      // Skip Lua comments and strings before tracking block boundaries.
+      const tokens = /--(?:\[(=*)\[[\s\S]*?\]\1\]|[^\r\n]*)|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_][A-Za-z_0-9]*/g;
+      let depth = 0;
+      for (const [token] of source.matchAll(tokens)) {
+        if (['function', 'if', 'do', 'repeat'].includes(token)) depth++;
+        else if (token === 'end' || token === 'until') depth = Math.max(0, depth - 1);
+        else if (token === 'return' && depth === 0) return true;
+      }
+      return false;
+    }
+    function isEntryFile(path) {
+      if (!path || !path.toLowerCase().endsWith('.lua')) return false;
+      const source = textOf(state.files.get(path));
+      return source !== null && !hasTopLevelReturn(source);
+    }
+    const entryFiles = () => ordered().filter(isEntryFile);
     function updateEntries() {
-      const entries = luaFiles();
+      const entries = entryFiles();
+      if (state.entry && !entries.includes(state.entry)) {
+        state.entry = null;
+        const previous = $('file-list').querySelector('[data-entry=true]');
+        if (previous) previous.dataset.entry = 'false';
+      }
       $('entry-select').replaceChildren(new Option('Select Lua entry', ''), ...entries.map((path) => new Option(path, path)));
       $('entry-select').value = entries.includes(state.entry) ? state.entry : '';
     }
@@ -328,6 +348,7 @@ if (typeof window !== 'undefined') {
       render();
     }
     function render() {
+      updateEntries();
       const folders = folderPaths();
       const children = new Map();
       for (const path of new Set([...state.files.keys(), ...folders])) {
@@ -422,7 +443,6 @@ if (typeof window !== 'undefined') {
       root.append(rootChildren);
       tree.append(root);
       $('file-list').replaceChildren(tree);
-      updateEntries();
       $('rename-file').disabled = $('delete-file').disabled = !state.writable || !state.focused;
       const focusedFile = state.files.get(state.focused);
       $('download-file').disabled = !focusedFile || isFolder(focusedFile);
@@ -887,7 +907,7 @@ if (typeof window !== 'undefined') {
       try {
         await flush();
         if (generation !== state.generation) return;
-        if (!state.entry || !state.files.has(state.entry) || isFolder(state.files.get(state.entry)) || !state.entry.toLowerCase().endsWith('.lua')) {
+        if (!isEntryFile(state.entry)) {
           log('Select a Lua entry file before running.', true);
           selectPane('preview');
           return;
@@ -929,6 +949,7 @@ if (typeof window !== 'undefined') {
     $('upload-folder-files').onchange = (event) => perform(() => uploadFiles(event));
     async function selectEntry(entry) {
       await flush();
+      if (entry !== null && !isEntryFile(entry)) return;
       state.entry = entry;
       if (state.db) await tx('meta', 'readwrite', (t) => setMeta(t.objectStore('meta'), 'entry', state.entry));
       render();
@@ -957,8 +978,8 @@ if (typeof window !== 'undefined') {
       }
       status('Ready');
       if (requestRun === null) return;
-      if (validPath(requestRun) || !state.files.has(requestRun) || isFolder(state.files.get(requestRun)) || !requestRun.toLowerCase().endsWith('.lua')) {
-        log('Cannot run missing Lua entry: ' + requestRun, true);
+      if (validPath(requestRun) || !isEntryFile(requestRun)) {
+        log('Cannot run Lua entry: ' + requestRun, true);
         runUrl(null);
         return;
       }

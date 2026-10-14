@@ -5,6 +5,7 @@ end
 
 local Game = require('game')
 local levels = require('levels')
+local controls = require('controls')
 local W, H = Game.WIDTH, Game.HEIGHT
 local min, max, floor = math.min, math.max, math.floor
 local input = {}
@@ -70,7 +71,8 @@ function input.poll(app, game, event)
         elseif type == SDL.EventType.MouseButtonDown and event.button.button == 1 then
             if app.active and not app.minimized then
                 local x, y = mapMouse(event.button.x, event.button.y, app.width, app.height)
-                if x >= 0 and y >= 0 and x < W and y < H then
+                if not controls.press(app, game, x, y) and game.state == "playing" and
+                    x >= 0 and y >= 0 and x < W and y < H then
                     app.dragging = true
                     app.lastX = x
                     app.lastY = y
