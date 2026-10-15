@@ -1,9 +1,11 @@
+import { createOutput } from "./output.js";
+
 export function createRuntime() {
+  const output = createOutput();
   let snapshot = {
     phase: "loading",
     status: "Loading…",
     failed: false,
-    messages: [],
     activeEntry: null,
   };
   let module;
@@ -25,10 +27,8 @@ export function createRuntime() {
     update({ status, failed });
   }
   function log(message, failed = false) {
-    update({
-      messages: [...snapshot.messages, { text: String(message), failed }],
-      ...(failed ? { status: "Failed", failed: true } : {}),
-    });
+    output.append(String(message), failed);
+    if (failed && !snapshot.failed) setStatus("Failed", true);
   }
   function runUrl(entry) {
     const url = new URL(location.href);
@@ -71,6 +71,7 @@ export function createRuntime() {
           generation++;
           update({ phase: "failed" });
           log("WASM aborted: " + reason, true);
+          output.flush();
           reject(new Error(String(reason)));
         },
         onRuntimeInitialized: () => {
@@ -79,6 +80,7 @@ export function createRuntime() {
           resolve();
         },
         onPlaygroundStopped: () => {
+          output.flush();
           runUrl(null);
           update({
             phase: "idle",
@@ -144,7 +146,12 @@ export function createRuntime() {
     if (module && snapshot.phase !== "loading" && !aborted)
       module.ccall("PlaygroundStop", null, [], []);
     runUrl(null);
-    update({ phase: aborted ? "failed" : "idle", status: "Stopped" });
+    output.flush();
+    update({
+      phase: aborted ? "failed" : "idle",
+      status: "Stopped",
+      failed: aborted,
+    });
   }
   async function run(prepare, beforeStart = () => {}) {
     if (
@@ -160,10 +167,10 @@ export function createRuntime() {
       if (current !== generation) return;
       module.ccall("PlaygroundStop", null, [], []);
       beforeStart();
+      output.clear();
       update({
         phase: "starting",
         activeEntry: entry,
-        messages: [],
         status: "Running",
         failed: false,
       });
@@ -194,6 +201,7 @@ export function createRuntime() {
     }
   }
   return {
+    output,
     subscribe,
     getSnapshot,
     initialize,

@@ -73,3 +73,12 @@ test("A script finishing during Start remains finished", async (t) => {
   assert.equal(runtime.getSnapshot().phase, "idle");
   assert.equal(runtime.getSnapshot().status, "Finished");
 });
+
+test("A normal Stop clears the failed status while retaining the error output", async (t) => {
+  const { runtime } = await setup(t);
+  runtime.log("script error", true);
+  runtime.stop();
+  assert.equal(runtime.getSnapshot().status, "Stopped");
+  assert.equal(runtime.getSnapshot().failed, false);
+  assert.equal(runtime.output.getSnapshot().messages[0].text, "script error");
+});

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Console } from "./Console.jsx";
 import { validPath } from "../files.js";
 
-export function Preview({ runtime, workspace, pane, messages }) {
+export function Preview({ runtime, workspace, pane }) {
   const host = useRef(null);
   useEffect(() => {
     let mounted = true;
@@ -20,7 +20,7 @@ export function Preview({ runtime, workspace, pane, messages }) {
         history.replaceState(null, "", url.href);
         return;
       }
-      await workspace.selectEntry(entry);
+      await workspace.selectEntry(entry, { persist: false });
       await workspace.run();
     }
     initialize().catch((error) => runtime.log(error.stack || error, true));
@@ -39,7 +39,7 @@ export function Preview({ runtime, workspace, pane, messages }) {
         <h2>Preview</h2>
       </div>
       <div ref={host} className="canvas-wrap" />
-      <Console messages={messages} workspace={workspace} />
+      <Console output={runtime.output} workspace={workspace} />
     </section>
   );
 }

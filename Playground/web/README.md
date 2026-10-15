@@ -24,7 +24,7 @@ Serve `build/wasm/playground` over HTTP and open `LuaTinkerPlayground.html`.
 ## Useful commands
 
 - Run `npm run lint` for ESLint and React Hooks checks, `npm run lint:fix` applies available
-lint fixes.
+  lint fixes.
 - Run `npm run format` to apply Prettier's formatting, and `npm run format:check` to
-check formatting without changing files.
+  check formatting without changing files.
 - Run `npm test` for the runtime lifecycle tests.

@@ -100,12 +100,7 @@ export function App({ runtime, workspace }) {
       <main className="workbench">
         <FileTree workspace={workspace} state={state} />
         <Editor workspace={workspace} state={state} />
-        <Preview
-          runtime={runtime}
-          workspace={workspace}
-          pane={state.pane}
-          messages={execution.messages}
-        />
+        <Preview runtime={runtime} workspace={workspace} pane={state.pane} />
       </main>
       {state.dialog && <WorkspaceDialog request={state.dialog} />}
     </>

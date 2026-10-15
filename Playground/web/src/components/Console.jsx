@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from "react";
+import { memo, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 
-function Message({ message, workspace }) {
+const Message = memo(function Message({ message, workspace }) {
   const locations =
     /(^|[\s("'`])((?:\/workspace\/|\.{1,2}\/)[^\r\n:'"<>()[\]{}]+?|[^\s:'"<>()[\]{}]+):([1-9]\d*)(?=[:\s)\]]|$)/gm;
   const parts = [];
@@ -29,24 +29,29 @@ function Message({ message, workspace }) {
   }
   parts.push(message.text.slice(cursor));
   return <div className={message.failed ? "error" : ""}>{parts}</div>;
-}
+});
 
-export function Console({ messages, workspace }) {
-  const output = useRef(null);
+export const Console = memo(function Console({ output, workspace }) {
+  const { messages, dropped } = useSyncExternalStore(
+    output.subscribe,
+    output.getSnapshot,
+  );
+  const container = useRef(null);
   useLayoutEffect(() => {
-    output.current.scrollTop = output.current.scrollHeight;
+    container.current.scrollTop = container.current.scrollHeight;
   }, [messages]);
   return (
     <div
-      ref={output}
+      ref={container}
       id="output"
       role="log"
       aria-live="polite"
       aria-label="Console output"
     >
-      {messages.map((message, index) => (
-        <Message key={index} message={message} workspace={workspace} />
+      {dropped > 0 && <div>{dropped} earlier messages omitted.</div>}
+      {messages.map((message) => (
+        <Message key={message.id} message={message} workspace={workspace} />
       ))}
     </div>
   );
-}
+});

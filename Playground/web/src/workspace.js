@@ -698,11 +698,11 @@ export function createWorkspace(runtime) {
     selectPane("editor");
   }
 
-  async function selectEntry(entry) {
+  async function selectEntry(entry, { persist = true } = {}) {
     await flush();
     if (entry !== null && !isEntryFile(entry)) return;
     state.entry = entry;
-    if (db)
+    if (db && persist)
       await tx("meta", "readwrite", (t) =>
         setMeta(t.objectStore("meta"), "entry", entry),
       );
