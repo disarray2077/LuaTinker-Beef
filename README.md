@@ -37,7 +37,7 @@
 
 GameSample and Playground use Beef's bundled SDL2 bindings for windows and input, [BeefGL](https://github.com/disarray2077/BeefGL) for rendering, and SDL2_mixer for audio. Playground also uses [StbImageBeef](https://github.com/StbBeef/StbImageBeef) and SDL2_image to load images.
 
-The browser version of Playground is built with Emscripten through [scripts/build-wasm.ps1](scripts/build-wasm.ps1).
+The browser version of Playground is built with Emscripten through [scripts/build-wasm.ps1](scripts/build-wasm.ps1). Building its React interface also requires Node.js and npm. See [frontend development](Playground/web/README.md) for UI-only builds.
 
 ## Quick Start
 

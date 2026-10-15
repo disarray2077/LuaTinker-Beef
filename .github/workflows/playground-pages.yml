@@ -21,6 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Playground/web/package-lock.json
+
       - name: Set up Beef nightly
         run: |
           $ErrorActionPreference = 'Stop'
@@ -53,6 +59,14 @@ jobs:
           if errorlevel 1 exit /b 1
           pwsh -NoProfile -File scripts\build-wasm.ps1 -Emsdk "%BEEF_ROOT%\wasm\emsdk" -BeefBuild "%BEEF_ROOT%\bin\BeefBuild.exe"
 
+      - name: Check Playground frontend
+        run: |
+          npm --prefix Playground/web run lint
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm --prefix Playground/web run format:check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm --prefix Playground/web test
+
       - name: Prepare site
         run: |
           $ErrorActionPreference = 'Stop'
@@ -60,6 +74,8 @@ jobs:
           $site = 'build/pages'
           New-Item -ItemType Directory -Force $site | Out-Null
           Copy-Item "$output/LuaTinkerPlayground.html" "$site/index.html"
+          Copy-Item "$output/ui.js" $site
+          Copy-Item "$output/ui.css" $site
           foreach ($extension in @('js', 'wasm', 'data')) {
             Copy-Item "$output/LuaTinkerPlayground.$extension" $site
           }

@@ -25,6 +25,7 @@ local text = canvas.text
 
 local window, context, gl
 local vertexArray, positionBuffer, colorBuffer, program
+local positions, colors
 local shaders = {}
 local graphics = {}
 
@@ -308,6 +309,9 @@ local function setupGraphics()
     gl.Enable(gl.EnableCap.Blend)
     gl.glBlendFunc(0x0302, 0x0303) -- GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
     assert(gl.GetError() == 0, "OpenGL geometry or blending setup failed")
+
+    positions = FloatList()
+    colors = FloatList()
 end
 
 local function present(width, height)
@@ -325,7 +329,8 @@ local function present(width, height)
 
     assert(canvas.count <= 2147483647 // (4 * 4), "triangle batch exceeds GL buffer size")
     
-    local positions, colors = FloatList(), FloatList()
+    positions:Clear()
+    colors:Clear()
     positions:AddRange(canvas.positions)
     colors:AddRange(canvas.colors)
     assert(positions.Count == canvas.count * 2 and colors.Count == canvas.count * 4,
@@ -337,8 +342,6 @@ local function present(width, height)
     gl.BindBuffer(arrayBuffer, colorBuffer)
     gl.BufferData(arrayBuffer, int32.cast(colors.Count * 4), ToIntPtr(colors.Ptr), gl.BufferUsageHint.StreamDraw)
     
-    positions, colors = nil, nil
-    
     gl.DrawArrays(gl.PrimitiveType.Triangles, 0, canvas.count)
     assert(gl.GetError() == 0, "OpenGL triangle batch failed")
     
@@ -346,6 +349,9 @@ local function present(width, height)
 end
 
 function graphics.close()
+    positions = nil
+    colors = nil
+
     if gl then
         gl.UseProgram(0)
         if vertexArray and vertexArray ~= 0 then
