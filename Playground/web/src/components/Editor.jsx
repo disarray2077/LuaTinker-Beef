@@ -51,6 +51,7 @@ export function Editor({ workspace, state, output }) {
         </button>
         <button
           type="button"
+          className="mobile-indent"
           disabled={disabled}
           onClick={() => editor.current.indent(false)}
         >
@@ -58,6 +59,7 @@ export function Editor({ workspace, state, output }) {
         </button>
         <button
           type="button"
+          className="mobile-indent"
           disabled={disabled}
           onClick={() => editor.current.indent(true)}
         >

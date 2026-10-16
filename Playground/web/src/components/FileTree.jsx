@@ -1,9 +1,16 @@
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { comparePaths, isFolder, parentPaths } from "../files.js";
+import { ActionMenu } from "./ActionMenu.jsx";
 
 export function FileTree({ workspace, state }) {
   const upload = useRef(null);
   const uploadFolder = useRef(null);
+  const menuTrigger = useRef(null);
+  const [menu, setMenu] = useState(null);
+  const closeMenu = useCallback((restoreFocus = true) => {
+    setMenu(null);
+    if (restoreFocus) menuTrigger.current?.focus();
+  }, []);
   const { folders, children, apps, entries } = useMemo(() => {
     const entries = new Set(state.entries);
     const apps = new Map();
@@ -31,6 +38,85 @@ export function FileTree({ workspace, state }) {
     return { folders, children, apps, entries };
   }, [state.files, state.entries]);
   const perform = workspace.perform;
+  function openMenu(event, kind, path = null) {
+    const context = event.type === "contextmenu";
+    event.preventDefault();
+    if (!context && menu?.kind === kind && menu.path === path) {
+      closeMenu();
+      return;
+    }
+    const target = event.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const trigger = target.querySelector(".tree-label") || target;
+    menuTrigger.current = trigger;
+    setMenu({
+      kind,
+      path,
+      anchor: {
+        x: context ? event.clientX : rect.right,
+        y: context ? event.clientY : rect.bottom,
+        alignRight: !context,
+        trigger,
+      },
+    });
+  }
+
+  let menuItems = [];
+  if (menu?.kind === "create")
+    menuItems = [
+      {
+        label: "New file",
+        action: () => perform(() => workspace.createItem(false)),
+      },
+      {
+        label: "New folder",
+        action: () => perform(() => workspace.createItem(true)),
+      },
+      { label: "Upload files", action: () => upload.current.click() },
+      { label: "Upload folder", action: () => uploadFolder.current.click() },
+    ];
+  else if (menu?.kind === "workspace")
+    menuItems = [
+      {
+        label: "Reset examples",
+        action: () => perform(workspace.resetExamples),
+        disabled: !state.writable,
+      },
+    ];
+  else if (menu?.kind === "file") {
+    const path = menu.path;
+    menuItems = [
+      {
+        label: "Rename",
+        action: () => perform(() => workspace.renameFile(path)),
+        disabled: !state.writable,
+      },
+      ...(!folders.has(path)
+        ? [
+            {
+              label: "Download",
+              action: () => perform(() => workspace.downloadFile(path)),
+            },
+          ]
+        : []),
+      ...(state.assets.includes(path)
+        ? [
+            {
+              label: "Reset to bundled version",
+              action: () => perform(() => workspace.resetPackagedFile(path)),
+              disabled: !state.writable,
+            },
+          ]
+        : []),
+      {
+        label: "Delete",
+        action: () => perform(() => workspace.deleteFile(path)),
+        disabled: !state.writable,
+        danger: true,
+      },
+    ];
+  }
+
   function branch(parent) {
     return (children.get(parent) || []).map((path) => {
       const folder = folders.has(path);
@@ -42,15 +128,17 @@ export function FileTree({ workspace, state }) {
       const button = (
         <button
           type="button"
+          className="tree-label"
           data-folder={folder}
           data-app={app}
           data-entry={entry !== null && entry === state.entry}
           title={app ? `Double-click to select ${entry}` : undefined}
           aria-current={path === state.focused}
           aria-expanded={folder && !app ? !collapsed : undefined}
-          onClick={() =>
-            perform(() => workspace.selectFile(path, { toggleFolder: !app }))
-          }
+          onClick={() => {
+            closeMenu(false);
+            perform(() => workspace.selectFile(path, { toggleFolder: !app }));
+          }}
           onDoubleClick={
             entries.has(entry)
               ? () =>
@@ -66,8 +154,22 @@ export function FileTree({ workspace, state }) {
       );
       return (
         <li key={path}>
-          {folder ? (
-            <div className="folder-row">
+          <div
+            className={`tree-row${folder ? " folder-row" : ""}`}
+            data-focused={
+              path === state.focused ||
+              (menu?.kind === "file" && menu.path === path)
+            }
+            onContextMenu={(event) => openMenu(event, "file", path)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "ContextMenu" ||
+                (event.shiftKey && event.key === "F10")
+              )
+                openMenu(event, "file", path);
+            }}
+          >
+            {folder && (
               <button
                 type="button"
                 className="folder-toggle"
@@ -77,24 +179,19 @@ export function FileTree({ workspace, state }) {
               >
                 {collapsed ? "▸" : "▾"}
               </button>
-              {button}
-            </div>
-          ) : !folder && state.assets.includes(path) ? (
-            <div className="file-row">
-              {button}
-              <button
-                type="button"
-                className="reset-file"
-                aria-label={`Reset ${path} to bundled version`}
-                disabled={!state.writable}
-                onClick={() => perform(() => workspace.resetPackagedFile(path))}
-              >
-                Reset
-              </button>
-            </div>
-          ) : (
-            button
-          )}
+            )}
+            {button}
+            <button
+              type="button"
+              className="row-actions"
+              aria-label={`Actions for ${path}`}
+              aria-haspopup="menu"
+              aria-expanded={menu?.kind === "file" && menu.path === path}
+              onClick={(event) => openMenu(event, "file", path)}
+            >
+              ⋯
+            </button>
+          </div>
           {folder && (
             <ul className="tree-children" hidden={collapsed}>
               {branch(path)}
@@ -118,6 +215,47 @@ export function FileTree({ workspace, state }) {
     >
       <div className="pane-header">
         <h2>Files</h2>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="New or upload files"
+          title="New or upload files"
+          aria-haspopup="menu"
+          aria-expanded={menu?.kind === "create"}
+          disabled={!state.writable}
+          onClick={(event) => openMenu(event, "create")}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 5v14M5 12h14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Workspace actions"
+          title="Workspace actions"
+          aria-haspopup="menu"
+          aria-expanded={menu?.kind === "workspace"}
+          onClick={(event) => openMenu(event, "workspace")}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <circle cx="5" cy="12" r="1.5" />
+            <circle cx="12" cy="12" r="1.5" />
+            <circle cx="19" cy="12" r="1.5" />
+          </svg>
+        </button>
       </div>
       <ul id="file-list">
         <li>
@@ -132,86 +270,37 @@ export function FileTree({ workspace, state }) {
           <ul className="tree-children">{branch("")}</ul>
         </li>
       </ul>
-      <div className="file-tools">
-        <button
-          type="button"
-          disabled={!state.writable}
-          onClick={() => perform(() => workspace.createItem(false))}
-        >
-          New file
-        </button>
-        <button
-          type="button"
-          disabled={!state.writable}
-          onClick={() => perform(() => workspace.createItem(true))}
-        >
-          New folder
-        </button>
-        <button
-          type="button"
-          disabled={!state.writable || !state.focused}
-          onClick={() => perform(workspace.renameFile)}
-        >
-          Rename
-        </button>
-        <button
-          type="button"
-          className="danger"
-          disabled={!state.writable || !state.focused}
-          onClick={() => perform(workspace.deleteFile)}
-        >
-          Delete
-        </button>
-        <button
-          type="button"
-          disabled={!state.writable}
-          onClick={() => upload.current.click()}
-        >
-          Upload files
-        </button>
-        <button
-          type="button"
-          disabled={!state.writable}
-          onClick={() => uploadFolder.current.click()}
-        >
-          Upload folder
-        </button>
-        <button
-          type="button"
-          aria-label="Download selected file"
-          disabled={
-            !state.files.has(state.focused) ||
-            isFolder(state.files.get(state.focused))
+      <input
+        ref={upload}
+        id="upload-files"
+        type="file"
+        multiple
+        aria-label="Upload files"
+        onChange={importFiles}
+      />
+      <input
+        ref={uploadFolder}
+        id="upload-folder-files"
+        type="file"
+        webkitdirectory=""
+        multiple
+        aria-label="Upload folder"
+        onChange={(event) => importFiles(event, true)}
+      />
+      {menu && (
+        <ActionMenu
+          anchor={menu.anchor}
+          label={
+            menu.kind === "file"
+              ? `Actions for ${menu.path}`
+              : menu.kind === "create"
+                ? "New or upload files"
+                : "Workspace actions"
           }
-          onClick={() => perform(workspace.downloadFile)}
-        >
-          Download
-        </button>
-        <button
-          type="button"
-          disabled={!state.writable}
-          onClick={() => perform(workspace.resetExamples)}
-        >
-          Reset examples
-        </button>
-        <input
-          ref={upload}
-          id="upload-files"
-          type="file"
-          multiple
-          aria-label="Upload files"
-          onChange={importFiles}
+          items={menuItems}
+          onClose={closeMenu}
         />
-        <input
-          ref={uploadFolder}
-          id="upload-folder-files"
-          type="file"
-          webkitdirectory=""
-          multiple
-          aria-label="Upload folder"
-          onChange={(event) => importFiles(event, true)}
-        />
-      </div>
+      )}
     </section>
   );
 }

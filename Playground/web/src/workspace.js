@@ -420,9 +420,8 @@ export function createWorkspace(runtime) {
       publish();
     }
   }
-  async function renameFile() {
+  async function renameFile(old = state.focused) {
     await flush();
-    const old = state.focused;
     if (!old) return;
     const folder = folderPaths().has(old);
     const folders = folderPaths();
@@ -505,9 +504,8 @@ export function createWorkspace(runtime) {
     state.entry = entry;
     reloadEditor();
   }
-  async function deleteFile() {
+  async function deleteFile(path = state.focused) {
     await flush();
-    const path = state.focused;
     if (!path) return;
     const folder = folderPaths().has(path);
     const removed = [...state.files.keys()].filter(
@@ -651,9 +649,8 @@ export function createWorkspace(runtime) {
     else publish(true);
     runtime.setStatus("Restored " + path);
   }
-  async function downloadFile() {
+  async function downloadFile(path = state.focused) {
     await flush();
-    const path = state.focused;
     const record = state.files.get(path);
     if (!record || isFolder(record)) return;
     const url = URL.createObjectURL(

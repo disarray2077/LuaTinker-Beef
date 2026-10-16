@@ -3,6 +3,7 @@ import { FileTree } from "./components/FileTree.jsx";
 import { Editor } from "./components/Editor.jsx";
 import { Preview } from "./components/Preview.jsx";
 import { WorkspaceDialog } from "./components/WorkspaceDialog.jsx";
+import { Workbench } from "./components/Workbench.jsx";
 
 export function App({ runtime, workspace }) {
   const state = useSyncExternalStore(
@@ -97,11 +98,11 @@ export function App({ runtime, workspace }) {
           </button>
         ))}
       </nav>
-      <main className="workbench">
+      <Workbench>
         <FileTree workspace={workspace} state={state} />
         <Editor workspace={workspace} state={state} output={runtime.output} />
         <Preview runtime={runtime} workspace={workspace} pane={state.pane} />
-      </main>
+      </Workbench>
       {state.dialog && <WorkspaceDialog request={state.dialog} />}
     </>
   );
