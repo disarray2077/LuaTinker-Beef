@@ -197,6 +197,21 @@ header h1 {
   align-items: center;
   gap: 4px;
 }
+#file-list .folder-row {
+  position: relative;
+}
+#file-list .folder-toggle {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  width: 28px;
+  padding: 0;
+  text-align: center;
+  color: var(--accent);
+}
+#file-list .folder-row > button:last-child {
+  padding-left: 30px;
+}
 #file-list .file-row > button:first-child {
   flex: 1;
   min-width: 0;
@@ -219,6 +234,11 @@ header h1 {
 #file-list button[data-entry="true"]::after {
   content: " · entry";
   color: var(--accent);
+  font-size: 11px;
+}
+#file-list button[data-app="true"]:not([data-entry="true"])::after {
+  content: " · app";
+  color: var(--muted);
   font-size: 11px;
 }
 .file-tools {

@@ -296,7 +296,7 @@ export function createWorkspace(runtime) {
         ),
       );
   }
-  async function selectFile(path) {
+  async function selectFile(path, { toggleFolder = true } = {}) {
     await flush();
     state.focused = path;
     if (path === "" || folderPaths().has(path)) {
@@ -304,8 +304,10 @@ export function createWorkspace(runtime) {
         publish();
         return;
       }
-      if (state.collapsed.has(path)) state.collapsed.delete(path);
-      else state.collapsed.add(path);
+      if (toggleFolder) {
+        if (state.collapsed.has(path)) state.collapsed.delete(path);
+        else state.collapsed.add(path);
+      }
       publish();
       return;
     }

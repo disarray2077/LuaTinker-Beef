@@ -4,7 +4,12 @@ import { comparePaths, isFolder, parentPaths } from "../files.js";
 export function FileTree({ workspace, state }) {
   const upload = useRef(null);
   const uploadFolder = useRef(null);
-  const { folders, children } = useMemo(() => {
+  const { folders, children, apps, entries } = useMemo(() => {
+    const entries = new Set(state.entries);
+    const apps = new Map();
+    for (const entry of entries)
+      if (entry.endsWith("/main.lua"))
+        apps.set(entry.slice(0, -"/main.lua".length), entry);
     const folders = new Set();
     for (const [path, record] of state.files) {
       if (isFolder(record)) folders.add(path);
@@ -19,14 +24,18 @@ export function FileTree({ workspace, state }) {
     for (const paths of children.values())
       paths.sort(
         (a, b) =>
-          Number(folders.has(b)) - Number(folders.has(a)) || comparePaths(a, b),
+          Number(apps.has(b)) - Number(apps.has(a)) ||
+          Number(folders.has(b)) - Number(folders.has(a)) ||
+          comparePaths(a, b),
       );
-    return { folders, children };
-  }, [state.files]);
+    return { folders, children, apps, entries };
+  }, [state.files, state.entries]);
   const perform = workspace.perform;
   function branch(parent) {
     return (children.get(parent) || []).map((path) => {
       const folder = folders.has(path);
+      const app = apps.has(path);
+      const entry = app ? apps.get(path) : folder ? null : path;
       const collapsed = state.collapsed.has(path);
       const label =
         path.slice(parent ? parent.length + 1 : 0) + (folder ? "/" : "");
@@ -34,22 +43,43 @@ export function FileTree({ workspace, state }) {
         <button
           type="button"
           data-folder={folder}
-          data-entry={!folder && path === state.entry}
+          data-app={app}
+          data-entry={entry !== null && entry === state.entry}
+          title={app ? `Double-click to select ${entry}` : undefined}
           aria-current={path === state.focused}
-          aria-expanded={folder ? !collapsed : undefined}
-          onClick={() => perform(() => workspace.selectFile(path))}
+          aria-expanded={folder && !app ? !collapsed : undefined}
+          onClick={() =>
+            perform(() => workspace.selectFile(path, { toggleFolder: !app }))
+          }
           onDoubleClick={
-            !folder && path.toLowerCase().endsWith(".lua")
-              ? () => perform(() => workspace.selectEntry(path))
+            entries.has(entry)
+              ? () =>
+                  perform(async () => {
+                    if (app) await workspace.selectFile(entry);
+                    await workspace.selectEntry(entry);
+                  })
               : undefined
           }
         >
-          {(folder ? (collapsed ? "▸ " : "▾ ") : "") + label}
+          {label}
         </button>
       );
       return (
         <li key={path}>
-          {!folder && state.assets.includes(path) ? (
+          {folder ? (
+            <div className="folder-row">
+              <button
+                type="button"
+                className="folder-toggle"
+                aria-label={`${collapsed ? "Expand" : "Collapse"} ${path}`}
+                aria-expanded={!collapsed}
+                onClick={() => perform(() => workspace.selectFile(path))}
+              >
+                {collapsed ? "▸" : "▾"}
+              </button>
+              {button}
+            </div>
+          ) : !folder && state.assets.includes(path) ? (
             <div className="file-row">
               {button}
               <button
