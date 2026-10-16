@@ -38,12 +38,7 @@ namespace LuaTinker
 			mTinkerState = lua.GetOrCreateTinkerState();
 			AddCStringConversion();
 			StackHelper.RegisterArgumentHintMetatable(mLua);
-			AddNumericCast<int32>("int32");
-			AddNumericCast<uint32>("uint32");
-			AddNumericCast<float>("float");
-			AddNumericCast<double>("double");
-			AddNullPointerHint();
-			AddOwnedValues();
+			AddNumericHints();
 			mLua.PushCClosure(=> TakeOwnershipHandler, 0);
 			mLua.SetGlobal("take_ownership");
 		}
@@ -64,25 +59,47 @@ namespace LuaTinker
 		{
 			Debug.WriteLine(StackHelper.EnumStack(mLua, .. scope .()));
 		}
-		private void AddNumericCast<T>(String name) where T : var, struct
+		private void AddNumericHints()
+		{
+			mLua.CreateTable(0, 12);
+			mLua.SetGlobal("ref");
+			mLua.CreateTable(0, 13);
+			mLua.PushString("void");
+			StackHelper.PushNullPointerArgumentHint(mLua);
+			mLua.RawSet(-3);
+			mLua.SetGlobal("nullptr");
+
+			AddNumericHints<int8>("int8");
+			AddNumericHints<uint8>("uint8");
+			AddNumericHints<int16>("int16");
+			AddNumericHints<uint16>("uint16");
+			AddNumericHints<int32>("int32");
+			AddNumericHints<uint32>("uint32");
+			AddNumericHints<int64>("int64");
+			AddNumericHints<uint64>("uint64");
+			AddNumericHints<int>("int");
+			AddNumericHints<uint>("uint");
+			AddNumericHints<float>("float");
+			AddNumericHints<double>("double");
+		}
+
+		private void AddNumericHints<T>(String name) where T : var, struct, INumeric
 		{
 			mLua.CreateTable(0, 1);
 			mLua.PushString("cast");
 			mLua.PushCClosure(=> NumericArgumentCastHandler<T>, 0);
 			mLua.RawSet(-3);
 			mLua.SetGlobal(name);
-		}
 
-		private void AddNullPointerHint()
-		{
-			mLua.CreateTable(0, 2);
-			mLua.PushString("int32");
-			StackHelper.PushNullPointerArgumentHint(mLua, typeof(int32*));
+			mLua.GetGlobal("ref");
+			AddOwnedValueConstructor<T>(name);
+			mLua.Pop(1);
+
+			mLua.GetGlobal("nullptr");
+			mLua.PushString(name);
+			StackHelper.PushNullPointerArgumentHint(mLua, typeof(T*));
 			mLua.RawSet(-3);
-			mLua.PushString("void");
-			StackHelper.PushNullPointerArgumentHint(mLua);
-			mLua.RawSet(-3);
-			mLua.SetGlobal("nullptr");
+			mLua.Pop(1);
 		}
 
 		private void AddCStringConversion()
@@ -94,14 +111,6 @@ namespace LuaTinker
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
-		}
-
-		private void AddOwnedValues()
-		{
-			mLua.CreateTable(0, 2);
-			AddOwnedValueConstructor<int32>("int32");
-			AddOwnedValueConstructor<uint32>("uint32");
-			mLua.SetGlobal("ref");
 		}
 
 		private void AddOwnedValueConstructor<T>(StringView name) where T : var, struct, INumeric
