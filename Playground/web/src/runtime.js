@@ -43,6 +43,11 @@ export function createRuntime() {
     canvas.width = 640;
     canvas.height = 480;
     canvas.tabIndex = 0;
+    canvas.onpointerdown = () => canvas.focus({ preventScroll: true });
+    canvas.onblur = () => {
+      if (!aborted && ["starting", "running"].includes(snapshot.phase))
+        module.ccall("PlaygroundReleaseKeys", null, [], []);
+    };
     canvas.oncontextmenu = (event) => event.preventDefault();
     host.replaceChildren(canvas);
     if (module) module.canvas = canvas;

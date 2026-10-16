@@ -43,7 +43,7 @@ async function setup(t, finishesImmediately = false) {
   }
   const runtime = createRuntime();
   await runtime.initialize({ replaceChildren() {} });
-  return { runtime, calls };
+  return { runtime, calls, module: window.Module };
 }
 
 test("Stop cancels a run waiting for workspace saves", async (t) => {
@@ -81,4 +81,20 @@ test("A normal Stop clears the failed status while retaining the error output", 
   assert.equal(runtime.getSnapshot().status, "Stopped");
   assert.equal(runtime.getSnapshot().failed, false);
   assert.equal(runtime.output.getSnapshot().messages[0].text, "script error");
+});
+
+test("Canvas focus releases held game keys without affecting a stopped runtime", async (t) => {
+  const { runtime, calls, module } = await setup(t);
+  await runtime.run(async () => ({ entry: "main.lua", files: new Map() }));
+  const canvas = module.canvas;
+  const focus = t.mock.method(canvas, "focus");
+  canvas.onpointerdown();
+  assert.equal(focus.mock.callCount(), 1);
+
+  canvas.onblur();
+  assert.equal(calls.at(-1), "PlaygroundReleaseKeys");
+  runtime.stop();
+  const stoppedCalls = calls.length;
+  canvas.onblur();
+  assert.equal(calls.length, stoppedCalls);
 });

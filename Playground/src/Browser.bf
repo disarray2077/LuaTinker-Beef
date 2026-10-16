@@ -27,6 +27,9 @@ extension Program
         if (!Initialize(StringView(path)))
             return 1;
 
+        // Keep SDL's keyboard handlers on the preview instead of the whole page.
+        SDL2.SDL.SetHint("SDL_EMSCRIPTEN_KEYBOARD_ELEMENT", "#canvas");
+
         sLua.PushBoolean(true);
         sLua.SetGlobal("WASM");
 
@@ -86,6 +89,13 @@ extension Program
             sThread.Pop(results);
         PlaygroundStop();
         emscripten_run_script("Module.onPlaygroundStopped();");
+    }
+
+    [Export, CLink]
+    public static void PlaygroundReleaseKeys()
+    {
+        if (sThread != null)
+            SDL2.SDL.ResetKeyboard();
     }
 
     [Export, CLink]
