@@ -1,6 +1,6 @@
 export function createOutput() {
   const limit = 1000;
-  let snapshot = { messages: [], dropped: 0 };
+  let snapshot = { messages: [], dropped: 0, errors: [] };
   let pending = [];
   let timer = null;
   let count = 0;
@@ -11,7 +11,13 @@ export function createOutput() {
     return () => listeners.delete(listener);
   };
   function publish(messages) {
-    snapshot = { messages, dropped: count - messages.length };
+    let errors = messages.filter((message) => message.failed);
+    if (
+      errors.length === snapshot.errors.length &&
+      errors.every((error, index) => error === snapshot.errors[index])
+    )
+      errors = snapshot.errors;
+    snapshot = { messages, dropped: count - messages.length, errors };
     for (const listener of listeners) listener();
   }
   function flush() {
@@ -39,5 +45,12 @@ export function createOutput() {
     count = 0;
     publish([]);
   }
-  return { subscribe, getSnapshot: () => snapshot, append, flush, clear };
+  return {
+    subscribe,
+    getSnapshot: () => snapshot,
+    getErrors: () => snapshot.errors,
+    append,
+    flush,
+    clear,
+  };
 }

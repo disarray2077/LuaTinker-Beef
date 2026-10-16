@@ -1,20 +1,15 @@
 import { memo, useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import { sourceLocations } from "../source-locations.js";
 
 const Message = memo(function Message({ message, workspace }) {
-  const locations =
-    /(^|[\s("'`])((?:\/workspace\/|\.{1,2}\/)[^\r\n:'"<>()[\]{}]+?|[^\s:'"<>()[\]{}]+):([1-9]\d*)(?=[:\s)\]]|$)/gm;
+  const locations = sourceLocations(message.text, workspace.resolveSourcePath);
   const parts = [];
   let cursor = 0;
-  for (const match of message.text.matchAll(locations)) {
-    const path = workspace.resolveSourcePath(match[2]);
-    const row = Number(match[3]);
-    if (!path || !Number.isSafeInteger(row)) continue;
-    const start = match.index + match[1].length;
-    parts.push(message.text.slice(cursor, start));
-    const label = `${match[2]}:${match[3]}`;
+  for (const { path, row, from, to, label } of locations) {
+    parts.push(message.text.slice(cursor, from));
     parts.push(
       <a
-        key={start}
+        key={from}
         href="#editor"
         title={`Open ${path} at line ${row}`}
         onClick={(event) => {
@@ -25,7 +20,7 @@ const Message = memo(function Message({ message, workspace }) {
         {label}
       </a>,
     );
-    cursor = start + label.length;
+    cursor = to;
   }
   parts.push(message.text.slice(cursor));
   return <div className={message.failed ? "error" : ""}>{parts}</div>;

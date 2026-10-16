@@ -27,4 +27,4 @@ Serve `build/wasm/playground` over HTTP and open `LuaTinkerPlayground.html`.
   lint fixes.
 - Run `npm run format` to apply Prettier's formatting, and `npm run format:check` to
   check formatting without changing files.
-- Run `npm test` for the runtime lifecycle tests.
+- Run `npm test` for the Playground web interface tests.

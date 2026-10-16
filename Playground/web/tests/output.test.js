@@ -42,3 +42,23 @@ test("Clearing output discards pending messages from the previous run", (t) => {
     [{ text: "new run", failed: true }],
   );
 });
+
+test("Editor error subscriptions ignore ordinary output updates", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const output = createOutput();
+  const empty = output.getErrors();
+  output.append("ordinary output", false);
+  assert.equal(output.getErrors(), empty);
+
+  output.append("/workspace/main.lua:2: failure", true);
+  output.flush();
+  const errors = output.getErrors();
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].text, "/workspace/main.lua:2: failure");
+
+  output.append("more output", false);
+  output.flush();
+  assert.equal(output.getErrors(), errors);
+  output.clear();
+  assert.equal(output.getErrors().length, 0);
+});

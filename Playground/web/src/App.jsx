@@ -99,7 +99,7 @@ export function App({ runtime, workspace }) {
       </nav>
       <main className="workbench">
         <FileTree workspace={workspace} state={state} />
-        <Editor workspace={workspace} state={state} />
+        <Editor workspace={workspace} state={state} output={runtime.output} />
         <Preview runtime={runtime} workspace={workspace} pane={state.pane} />
       </main>
       {state.dialog && <WorkspaceDialog request={state.dialog} />}
