@@ -69,5 +69,5 @@ if window then SDL.DestroyWindow(window) end
 
 SDL.Quit()
 
-if not ok then error(err) end
+if not ok then error(err, 0) end
 print("Playground exited after " .. frames .. " frames")

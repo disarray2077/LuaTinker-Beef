@@ -81,5 +81,5 @@ local ok, err = xpcall(run, debug.traceback)
 graphics.close()
 SDL.Quit()
 
-if not ok then error(err) end
+if not ok then error(err, 0) end
 print('Rope playground exited after ' .. frames .. ' frames on level ' .. game.level)

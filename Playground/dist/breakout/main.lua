@@ -366,6 +366,6 @@ end
 local ok, err = xpcall(run, debug.traceback)
 presentation.close()
 if not ok then
-    error(err)
+    error(err, 0)
 end
 print("Breakout remaster exited after " .. frames .. " frames (score " .. game.score .. ", lives " .. game.lives .. ")")

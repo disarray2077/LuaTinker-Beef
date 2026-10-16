@@ -237,5 +237,5 @@ if context and context ~= 0 then SDL.GL_DeleteContext(context) end
 if window then SDL.DestroyWindow(window) end
 SDL.Quit()
 
-if not ok then error(err) end
+if not ok then error(err, 0) end
 print("OpenGL playground exited after " .. frames .. " frames")
