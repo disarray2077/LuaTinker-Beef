@@ -38,7 +38,7 @@ local requiredFunctions = {
 local opengl = {}
 
 function opengl.GetMissingRequiredFunction()
-    local gl = BeefGL.GL
+    local gl = BeefGL
     for _, name in ipairs(requiredFunctions) do
         if gl[name].IsNull then
             return name

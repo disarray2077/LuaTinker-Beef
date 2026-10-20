@@ -94,7 +94,7 @@ namespace LuaTinker.Tests
 			tinker.AddClass<BaseValue>();
 			tinker.AddClass<DerivedValue>();
 			tinker.AddClassParent<DerivedValue, BaseValue>();
-			tinker.AutoTinkClass<SpanOverloads>();
+			tinker.AutoTinkClass<SpanOverloads>(.Shallow);
 			let instance = scope DerivedValue() { Number = 7 };
 			tinker.SetValue("instance", instance);
 			Value value = .() { Number = 9 };
@@ -109,7 +109,7 @@ namespace LuaTinker.Tests
 			Type2User.Create(lua, borrowedString);
 			lua.SetGlobal("borrowedString");
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestSpan.SpanOverloads
+				local api = SpanOverloads
 				assert(api.Elements({1}) == 1)
 				assert(not pcall(function() api.Elements({true}) end))
 				assert(not pcall(function() api.Elements({instance}) end))
@@ -215,9 +215,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<SpanOverloads>();
+			tinker.AutoTinkClass<SpanOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestSpan.SpanOverloads
+				local api = SpanOverloads
 				assert(api.Select({"alpha", "beta"}) == 12)
 				assert(api.Select({4, 1}) == 22)
 				assert(api.Numeric({1, 2}) == 32)
@@ -240,9 +240,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<SpanOverloads>();
+			tinker.AutoTinkClass<SpanOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestSpan.SpanOverloads
+				local api = SpanOverloads
 				assert(api.WithFallback({"alpha"}) == 3)
 				assert(api.WithFallback({4}) == 4)
 				assert(api.WithFallback("text") == 1)
@@ -302,7 +302,7 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<SpanTarget>();
+			tinker.AutoTinkClass<SpanTarget>(.Shallow);
 			let target = scope SpanTarget();
 			tinker.SetValue("target", target);
 			if (lua.DoString("""
@@ -320,7 +320,7 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<Reflected>();
+			tinker.AutoTinkClass<Reflected>(.Shallow);
 			tinker.AddClass<Direct>();
 			tinker.AddClassCtor<Direct, Span<int32>>();
 			tinker.AddClassVar<Direct, const "Value">();
@@ -403,12 +403,12 @@ namespace LuaTinker.Tests
 			tinker.SetValue("borrowedBool", ref borrowedBool);
 			tinker.AddMethod<function int32(Span<int32>)>("Fingerprint", => Fingerprint);
 			tinker.AddMethod<function bool(Span<bool>)>("ReadBool", (values) => values[0]);
-			tinker.AutoTinkClass<SpanOverloads>();
+			tinker.AutoTinkClass<SpanOverloads>(.Shallow);
 			if (lua.DoString("""
 				assert(Fingerprint(borrowed) == 413)
 				assert(ReadBool(borrowedBool))
-				assert(LuaTinker.Tests.TestSpan.SpanOverloads.Select(borrowed) == 23)
-				assert(LuaTinker.Tests.TestSpan.SpanOverloads.Elements(borrowedBool) == 2)
+				assert(SpanOverloads.Select(borrowed) == 23)
+				assert(SpanOverloads.Elements(borrowedBool) == 2)
 				"""))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}

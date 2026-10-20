@@ -23,9 +23,9 @@ namespace LuaTinker.Tests
 			defer { FunctionAPI.Callback = null; }
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<FunctionAPI>();
+			tinker.AutoTinkClass<FunctionAPI>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestAutoTink.FunctionAPI
+				local api = FunctionAPI
 				assert(api.Count == 3)
 				api.Count = 7
 				assert(api.Callback(41) == 42)
@@ -34,7 +34,7 @@ namespace LuaTinker.Tests
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 			Test.Assert(FunctionAPI.Count == 7);
 			FunctionAPI.Callback = (value) => value * 2;
-			if (lua.DoString("assert(LuaTinker.Tests.TestAutoTink.FunctionAPI.Callback(21) == 42)"))
+			if (lua.DoString("assert(FunctionAPI.Callback(21) == 42)"))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}
 
@@ -82,9 +82,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<FilteredAPI, const "", ExcludeTriple>();
+			tinker.AutoTinkClass<FilteredAPI, ExcludeTriple>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestAutoTink.FilteredAPI
+				local api = FilteredAPI
 				assert(api.Twice(21) == 42)
 				assert(api.Twice("text") == 4)
 				assert(api.Triple == nil)
@@ -97,11 +97,11 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<MixedAPI>();
+			tinker.AutoTinkClass<MixedAPI>(.Shallow);
 			int32 holder = 7;
 			tinker.SetValue("holder", ref holder);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestAutoTink.MixedAPI
+				local api = MixedAPI
 				assert(api.Twice(21) == 42)
 				assert(api.Twice("text") == 4)
 				assert(api.SetCallback == nil)
@@ -119,11 +119,11 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<MixedAPI>();
+			tinker.AutoTinkClass<MixedAPI>(.Shallow);
 			int32 holder = 7;
 			tinker.SetValue("holder", ref holder);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestAutoTink.MixedAPI
+				local api = MixedAPI
 				assert(api.Twice(holder) == 0)
 				local cell = ref.int32(7)
 				assert(api.Twice(cell) == 0)
@@ -138,7 +138,7 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<MixedConstructors>();
+			tinker.AutoTinkClass<MixedConstructors>(.Shallow);
 			int32 holder = 0;
 			tinker.SetValue("holder", ref holder);
 			if (lua.DoString("""
@@ -168,8 +168,8 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-			tinker.AutoTinkClass<System.String, const "StringBuilder">();
-			tinker.AutoTinkClass<System.Console>();
+			tinker.AutoTinkClass<System.String>(.Shallow, name: "StringBuilder");
+			tinker.AutoTinkClass<System.Console>(.Shallow);
 
 			if (lua.DoString(
 				@"""
@@ -177,7 +177,7 @@ namespace LuaTinker.Tests
 				str:Append("1")
 				str:Append("2", "2.1")
 				str:Append("3")
-				System.Console.WriteLine(str)
+				Console.WriteLine(str)
 				"""
 				))
 			{

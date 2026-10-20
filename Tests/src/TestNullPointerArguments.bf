@@ -48,9 +48,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNullPointerArguments.PointerAPI
+				local api = PointerAPI
 				assert(api.Select(nullptr.int32) == 1)
 				assert(api.OnlyInt32(nullptr.void))
 				assert(api.OnlyFloat(nullptr.void))
@@ -68,10 +68,10 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
-			tinker.AutoTinkClass<PointerCtor>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
+			tinker.AutoTinkClass<PointerCtor>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNullPointerArguments.PointerAPI
+				local api = PointerAPI
 				local ok, err = pcall(function() api.Select(nullptr.void) end)
 				assert(not ok and err:find("ambiguous null pointer overload at argument 1", 1, true), tostring(err))
 				ok, err = pcall(function() PointerCtor(nullptr.void) end)
@@ -87,7 +87,7 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerCtor>();
+			tinker.AutoTinkClass<PointerCtor>(.Shallow);
 			tinker.AddClass<ManualPointerCtor>();
 			tinker.AddClassCtor<ManualPointerCtor, int32*>();
 			tinker.AddClassVar<ManualPointerCtor, const "IsNull">();
@@ -110,9 +110,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNullPointerArguments.PointerAPI
+				local api = PointerAPI
 				assert(api.Variadic(nullptr.int32, nullptr.void) == 2)
 				assert(api.Variadic() == 0)
 				local ok, err = pcall(function() api.Variadic(nullptr.void) end)
@@ -127,9 +127,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNullPointerArguments.PointerAPI
+				local api = PointerAPI
 				assert(not pcall(function() api.OnlyValue(nullptr.int32) end))
 				assert(not pcall(function() api.OnlyValue(nullptr.void) end))
 				assert(not pcall(function() api.RefOnly(nullptr.int32) end))

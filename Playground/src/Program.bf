@@ -89,15 +89,15 @@ static class Program
 
     private static void Register(LuaTinker tinker, Lua lua)
     {
-        SDLBindings.Register(tinker, lua);
-        ImageBindings.Register(tinker, lua);
+        SDLBindings.Register(tinker);
+        ImageBindings.Register(tinker);
         AudioBindings.Register(tinker);
         OpenGLBindings.Register(tinker);
 
         tinker.AddClass<String>("StringBuilder");
         tinker.AddClassCtor<String>();
-        tinker.AutoTinkClass<List<float>, const "FloatList">();
-        tinker.AutoTinkClass<List<uint8>, const "UInt8List">();
+        tinker.AutoTinkClass<List<float>>(.Shallow, name: "FloatList");
+        tinker.AutoTinkClass<List<uint8>>(.Shallow, name: "UInt8List");
         tinker.AddMethod<function IntPtr(float*)>("ToIntPtr", (pointer) => (void*)pointer); // sad...
     }
 

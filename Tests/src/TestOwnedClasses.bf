@@ -83,7 +83,7 @@ namespace LuaTinker.Tests
 						tinker.AddClassMethod<AppendBuffer, function int32(AppendBuffer this)>("Fingerprint", => AppendBuffer.Fingerprint);
 					}
 					else
-						tinker.AutoTinkClass<AppendBuffer>();
+						tinker.AutoTinkClass<AppendBuffer>(.Shallow);
 
 					if (lua.DoString("assert(not pcall(function() AppendBuffer(1,2,'bad') end)); held = AppendBuffer(1,2,3)"))
 						Test.FatalError(lua.ToString(-1, .. scope .()));
@@ -123,7 +123,7 @@ namespace LuaTinker.Tests
 				{
 					let lua = scope Lua(true);
 					let tinker = scope LuaTinker(lua);
-					tinker.AutoTinkClass<AppendBuffer>();
+					tinker.AutoTinkClass<AppendBuffer>(.Shallow);
 					tinker.SetValue("borrowed", original);
 					Test.Assert((tinker.GetValue<AppendBuffer>("borrowed") case .Ok(let recovered)) && recovered == original);
 

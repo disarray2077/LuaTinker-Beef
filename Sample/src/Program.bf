@@ -43,35 +43,35 @@ static class Program
 
 	static void RegisterBindings(LuaTinker tinker, List<String> names)
 	{
-		names.Add("System.Console (Static Class)");
-		tinker.AutoTinkClass<System.Console>();
+		names.Add("Console (Static Class)");
+		tinker.AutoTinkClass<System.Console>(.Shallow);
 
-		names.Add("System.IO.File (Static Class)");
-		tinker.AutoTinkClass<System.IO.File>();
+		names.Add("File (Static Class)");
+		tinker.AutoTinkClass<System.IO.File>(.Shallow);
 
 		names.Add("String (Class)");
-		tinker.AutoTinkClass<System.String>();
+		tinker.AutoTinkClass<System.String>(.Shallow);
 
 		names.Add("StringList (Class)");
-		tinker.AutoTinkClass<List<String>, const "StringList">();
+		tinker.AutoTinkClass<List<String>>(.Shallow, name: "StringList");
 
 		names.Add("Random (Class)");
-		tinker.AutoTinkClass<System.Random>();
+		tinker.AutoTinkClass<System.Random>(.Shallow);
 
 		names.Add("Stopwatch (Class)");
-		tinker.AutoTinkClass<System.Diagnostics.Stopwatch>();
+		tinker.AutoTinkClass<System.Diagnostics.Stopwatch>(.Shallow);
 		
 		names.Add("FileStream (Class)");
 		tinker.AddClass<System.IO.Stream>(); // TODO: AutoTinkClass
-		tinker.AutoTinkClass<System.IO.BufferedStream>();
+		tinker.AutoTinkClass<System.IO.BufferedStream>(.Shallow);
 		tinker.AddClassParent<System.IO.BufferedStream, System.IO.Stream>();
-		tinker.AutoTinkClass<System.IO.BufferedFileStream>();
+		tinker.AutoTinkClass<System.IO.BufferedFileStream>(.Shallow);
 		tinker.AddClassParent<System.IO.BufferedFileStream, System.IO.BufferedStream>();
-		tinker.AutoTinkClass<System.IO.FileStream>();
+		tinker.AutoTinkClass<System.IO.FileStream>(.Shallow);
 		tinker.AddClassParent<System.IO.FileStream, System.IO.BufferedFileStream>();
 		
 		names.Add("StreamReader (Class)");
-		tinker.AutoTinkClass<System.IO.StreamReader>();
+		tinker.AutoTinkClass<System.IO.StreamReader>(.Shallow);
 	}
 
 	static void ExecuteLua(Lua lua, String code)
@@ -130,7 +130,7 @@ static class Program
 			Console.WriteLine("  print(rand:Next(1, 100))");
 			Console.WriteLine();
 			Console.WriteLine("  -- Call static methods with a dot '.' using the full namespace");
-			Console.WriteLine("  System.Console.WriteLine(\"Hello from a static method!\")");
+			Console.WriteLine("  Console.WriteLine(\"Hello from a static method!\")");
 			Console.WriteLine();
 			Console.WriteLine("  -- Access properties like table fields");
 			Console.WriteLine("  sw = Stopwatch()");

@@ -65,12 +65,15 @@ class TestDefaultArguments
 	{
 		let lua = scope Lua(true);
 		LuaTinker tinker = scope .(lua);
-		tinker.AddNamespace("Target");
-		tinker.AddNamespaceMethod<Target, const "Multiply">("Target");
-		tinker.AddNamespaceMethod<Target, const "Text">("Target");
-		tinker.AddNamespaceMethod<Target, const "IsNull">("Target");
-		tinker.AddNamespaceMethod<Target, const "Dynamic">("Target");
-		tinker.AddNamespaceMethod<Target, const "EnumDefault">("Target");
+
+		using (let ns = tinker.BeginNamespace("Target"))
+		{
+			ns.AddMethod<Target, const "Multiply">();
+			ns.AddMethod<Target, const "Text">();
+			ns.AddMethod<Target, const "IsNull">();
+			ns.AddMethod<Target, const "Dynamic">();
+			ns.AddMethod<Target, const "EnumDefault">();
+		}
 		Target.RuntimeValue = 7;
 		defer { Target.RuntimeValue = 7; }
 		if (lua.DoString("""
@@ -99,9 +102,9 @@ class TestDefaultArguments
 	{
 		let lua = scope Lua(true);
 		LuaTinker tinker = scope .(lua);
-		tinker.AutoTinkClass<Target, const "Target">();
+		tinker.AutoTinkClass<Target>(.Shallow, name: "Target");
 		tinker.AddMethod<function void(ref int)>("IncrementCell", (value) => { value++; });
-		tinker.AutoTinkClass<OverloadedConstructor, const "OverloadedConstructor">();
+		tinker.AutoTinkClass<OverloadedConstructor>(.Shallow, name: "OverloadedConstructor");
 		tinker.AddClass<Appended>("Appended");
 		tinker.AddClassCtor<Appended>();
 		tinker.AddClassMethod<Appended, const "Read">();
@@ -129,7 +132,7 @@ class TestDefaultArguments
 			"""))
 			Test.FatalError(lua.ToString(-1, .. scope .()));
 		// A single static method with defaults also takes AutoTink's reflected path.
-		let result = tinker.Eval<int>("return LuaTinker.Tests.TestDefaultArguments.Target.Multiply(2)");
+		let result = tinker.Eval<int>("return Target.Multiply(2)");
 		if (result case .Err(let error))
 			Test.FatalError(scope String(error));
 		Test.Assert(result.Get() == 6);
@@ -140,9 +143,12 @@ class TestDefaultArguments
 	{
 		let lua = scope Lua(true);
 		LuaTinker tinker = scope .(lua);
-		tinker.AddNamespace("Target");
-		tinker.AddNamespaceMethod<Target, const "Choose">("Target");
-		tinker.AddNamespaceMethod<Target, const "Sum">("Target");
+
+		using (let ns = tinker.BeginNamespace("Target"))
+		{
+			ns.AddMethod<Target, const "Choose">();
+			ns.AddMethod<Target, const "Sum">();
+		}
 		if (lua.DoString("""
 			assert(Target.Choose(2) == 2)
 			assert(Target.Choose(2, 4) == 1)

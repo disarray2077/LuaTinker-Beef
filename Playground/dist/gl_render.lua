@@ -153,7 +153,7 @@ local function run()
     assert_sdl(context ~= 0)
     assert_sdl(SDL.GL_MakeCurrent(window, context) == 0)
 
-    gl = BeefGL.GL
+    gl = BeefGL
     gl.Init(function(proc)
         return SDL.GL_GetProcAddress(proc)
     end)

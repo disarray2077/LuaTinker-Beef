@@ -209,11 +209,17 @@ namespace LuaTinker
 				}
 			}
 
-			if (!mTinkerState.TryRegisterClass<T>(name))
+			if (CreateClass(typeof(T), name))
+				mLua.SetGlobal(name);
+		}
+
+		private bool CreateClass(Type type, String name)
+		{
+			if (!mTinkerState.TryRegisterClass(name, type))
 			{
 				Debug.Assert(false, mTinkerState.GetLastError());
 				StackHelper.TryThrowError(mLua, mTinkerState);
-				return;
+				return false;
 			}
 
 			mLua.CreateTable(0, 5);
@@ -239,8 +245,8 @@ namespace LuaTinker
 			mLua.RawSet(-3);
 
 			UserdataMetatables.Mark(mLua, -1, .Pointer);
-			mTinkerState.StoreClassMetatable<T>(mLua);
-			mLua.SetGlobal(name);
+			mTinkerState.StoreClassMetatable(mLua, type);
+			return true;
 		}
 
 		private bool EnsureClassRegistered<T>()
@@ -570,7 +576,7 @@ namespace LuaTinker
 		/// Ensures a namespace (a nested table structure) exists in Lua. Creates it if it doesn't.
 		/// @param path A dot-separated namespace path (e.g., "MyLib.Utils").
 		/// @return True if the table was created, otherwise false.
-		public bool AddNamespace(String path)
+		internal bool AddNamespace(String path)
 		{
 			bool parentExists = false;
 			bool first = true;
@@ -682,7 +688,7 @@ namespace LuaTinker
 		/// Registers an enumeration type within a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param enumName The name for the enum table in Lua. If empty, the type's name is used.
-		public void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty, bool typed = false) where E : enum
+		internal void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty, bool typed = false) where E : enum
 		{
 			if (FindNamespaceTable(namespacePath))
 			{
@@ -700,7 +706,7 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param methodName The name of the function in the namespace.
 		/// @param func The function to bind.
-		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, struct
+		internal void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, struct
 		{
 			if (FindNamespaceTable(namespacePath))
 			{
@@ -716,7 +722,7 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param methodName The name of the function in the namespace.
 		/// @param func The delegate to bind.
-		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
+		internal void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
 		{
 			mTinkerState.RegisterAliveObject(func);
 
@@ -733,7 +739,7 @@ namespace LuaTinker
 		/// Binds a static method by its name into a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param name The name of the method in Lua.
-		public void AddNamespaceMethod<T, Name>(String namespacePath, String name = "")
+		internal void AddNamespaceMethod<T, Name>(String namespacePath, String name = "")
 			where Name : const String
 		{
 			if (FindNamespaceTable(namespacePath))
@@ -748,7 +754,7 @@ namespace LuaTinker
 		/// Binds a mutable static field of T to a Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param name The name of the variable.
-		public void AddNamespaceVar<T, Name>(String namespacePath, String name = "")
+		internal void AddNamespaceVar<T, Name>(String namespacePath, String name = "")
 			where Name : const String
 		{
 			[Comptime]
@@ -787,7 +793,7 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param varName The name of the variable.
 		/// @param value The value to set.
-		public void AddNamespaceVar<TVar>(String namespacePath, String varName, TVar value)
+		internal void AddNamespaceVar<TVar>(String namespacePath, String varName, TVar value)
 			where TVar : var
 		{
 			if (FindNamespaceTable(namespacePath))
@@ -803,7 +809,7 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param varName The name of the variable.
 		/// @param value A reference to the value to set.
-		public void AddNamespaceVar<TVar>(String namespacePath, String varName, ref TVar value)
+		internal void AddNamespaceVar<TVar>(String namespacePath, String varName, ref TVar value)
 			where TVar : var
 		{
 			if (FindNamespaceTable(namespacePath))

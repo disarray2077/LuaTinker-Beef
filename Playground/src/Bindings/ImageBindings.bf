@@ -1,4 +1,3 @@
-using KeraLua;
 using SDL2;
 using StbImageBeef;
 
@@ -6,18 +5,11 @@ namespace LuaTinker.Playground;
 
 static class ImageBindings
 {
-    public static void Register(LuaTinker tinker, Lua lua)
+    public static void Register(LuaTinker tinker)
     {
-        tinker.AutoTinkClass<SDLImage>();
-        tinker.AddNamespaceEnum<SDLImage.InitFlags>("SDL2.SDLImage");
-        lua.GetGlobal("SDL2");
-        lua.GetField(-1, "SDLImage");
-        lua.SetGlobal("SDLImage");
-        lua.Pop(1);
-
-        tinker.AutoTinkClass<ImageResult>();
-        lua.GetGlobal("StbImageBeef");
-        lua.SetGlobal("StbImage");
-        tinker.AddNamespaceEnum<ColorComponents>("StbImage");
+        using (let image = tinker.BeginNamespace("SDLImage"))
+            image.AutoTinkClass<SDLImage, ?>(.Deep, .IncludeEnums, .Inline);
+        using (let stb = tinker.BeginNamespace("StbImage"))
+            stb.AutoTinkClass<ImageResult, ?>(.Deep, .IncludeEnums);
     }
 }

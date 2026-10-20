@@ -47,11 +47,11 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<CellAPI>();
+			tinker.AutoTinkClass<CellAPI>(.Shallow);
 			tinker.AddMethod<function void(ref int32)>("DirectBump", (value) => { value++; });
 			tinker.AddMethod<delegate void(ref int32)>("DelegateBump", new (value) => { value++; });
 			if (lua.DoString("""
-				local CellAPI = LuaTinker.Tests.TestOwnedValues.CellAPI
+				local CellAPI = CellAPI
 				local signed = ref.int32(-4)
 				local unsigned = ref.uint32(3)
 				CellAPI.Bump(signed)
@@ -73,10 +73,10 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<CellAPI>();
+			tinker.AutoTinkClass<CellAPI>(.Shallow);
 			tinker.AddMethod<function void(int32*)>("DirectWrite", (value) => { *value += 1; });
 			if (lua.DoString("""
-				local CellAPI = LuaTinker.Tests.TestOwnedValues.CellAPI
+				local CellAPI = CellAPI
 				local signed = ref.int32(0)
 				local unsigned = ref.uint32(0)
 				CellAPI.Write(signed)
@@ -114,9 +114,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<CellAPI>();
+			tinker.AutoTinkClass<CellAPI>(.Shallow);
 			if (lua.DoString("""
-				local CellAPI = LuaTinker.Tests.TestOwnedValues.CellAPI
+				local CellAPI = CellAPI
 				do
 					local value = ref.int32(7)
 					held = value

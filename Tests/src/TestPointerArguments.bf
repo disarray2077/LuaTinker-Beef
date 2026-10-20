@@ -52,12 +52,12 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
-			tinker.AutoTinkClass<NumericPointerConstruction>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
+			tinker.AutoTinkClass<NumericPointerConstruction>(.Shallow);
 			tinker.AddMethod<function uint32(uint32*)>("ReadWord", (value) => *value);
 			tinker.AddMethod<delegate float(float*)>("ReadFloat", new (value) => *value);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestPointerArguments.PointerAPI
+				local api = PointerAPI
 				assert(api.ReadByte(37) == 37)
 				assert(api.Select(37) == 137)
 				assert(api.Select(256) == 556)
@@ -126,8 +126,8 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
-			tinker.AutoTinkClass<System.Collections.List<uint8>, const "UInt8List">();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
+			tinker.AutoTinkClass<System.Collections.List<uint8>>(.Shallow, name: "UInt8List");
 			tinker.AddMethod<function int32(void*)>("DirectVoid", (value) => *(uint8*)value);
 			tinker.AddMethod<function void*(void*)>("EchoVoid", (value) => value);
 			uint8 byte = 37;
@@ -137,7 +137,7 @@ namespace LuaTinker.Tests
 			tinker.SetValue("byteReference", ref byte);
 			tinker.SetValue("voidPointer", (void*)&byte);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestPointerArguments.PointerAPI
+				local api = PointerAPI
 				assert(api.Select(bytePointer) == 137)
 				assert(api.Select(byteReference) == 137)
 				assert(api.Select(wordPointer) == 309)
@@ -181,12 +181,12 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
-			tinker.AutoTinkClass<CStringConstruction>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
+			tinker.AutoTinkClass<CStringConstruction>(.Shallow);
 			tinker.AddMethod<function int32(char8*)>("DirectLength", (text) => text == null ? -1 : (int32)StringView(text).Length);
 			tinker.AddMethod<delegate int32(char8*)>("DelegateLength", new (text) => text == null ? -1 : (int32)StringView(text).Length);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestPointerArguments.PointerAPI
+				local api = PointerAPI
 				assert(api.CStringLength('window') == 6)
 				assert(api.CStringLength('A\0B') == 1)
 				assert(api.CStringLength(nil) == -1)
@@ -206,9 +206,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<PointerAPI>();
+			tinker.AutoTinkClass<PointerAPI>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestPointerArguments.PointerAPI
+				local api = PointerAPI
 				pointer = api.ErrorText()
 				assert(string.from_cstr(pointer) == 'native error')
 				assert(tostring(pointer) ~= 'native error')

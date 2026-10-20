@@ -36,8 +36,11 @@ namespace LuaTinker.Tests
 			defer { Current = null; }
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AddNamespace("Callbacks");
-			tinker.AddNamespaceVar<TestNamespace, const "Current">("Callbacks", "current");
+			using (let ns = tinker.BeginNamespace("Callbacks"))
+			{
+				ns.AddVar<TestNamespace, const "Current">("current");
+			}
+
 			tinker.SetValue<function int32(int32)>("otherCallback", (value) => value);
 			if (lua.DoString("""
 				assert(getmetatable(Callbacks.current) == getmetatable(Callbacks.current))
@@ -115,9 +118,12 @@ namespace LuaTinker.Tests
 			Number = 5;
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AddNamespace("Fields");
-			tinker.AddNamespaceVar("Fields", "Number", 99);
-			tinker.AddNamespaceVar<TestNamespace, const "Number">("Fields");
+			using (let ns = tinker.BeginNamespace("Fields"))
+			{
+				ns.AddVar("Number", 99);
+				ns.AddVar<TestNamespace, const "Number">();
+			}
+
 			if (lua.DoString("""
 				assert(Fields.Number == 5)
 				Fields.Number = 8
@@ -172,9 +178,14 @@ namespace LuaTinker.Tests
 			tinker.AddClass<Version>("Version");
 			tinker.AddClassMethod<Version, function bool(Version this, Version)>("Check", => Version.Check);
 
-			tinker.AddNamespace("LuaTinker.Tests");
-			tinker.AddNamespaceMethod("LuaTinker.Tests", "TestCall", (function void(int8)) => TestCall);
-			tinker.AddNamespaceVar("LuaTinker", "Version", Environment.OSVersion.Version);
+			using (let ns = tinker.BeginNamespace("LuaTinker.Tests"))
+			{
+				ns.AddMethod("TestCall", (function void(int8)) => TestCall);
+			}
+			using (let ns = tinker.BeginNamespace("LuaTinker"))
+			{
+				ns.AddVar("Version", Environment.OSVersion.Version);
+			}
 
 			tinker.AddMethod<function Version()>("GetVersion", () => Environment.OSVersion.Version);
 
@@ -189,10 +200,15 @@ namespace LuaTinker.Tests
 			{
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 			}
-			
-			tinker.AddNamespace("LuaTinker.Tests.Networking.Factory.Services");
-			tinker.AddNamespaceMethod("LuaTinker.Tests.Networking.Factory.Services", "CreateInstance", (function void(int8)) => TestCall);
-			tinker.AddNamespaceMethod("LuaTinker.Tests.Networking", "SendData", (function void(int8)) => TestCall);
+
+			using (let ns = tinker.BeginNamespace("LuaTinker.Tests.Networking.Factory.Services"))
+			{
+				ns.AddMethod("CreateInstance", (function void(int8)) => TestCall);
+			}
+			using (let ns = tinker.BeginNamespace("LuaTinker.Tests.Networking"))
+			{
+				ns.AddMethod("SendData", (function void(int8)) => TestCall);
+			}
 			
 			if (lua.DoString(
 				@"""

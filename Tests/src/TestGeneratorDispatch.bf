@@ -51,14 +51,17 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 			tinker.AddClass<Target>();
 			tinker.AddClassCtor<Target>();
-			tinker.AddNamespaceMethod<Target, const "Numeric">("Target");
-			tinker.AddNamespaceMethod<Target, const "FloatingFirst">("Target");
-			tinker.AddNamespaceMethod<Target, const "CatchAll">("Target");
-			tinker.AddNamespaceMethod<Target, const "Specific">("Target");
-			tinker.AddNamespaceMethod<Target, const "Fallback">("Target");
-			tinker.AddNamespaceMethod<Target, const "Nullable">("Target");
-			tinker.AddNamespaceMethod<Target, const "Zero">("Target");
-			tinker.AddNamespaceMethod<Target, const "Tuple">("Target");
+			using (let ns = tinker.BeginNamespace("Target"))
+			{
+				ns.AddMethod<Target, const "Numeric">();
+				ns.AddMethod<Target, const "FloatingFirst">();
+				ns.AddMethod<Target, const "CatchAll">();
+				ns.AddMethod<Target, const "Specific">();
+				ns.AddMethod<Target, const "Fallback">();
+				ns.AddMethod<Target, const "Nullable">();
+				ns.AddMethod<Target, const "Zero">();
+				ns.AddMethod<Target, const "Tuple">();
+			}
 			tinker.AddMethod<delegate (int, StringView)()>("DelegateTuple", new () => Target.Tuple());
 			tinker.AddClassMethod<Target, const "Instance">();
 			if (lua.DoString("""
@@ -97,10 +100,13 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 			tinker.AddClass<Target>();
 			tinker.AddClassCtor<Target>();
-			tinker.AddNamespaceMethod<Target, const "SingleMethod">("Target");
-			tinker.AddNamespaceMethod<Target, const "Zero">("Target");
-			tinker.AddNamespaceMethod<Target, const "Nullable">("Target");
-			tinker.AddNamespaceMethod<Target, const "Fallback">("Target");
+			using (let ns = tinker.BeginNamespace("Target"))
+			{
+				ns.AddMethod<Target, const "SingleMethod">();
+				ns.AddMethod<Target, const "Zero">();
+				ns.AddMethod<Target, const "Nullable">();
+				ns.AddMethod<Target, const "Fallback">();
+			}
 			tinker.AddClassMethod<Target, const "SingleInstance">();
 			if (lua.DoString("""
 				assert(Target.SingleMethod(7, true) == 7)
@@ -134,8 +140,11 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 			tinker.AddClass<Target>();
 			tinker.AddClassCtor<Target>();
-			tinker.AddNamespaceMethod<Target, const "Arity">("Target");
-			tinker.AddNamespaceMethod<Target, const "Specific">("Target");
+			using (let ns = tinker.BeginNamespace("Target"))
+			{
+				ns.AddMethod<Target, const "Arity">();
+				ns.AddMethod<Target, const "Specific">();
+			}
 			tinker.AddClassMethod<Target, const "Instance">();
 			tinker.AddClassMethod<Target, const "InstanceSum">();
 			if (lua.DoString("""
@@ -163,8 +172,11 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			LuaTinker tinker = scope .(lua);
-			tinker.AddNamespace("Target");
-			tinker.AddNamespaceMethod<Target, const "GappedArity">("Target");
+
+			using (let ns = tinker.BeginNamespace("Target"))
+			{
+				ns.AddMethod<Target, const "GappedArity">();
+			}
 			if (lua.DoString("""
 				local ok, err = pcall(function() Target.GappedArity(1, 2) end)
 				assert(not ok and err:find("expected '1 or 3' arguments but got '2'", 1, true), tostring(err))
@@ -179,8 +191,11 @@ namespace LuaTinker.Tests
 			LuaTinker tinker = scope .(lua);
 			tinker.AddClass<Target>();
 			tinker.AddClassCtor<Target>();
-			tinker.AddNamespaceMethod<Target, const "Sum">("Target");
-			tinker.AddNamespaceMethod<Target, const "FixedSum">("Target");
+			using (let ns = tinker.BeginNamespace("Target"))
+			{
+				ns.AddMethod<Target, const "Sum">();
+				ns.AddMethod<Target, const "FixedSum">();
+			}
 			tinker.AddClassMethod<Target, const "InstanceSum">();
 			tinker.AddMethod<function int(params Span<int>)>("BoundSum", => Target.Sum);
 			tinker.AddMethod<function int(int, params Span<int>)>("BoundFixedSum", => Target.FixedSum);

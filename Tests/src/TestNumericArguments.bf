@@ -134,9 +134,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.Pick(-1) == 32)
 				assert(api.Pick(1) == 32)
 				assert(api.Pick(int32.cast(1)) == 32)
@@ -150,9 +150,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.WithFallback(300) == 32)
 				assert(api.WithFallback(uint32.cast(1)) == 32)
 				assert(api.WithFallback("text") == 1)
@@ -168,11 +168,13 @@ namespace LuaTinker.Tests
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
 			tinker.AddEnum<SignedChoice>();
-			tinker.AddNamespace("Choices");
-			tinker.AddNamespaceEnum<UnsignedChoice>("Choices");
-			tinker.AutoTinkClass<NumericOverloads>();
+			using (let ns = tinker.BeginNamespace("Choices"))
+			{
+				ns.AddEnum<UnsignedChoice>();
+			}
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.PickEnum(SignedChoice.cast(1)) == 1)
 				assert(api.PickEnum(Choices.UnsignedChoice.cast(1)) == 2)
 				assert(api.PickEnum(4294967295) == 2)
@@ -189,9 +191,9 @@ namespace LuaTinker.Tests
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
 			tinker.AddEnum<SignedChoice>();
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(not pcall(function() api.Mixed(SignedChoice.One) end))
 				assert(not pcall(function() api.Mixed(2) end))
 				assert(not pcall(function() api.EnumFirst(1) end))
@@ -206,9 +208,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.Pair(1, 2) == 12)
 				assert(api.Pair(int32.cast(1), uint32.cast(2)) == 12)
 				assert(api.Pair(uint32.cast(1), int32.cast(2)) == 21)
@@ -221,9 +223,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.Later(300, "text") == 32)
 				assert(not pcall(function() api.Later(1, true) end))
 				"""))
@@ -235,9 +237,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				local ok, err = pcall(function() api.PreferredPrefix(1, "text") end)
 				assert(not ok and err:find("expected 'bool' at argument 2 but got 'string'", 1, true), tostring(err))
 				"""))
@@ -249,9 +251,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				local ok, err = pcall(function() api.AmbiguousSecond(1, 1) end)
 				assert(not ok and err:find("ambiguous numeric overload at argument 2 ('uint8' or 'uint32')", 1, true), tostring(err))
 				ok, err = pcall(function() api.AmbiguousRange(300) end)
@@ -272,9 +274,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.DeepestFailure(true, true, "text") == 1)
 				assert(api.DeepestFailure({}, 1) == 2)
 				local ok, err = pcall(function() api.DeepestFailure(true, true, {}) end)
@@ -288,9 +290,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(not pcall(function() api.PreferredPrefix() end))
 				assert(not pcall(function() api.PreferredPrefix(true) end))
 				"""))
@@ -302,7 +304,7 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericCtor>();
+			tinker.AutoTinkClass<NumericCtor>(.Shallow);
 			tinker.AddClass<ManualUIntCtor>();
 			tinker.AddClassCtor<ManualUIntCtor, uint32>();
 			tinker.AddClassVar<ManualUIntCtor, const "Kind">();
@@ -323,8 +325,8 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericCtor>();
-			tinker.AutoTinkClass<NarrowCtor>();
+			tinker.AutoTinkClass<NumericCtor>(.Shallow);
+			tinker.AutoTinkClass<NarrowCtor>(.Shallow);
 			if (lua.DoString("""
 				local ok, err = pcall(function() NumericCtor(1):Pick(1) end)
 				assert(not ok and err:find("ambiguous numeric overload at argument 1", 1, true), tostring(err))
@@ -339,9 +341,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.Sum(uint32.cast(1), uint32.cast(2)) == 3)
 				assert(not pcall(function() api.Sum(1, 2) end))
 				assert(not pcall(function() api.Sum(uint32.cast(1), int32.cast(2)) end))
@@ -355,8 +357,10 @@ namespace LuaTinker.Tests
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
 			tinker.AddEnum<SignedChoice>();
-			tinker.AddNamespace("Choices");
-			tinker.AddNamespaceEnum<UnsignedChoice>("Choices");
+			using (let ns = tinker.BeginNamespace("Choices"))
+			{
+				ns.AddEnum<UnsignedChoice>();
+			}
 			tinker.AddMethod<function int32(int32)>("SignedValue", (value) => value);
 			tinker.AddMethod<function uint32(uint32)>("UnsignedValue", (value) => value);
 			if (lua.DoString("""
@@ -433,9 +437,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<FloatingOverloads>();
+			tinker.AutoTinkClass<FloatingOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.FloatingOverloads
+				local api = FloatingOverloads
 				local kind, value = api.Pick(float.cast(0.25))
 				assert(kind == 1 and value == 0.25)
 				kind, value = api.Pick(double.cast(0.25))
@@ -457,9 +461,9 @@ namespace LuaTinker.Tests
 		{
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<TypedFloatingOverloads>();
+			tinker.AutoTinkClass<TypedFloatingOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.TypedFloatingOverloads
+				local api = TypedFloatingOverloads
 				local kind, value = api.Pick(1e40)
 				assert(kind == 2 and value == 1e40)
 				assert(not pcall(function() api.Pick(0.25) end))
@@ -598,9 +602,9 @@ namespace LuaTinker.Tests
 			tinker.AddEnum<DefinedChoice>();
 			tinker.AddEnum<OtherChoice>();
 			tinker.AddEnum<WideChoice>();
-			tinker.AutoTinkClass<NumericOverloads>();
+			tinker.AutoTinkClass<NumericOverloads>(.Shallow);
 			if (lua.DoString("""
-				local api = LuaTinker.Tests.TestNumericArguments.NumericOverloads
+				local api = NumericOverloads
 				assert(api.PickDefined(DefinedChoice.One) == 1)
 				assert(api.PickDefined(OtherChoice.Three) == 2)
 				assert(api.PickWide(9223372036854775807) == 1)

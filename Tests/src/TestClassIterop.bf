@@ -14,9 +14,11 @@ namespace LuaTinker.Tests
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-			
-			tinker.AddNamespace("System.IO.File");
-			tinker.AddNamespaceMethod<function Result<void, FileError>(StringView, String, bool)>("System.IO.File", "ReadAllText", => File.ReadAllText);
+
+			using (let ns = tinker.BeginNamespace("System.IO.File"))
+			{
+				ns.AddMethod<function Result<void, FileError>(StringView, String, bool)>("ReadAllText", => File.ReadAllText);
+			}
 			
 			tinker.AddClass<String>("StringBuilder");
 			tinker.AddClassCtor<String>();

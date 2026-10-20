@@ -74,9 +74,9 @@ class TestLuaDelegates
 	{
 		let lua = scope Lua(true);
 		let tinker = scope LuaTinker(lua);
-		tinker.AutoTinkClass<Target>();
+		tinker.AutoTinkClass<Target>(.Shallow);
 		if (lua.DoString("""
-			api = LuaTinker.Tests.TestLuaDelegates.Target
+			api = Target
 			assert(not pcall(function() api.Apply(function(value) return value end, 1) end))
 			"""))
 			Test.FatalError(lua.ToString(-1, .. scope .()));

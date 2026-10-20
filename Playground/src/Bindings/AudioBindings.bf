@@ -19,6 +19,6 @@ static class AudioBindings
 {
     public static void Register(LuaTinker tinker)
     {
-        tinker.AutoTinkClass<SDLMixer, const "", MixerExclusions>();
+        tinker.AutoTinkClass<SDLMixer, MixerExclusions>(.Shallow);
     }
 }

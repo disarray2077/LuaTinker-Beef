@@ -50,7 +50,7 @@ public static void Main()
     lua.Encoding = System.Text.Encoding.UTF8;
     let tinker = scope LuaTinker(lua);
 
-    tinker.AutoTinkClass<System.String, const "StringBuilder">();
+    tinker.AutoTinkClass<System.String>(.Shallow, name: "StringBuilder");
     tinker.SetValue("name", "Ada");
     tinker.SetValue("score", 10);
 
@@ -92,14 +92,11 @@ public static void Main()
 
 ### Automatic Binding
 
-`AutoTinkClass` makes a Beef type's supported public members available in Lua. Here, registering `String` lets the script construct a Beef string, call its `Append` overloads, and print it through `Console`.
-
-> [!NOTE]
-> Parent hierarchies, enums, and constant fields still need explicit registration. However, this may change in the future.
+`AutoTinkClass` exposes a Beef type's supported public members, including indexers. Use `.Shallow` to register just that type:
 
 ```cs
-tinker.AutoTinkClass<System.Console>();
-tinker.AutoTinkClass<System.String, const "StringBuilder">();
+tinker.AutoTinkClass<System.Console>(.Shallow);
+tinker.AutoTinkClass<System.String>(.Shallow, name: "StringBuilder");
 ```
 
 ```lua
@@ -107,34 +104,47 @@ local text = StringBuilder()
 text:Append("Hello, ")
 text:Append("LuaTinker", 0, 3) -- Uses the offset and length overload.
 text:AppendF(" from {}!", "Beef")
-System.Console.WriteLine(text) -- Hello, Lua from Beef!
+Console.WriteLine(text) -- Hello, Lua from Beef!
+```
+
+> [!NOTE]
+> Constant fields still need explicit registration.
+
+Use `.Deep` to register related types too. Registering `Players` below also makes `Player` available in Lua:
+
+```cs
+public struct Player : this(int32 Score);
+
+public static class Players
+{
+    public static int32 GetScore(Player player) => player.Score;
+}
+
+tinker.AutoTinkClass<Players>(.Deep);
+```
+
+```lua
+local player = Player(100)
+print(Players.GetScore(player)) -- 100
 ```
 
 ### Manual Binding
 
-`AddClass` registers a type, and you choose which members to expose. For `Vector2`, the bindings below give Lua a constructor, access to the coordinates, and a method to calculate the squared length.
+Use `BeginClass` to choose which members Lua can access from a type. The binding below gives `Vector2` a constructor, writable coordinates, and a method:
 
 ```cs
-public struct Vector2
+public struct Vector2 : this(float x, float y)
 {
-    public float x, y;
-
-    public this(float x, float y)
-    {
-        this.x = x;
-        this.y = y;
-    }
-
     public float LengthSquared() => x * x + y * y;
 }
 
-// Register the type, its constructor, fields, and a method.
-tinker.AddClass<Vector2>();
-tinker.AddClassCtor<Vector2, (float, float)>();
-tinker.AddClassVar<Vector2, const "x">(); // The field itself is registered, not just its current value.
-tinker.AddClassVar<Vector2, const "y">();
-tinker.AddClassMethod<Vector2, function float(Vector2 this)>(
-    "LengthSquared", => Vector2.LengthSquared);
+using (let vector = tinker.BeginClass<Vector2>())
+{
+    vector.AddCtor<(float, float)>();
+    vector.AddVar<const "x">();
+    vector.AddVar<const "y">();
+    vector.AddMethod<const "LengthSquared">();
+}
 ```
 
 ```lua
@@ -312,8 +322,11 @@ public static class Rewards
 }
 
 tinker.AddEnum<Difficulty>("Difficulty", true); // Register typed enum constants.
-tinker.AddNamespace("Rewards");
-tinker.AddNamespaceMethod<Rewards, const "Bonus">("Rewards");
+
+using (let ns = tinker.BeginNamespace("Rewards"))
+{
+    ns.AddMethod<Rewards, const "Bonus">();
+}
 ```
 
 ```lua

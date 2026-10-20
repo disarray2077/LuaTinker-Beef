@@ -14,7 +14,7 @@ local shaders, programs, uniforms = {}, {}, {}
 
 -- Mix_QuickLoad_RAW borrows the sample memory, so
 -- keep each UInt8List alive for as long as its Mix_Chunk exists!
-local mixer = SDL2.SDLMixer
+local mixer = SDLMixer
 local audio = { opened = false, chunks = {}, buffers = {} }
 
 local function synthesize(startHz, endHz, duration, volume)
@@ -159,7 +159,7 @@ local function setupGraphics()
         assert_sdl(SDL.GL_SetSwapInterval(0) == 0)
     end
 
-    gl = BeefGL.GL
+    gl = BeefGL
     gl.Init(function(proc)
         return SDL.GL_GetProcAddress(proc)
     end)
