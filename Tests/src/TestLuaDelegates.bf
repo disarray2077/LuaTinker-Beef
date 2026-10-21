@@ -14,6 +14,15 @@ class TestLuaDelegates
 		public static int32 Pair(delegate int32(int32) first, delegate int32(int32) second) => first(2) + second(3);
 	}
 
+	class EventSource
+	{
+		private Event<delegate int32(int32)> mHandlers ~ _.Dispose();
+
+		public void Add(delegate int32(int32) handler) => mHandlers.Add(handler);
+		public int32 Fire(int32 value) => mHandlers.Invoke(value);
+		public void Clear() => mHandlers.Dispose();
+	}
+
 	class StackOnlyAllocator : SingleAllocator
 	{
 		[AllowAppend]
@@ -173,5 +182,74 @@ class TestLuaDelegates
 			Test.Assert(!lua.TinkerState.HasError);
 		}
 		lua.Pop(1);
+	}
+
+	[Test]
+	public static void TestPersistentEventCallbacks()
+	{
+		let lua = scope Lua(true);
+		let tinker = scope LuaTinker(lua);
+		let source = scope EventSource();
+		tinker.RegisterDelegate<delegate int32(int32)>(.Persistent);
+		tinker.AutoTinkClass<EventSource>(.Shallow);
+		tinker.SetValue("source", source);
+		if (lua.DoString("""
+			weak = setmetatable({}, {__mode = 'v'})
+			local payload = {offset = 5}
+			weak[1] = payload
+			source:Add(function(value) return value + payload.offset end)
+			"""))
+			Test.FatalError(lua.ToString(-1, .. scope .()));
+		if (lua.DoString("collectgarbage('collect'); assert(weak[1] ~= nil)"))
+			Test.FatalError(lua.ToString(-1, .. scope .()));
+		Test.Assert(source.Fire(7) == 12);
+		source.Clear();
+		if (lua.DoString("collectgarbage('collect'); assert(weak[1] == nil)"))
+			Test.FatalError(lua.ToString(-1, .. scope .()));
+	}
+
+	[Test]
+	public static void TestPersistentCallbackRecovery()
+	{
+		let lua = scope Lua(true);
+		let tinker = scope LuaTinker(lua);
+		let source = scope EventSource();
+		tinker.RegisterDelegate<delegate int32(int32)>(.Persistent);
+		tinker.AutoTinkClass<EventSource>(.Shallow);
+		tinker.SetValue("source", source);
+		if (lua.DoString("""
+			local fail = true
+			source:Add(function(value)
+			    if fail then
+			        fail = false
+			        error('callback failed', 0)
+			    end
+			    return value + 1
+			end)
+			source:Fire(2)
+			"""))
+			Test.FatalError(lua.ToString(-1, .. scope .()));
+		Test.Assert(lua.TinkerState.HasError);
+		Test.Assert(source.Fire(2) == 3);
+		Test.Assert(!lua.TinkerState.HasError);
+	}
+
+	[Test]
+	public static void TestPersistentCallbackSelfRemoval()
+	{
+		let lua = scope Lua(true);
+		let tinker = scope LuaTinker(lua);
+		let source = scope EventSource();
+		tinker.RegisterDelegate<delegate int32(int32)>(.Persistent);
+		tinker.AutoTinkClass<EventSource>(.Shallow);
+		tinker.SetValue("source", source);
+		if (lua.DoString("""
+			source:Add(function(value)
+			    source:Clear()
+			    return value + 1
+			end)
+			assert(source:Fire(2) == 3)
+			"""))
+			Test.FatalError(lua.ToString(-1, .. scope .()));
 	}
 }

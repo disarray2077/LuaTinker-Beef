@@ -1177,11 +1177,18 @@ namespace LuaTinker
 		public void SetNumber(StringView name, double number)
 			=> SetValue(name, number);
 
-		/// Allows Lua functions to be passed as call-scoped delegates of this signature.
-		public void RegisterDelegate<D>() where D : Delegate
+		/// Allows Lua functions to be passed as delegates of this signature.
+		/// @param lifetime How long the delegate will live after being passed to Beef.
+		public void RegisterDelegate<D>(DelegateLifetime lifetime = .CallScoped) where D : Delegate
 		{
 			LuaDelegateAdapter<D>.ValidateSignature();
-			mTinkerState.RegisterDelegate(typeof(D), => LuaDelegateAdapter<D>.Create, LuaDelegateAdapter<D>.StorageSize);
+			switch (lifetime)
+			{
+			case .CallScoped:
+				mTinkerState.RegisterDelegate(typeof(D), => LuaDelegateAdapter<D>.Create, LuaDelegateAdapter<D>.StorageSize);
+			case .Persistent:
+				mTinkerState.RegisterDelegate(typeof(D), => LuaDelegateAdapter<D>.CreatePersistent, 0);
+			}
 		}
 	}
 }
