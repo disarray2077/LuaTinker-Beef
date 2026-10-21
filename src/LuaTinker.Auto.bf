@@ -180,7 +180,8 @@ namespace LuaTinker
 		{
 			if (!visited.Add(typeof(E)))
 				return;
-			let name = typeof(E).GetName(.. scope .());
+			let name = scope String();
+			AppendScopeClassName(typeof(E), "", name);
 			RequireAutoTinkName(typeof(E), namespacePath, name, names);
 			if (namespacePath.IsEmpty)
 				AddEnum<E>(name, typed);

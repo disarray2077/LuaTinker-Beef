@@ -13,6 +13,21 @@ namespace LuaTinker.Tests
 		public enum NestedChoice { Two = 2 }
 		public enum ExcludedChoice { Three = 3 }
 		public struct NativeHandle;
+		public class GenericEnumDependencies
+		{
+			public Result<void> First;
+			public Result<int32> Second;
+		}
+
+		[Test]
+		public static void TestGenericEnumDependencyNames()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AutoTinkClass<GenericEnumDependencies>(.Deep);
+			if (lua.DoString("assert(type(Resultvoid) == 'table' and type(Resultint32) == 'table')"))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
 
 		public static class CollisionA
 		{
