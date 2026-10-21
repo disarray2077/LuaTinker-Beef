@@ -93,6 +93,7 @@ static class Program
         ImageBindings.Register(tinker);
         AudioBindings.Register(tinker);
         OpenGLBindings.Register(tinker);
+        FormsBindings.Register(tinker, lua.TinkerState);
 
         tinker.AddClass<String>("StringBuilder");
         tinker.AddClassCtor<String>();

@@ -4,6 +4,7 @@ export const names = [
   "gl_render.lua",
   "rope/main.lua",
   "breakout/main.lua",
+  "forms/main.lua",
 ];
 export const isFolder = (record) => record?.folder === true;
 export const bytesOf = (record) => new Uint8Array(record.bytes);
