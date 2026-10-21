@@ -41,7 +41,8 @@ struct SDLExportExclusions : IMethodExclusionProvider
     {
         switch (name)
         {
-        case "Init", "InitSubSystem", "Quit", "GetTicks", "Delay", "GetError", "CreateWindow", "CreateRenderer",
+        case "Init", "InitSubSystem", "Quit", "GetTicks", "Delay", "GetError", "GetVersion", "CreateWindow", "CreateRenderer",
+             "CreateTextureFromSurface", "FreeSurface",
              "DestroyWindow", "DestroyRenderer", "DestroyTexture", "PushEvent", "PollEvent",
              "SetRenderDrawColor", "RenderClear", "RenderPresent", "RenderFillRect",
              "RenderDrawRect", "RenderDrawLine", "RenderCopy", "RenderSetLogicalSize",
@@ -61,6 +62,7 @@ static class SDLBindings
     {
         using (let sdl = tinker.BeginNamespace("SDL"))
         {
+            sdl.AutoTinkClass<SDL.Color>(.Shallow);
             sdl.AutoTinkClass<SDL, SDLExportExclusions, ?>(.Deep, .IncludeAll, .Inline);
             using (let positions = sdl.BeginNamespace("WindowPos"))
             {

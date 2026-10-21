@@ -92,6 +92,7 @@ static class Program
         SDLBindings.Register(tinker);
         ImageBindings.Register(tinker);
         AudioBindings.Register(tinker);
+        FontBindings.Register(tinker);
         OpenGLBindings.Register(tinker);
         FormsBindings.Register(tinker, lua.TinkerState);
 
