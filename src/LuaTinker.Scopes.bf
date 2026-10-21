@@ -155,11 +155,14 @@ namespace LuaTinker
 		public static void EmitClass(Type owner)
 		{
 			String code = scope .();
-			EmitFamily("AddClass", true, code);
+			let structScope = (owner as System.Reflection.SpecializedGenericType)?.GetGenericArg(0).IsStruct ?? false;
+			EmitFamily("AddClass", true, code, structScope);
+			if (structScope)
+				EmitFamily("AddStruct", true, code);
 			Compiler.EmitTypeBody(owner, code);
 		}
 
-		private static void EmitFamily(StringView prefix, bool classScope, String code)
+		private static void EmitFamily(StringView prefix, bool classScope, String code, bool structScope = false)
 		{
 			HashSet<StringView> names = scope .();
 			for (let method in typeof(LuaTinker).GetMethods(.Public | .NonPublic | .DeclaredOnly))
@@ -168,12 +171,12 @@ namespace LuaTinker
 					continue;
 				let scopeName = scope String("Add");
 				scopeName.Append(method.Name.Substring(prefix.Length));
-				EmitMethods(method.Name, scopeName, classScope, false, code);
+				EmitMethods(method.Name, scopeName, classScope, false, code, structScope);
 			}
 		}
 
 		// Reflection discovers the methods; declaration text preserves their constraints and defaults.
-		private static void EmitMethods(StringView sourceName, StringView scopeName, bool classScope, bool autoTink, String code)
+		private static void EmitMethods(StringView sourceName, StringView scopeName, bool classScope, bool autoTink, String code, bool structScope = false)
 		{
 			let source = typeof(LuaTinker).TypeDeclaration.GetMethodDeclarationText(sourceName);
 			List<Token> tokens = scope .();
@@ -208,6 +211,13 @@ namespace LuaTinker
 				declarationStart = bodyEnd + 1;
 				i = bodyEnd;
 				if (visibilityIndex < 0)
+					continue;
+				bool requiresClass = false;
+				if (structScope)
+					for (int j = parameterEnd + 1; j + 3 < bodyStart; j++)
+						if (tokens[j].Text == "where" && tokens[j + 1].Text == "T" && tokens[j + 2].Text == ":" && tokens[j + 3].Text == "class")
+							requiresClass = true;
+				if (requiresClass)
 					continue;
 
 				List<(int start, int end)> generics = scope .();

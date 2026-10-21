@@ -458,7 +458,7 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
-		/// Binds a property by its name to a registered class.
+		/// Binds a property by its name to a registered class or struct.
 		/// @param name The name of the property in Lua.
 		public void AddClassProperty<T, Name>(String name = "")
 			where Name : const String
@@ -479,8 +479,35 @@ namespace LuaTinker
 		/// @param getter The getter delegate. Can be null for a write-only property.
 		/// @param setter The setter delegate. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar, TGet, TSet>(String name, TGet getter, TSet setter)
+			where T : class
 			where TGet : class, delegate TVar(T)
 			where TSet : class, delegate void(T, TVar)
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			Debug.AssertNotStack(getter);
+			Debug.AssertNotStack(setter);
+			if (!EnsureClassRegistered<T>())
+				return;
+			mTinkerState.RegisterAliveObject(getter);
+			mTinkerState.RegisterAliveObject(setter);
+
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
+			{
+				mLua.PushString(name);
+				new:mVariableUserdataAllocator DelegatePropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		/// Binds a property to a struct using explicit getter and setter delegates.
+		/// @param name The name of the property in Lua.
+		/// @param getter The getter delegate. Can be null for a write-only property.
+		/// @param setter The setter delegate. Can be null for a read-only property.
+		public void AddStructProperty<T, TVar, TGet, TSet>(String name, TGet getter, TSet setter)
+			where T : struct
+			where TGet : class, delegate TVar(T)
+			where TSet : class, delegate void(ref T, TVar)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
 			Debug.AssertNotStack(getter);
@@ -504,6 +531,7 @@ namespace LuaTinker
 		/// @param getter The getter function. Can be null for a write-only property.
 		/// @param setter The setter function. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar>(String name, function TVar(T) getter, function void(T, TVar) setter)
+			where T : class
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
 			if (!EnsureClassRegistered<T>())
@@ -511,7 +539,26 @@ namespace LuaTinker
 			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T), function void(T, TVar)>(getter, setter);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		/// Binds a property to a struct using explicit getter and setter function pointers.
+		// @param name The name of the property in Lua.
+		/// @param getter The getter function. Can be null for a write-only property.
+		/// @param setter The setter function. Can be null for a read-only property.
+		public void AddStructProperty<T, TVar>(String name, function TVar(T) getter, function void(ref T, TVar) setter)
+			where T : struct
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
+			{
+				mLua.PushString(name);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T), function void(ref T, TVar)>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -522,6 +569,7 @@ namespace LuaTinker
 		/// @param getter The getter function. Can be null for a write-only property.
 		/// @param setter The setter function. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar>(String name, function TVar(T this) getter, function void(T this, TVar) setter)
+			where T : class
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
 			if (!EnsureClassRegistered<T>())
@@ -529,7 +577,26 @@ namespace LuaTinker
 			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T this), function void(T this, TVar)>(getter, setter);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		/// Binds a property to a struct using explicit getter and setter function pointers (with 'this' syntax).
+		/// @param name The name of the property in Lua.
+		/// @param getter The getter function. Can be null for a write-only property.
+		/// @param setter The setter function. Can be null for a read-only property.
+		public void AddStructProperty<T, TVar>(String name, function TVar(T this) getter, function void(mut T this, TVar) setter)
+			where T : struct
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
+			{
+				mLua.PushString(name);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T this), function void(mut T this, TVar)>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);

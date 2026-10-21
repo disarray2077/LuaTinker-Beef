@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using KeraLua;
 using LuaTinker.StackHelpers;
 
@@ -7,33 +6,25 @@ using internal KeraLua;
 
 namespace LuaTinker.Wrappers
 {
-	public sealed class FuncPropertyWrapper<T, TVar> : VariableWrapperBase
+	public sealed class FuncPropertyWrapper<T, TVar, TGet, TSet> : VariableWrapperBase
 		where T : var
 		where TVar : var
+		where TGet : var, struct
+		where TSet : var, struct
 	{
-		function TVar(T this) mGetFunc;
-		function void(T this, TVar) mSetFunc;
-		function TVar(T) mStaticGetFunc;
-		function void(T, TVar) mStaticSetFunc;
+		TGet mGetFunc;
+		TSet mSetFunc;
 
-		public this(function TVar(T this) getFunc, function void(T this, TVar) setFunc)
+		public this(TGet getFunc, TSet setFunc)
 		{
 			mGetFunc = getFunc;
 			mSetFunc = setFunc;
 		}
 
-		public this(function TVar(T) getFunc, function void(T, TVar) setFunc)
-		{
-			// Previously, we reused the instance function pointer for static methods by casting it
-			// to the corresponding instance signature. However, static and instance methods can use
-			// different calling conventions for struct return values, making the cast brittle.
-			mStaticGetFunc = getFunc;
-			mStaticSetFunc = setFunc;
-		}
-
 		public override void Get(Lua lua)
 		{
-			if (mGetFunc == null && mStaticGetFunc == null)
+#unwarn
+			if (mGetFunc == null)
 			{
 				let tinkerState = lua.TinkerState;
 				tinkerState.SetLastError("this property is write-only");
@@ -47,15 +38,20 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			if (mStaticGetFunc != null)
-				StackHelper.Push(lua, mStaticGetFunc(StackHelper.Pop!<T>(lua, 1)));
-			else
-				StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));
+			[Comptime]
+			void EmitGetter()
+			{
+				if (typeof(T).IsGenericParam || typeof(TGet).IsGenericParam)
+					return;
+				Compiler.MixinRoot("StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));");
+			}
+			EmitGetter();
 		}
 
 		public override void Set(Lua lua)
 		{
-			if (mSetFunc == null && mStaticSetFunc == null)
+#unwarn
+			if (mSetFunc == null)
 			{
 				let tinkerState = lua.TinkerState;
 				tinkerState.SetLastError("this property is read-only");
@@ -69,10 +65,18 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			if (mStaticSetFunc != null)
-				mStaticSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
-			else
-				mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
+			[Comptime]
+			void EmitSetter()
+			{
+				if (typeof(T).IsGenericParam || typeof(TSet).IsGenericParam)
+					return;
+				let isInstance = typeof(TSet).GetMethod("Invoke").Get().GetParamName(0) == "this";
+				let receiver = typeof(T).IsStruct
+					? scope $"{(isInstance ? "" : "ref ")}StackHelper.PopRef<T>(lua, 1)"
+					: "StackHelper.Pop!<T>(lua, 1)";
+				Compiler.MixinRoot(scope $"mSetFunc({receiver}, StackHelper.Pop!<TVar>(lua, 3));");
+			}
+			EmitSetter();
 		}
 	}
 }

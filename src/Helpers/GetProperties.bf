@@ -38,6 +38,9 @@ namespace LuaTinker.Helpers
 	
 		public class NormalProperty : PropertyBase
 		{
+			public bool GetterReturnsRef;
+			public bool GetterIsMutating;
+			public bool SetterTakesRef;
 		}
 	
 		public class IndexerProperty : PropertyBase
@@ -50,6 +53,8 @@ namespace LuaTinker.Helpers
 		{
 			for (let methodInfo in type.GetMethods())
 			{
+				if (!methodInfo.IsPublic)
+					continue;
 				if (methodInfo.Name == "get__")
 				{
 					if (!lookupFlags.HasFlag(.Indexers) || !lookupFlags.HasFlag(.Gets))
@@ -104,19 +109,24 @@ namespace LuaTinker.Helpers
 					if (!lookupFlags.HasFlag(.Properties) || !lookupFlags.HasFlag(.Gets))
 						continue;
 					let propertyName = methodInfo.Name..RemoveFromStart(5);
+					let propType = (methodInfo.ReturnType as RefType)?.UnderlyingType ?? methodInfo.ReturnType;
 					if (properties.TryAdd(propertyName, let keyPtr, let valuePtr))
 					{
 						let prop = new NormalProperty();
 						prop.IsStatic = methodInfo.IsStatic;
-						prop.Type = methodInfo.ReturnType;
+						prop.Type = propType;
 						prop.DeclaringType = methodInfo.DeclaringType;
 						prop.Methods = .Get;
+						prop.GetterReturnsRef = methodInfo.ReturnType is RefType;
+						prop.GetterIsMutating = methodInfo.IsMutating;
 						*valuePtr = prop;
 					}
 					else
 					{
 						NormalProperty prop = (.)*valuePtr;
-						Debug.Assert(prop.IsStatic == methodInfo.IsStatic && prop.Type == methodInfo.ReturnType);
+						Debug.Assert(prop.IsStatic == methodInfo.IsStatic && prop.Type == propType);
+						prop.GetterReturnsRef = methodInfo.ReturnType is RefType;
+						prop.GetterIsMutating = methodInfo.IsMutating;
 						if (!prop.Methods.HasFlag(.Get))
 							prop.Methods |= .Get;
 					}
@@ -126,19 +136,23 @@ namespace LuaTinker.Helpers
 					if (!lookupFlags.HasFlag(.Properties) || !lookupFlags.HasFlag(.Sets))
 						continue;
 					let propertyName = methodInfo.Name..RemoveFromStart(5);
+					let paramType = methodInfo.GetParamType(0);
+					let propType = (paramType as RefType)?.UnderlyingType ?? paramType;
 					if (properties.TryAdd(propertyName, let keyPtr, let valuePtr))
 					{
 						let prop = new NormalProperty();
 						prop.IsStatic = methodInfo.IsStatic;
-						prop.Type = methodInfo.GetParamType(0);
+						prop.Type = propType;
 						prop.DeclaringType = methodInfo.DeclaringType;
 						prop.Methods = .Set;
+						prop.SetterTakesRef = paramType is RefType;
 						*valuePtr = prop;
 					}
 					else
 					{
 						NormalProperty prop = (.)*valuePtr;
-						Debug.Assert(prop.IsStatic == methodInfo.IsStatic && prop.Type == methodInfo.GetParamType(0));
+						Debug.Assert(prop.IsStatic == methodInfo.IsStatic && prop.Type == propType);
+						prop.SetterTakesRef = paramType is RefType;
 						if (!prop.Methods.HasFlag(.Set))
 							prop.Methods |= .Set;
 					}

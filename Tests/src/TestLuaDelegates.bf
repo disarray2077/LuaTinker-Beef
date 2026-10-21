@@ -17,6 +17,7 @@ class TestLuaDelegates
 	class EventSource
 	{
 		private Event<delegate int32(int32)> mHandlers ~ _.Dispose();
+		public ref Event<delegate int32(int32)> Handlers => ref mHandlers;
 
 		public void Add(delegate int32(int32) handler) => mHandlers.Add(handler);
 		public int32 Fire(int32 value) => mHandlers.Invoke(value);
@@ -182,6 +183,23 @@ class TestLuaDelegates
 			Test.Assert(!lua.TinkerState.HasError);
 		}
 		lua.Pop(1);
+	}
+
+	[Test]
+	public static void TestRefEventSubscription()
+	{
+		let lua = scope Lua(true);
+		let tinker = scope LuaTinker(lua);
+		let source = scope EventSource();
+		tinker.RegisterDelegate<delegate int32(int32)>(.Persistent);
+		tinker.AutoTinkClass<EventSource>(.Shallow);
+		tinker.AutoTinkClass<Event<delegate int32(int32)>>(.Shallow, name: "Handlers");
+		tinker.SetValue("source", source);
+		if (lua.DoString("""
+			source.Handlers:Add(function(value) return value + 4 end)
+			assert(source:Fire(3) == 7)
+			"""))
+			Test.FatalError(lua.ToString(-1, .. scope .()));
 	}
 
 	[Test]

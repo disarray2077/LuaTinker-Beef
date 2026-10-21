@@ -385,7 +385,11 @@ namespace LuaTinker
 						String methodParams = scope .();
 
 						if (!method.IsStatic)
-							methodParams.AppendF($"T this");
+						{
+							if (type.IsStruct && method.IsMutating)
+								methodParams.Append("mut ");
+							methodParams.Append("T this");
+						}
 
 						for (int i < method.ParamCount)
 						{
@@ -466,14 +470,21 @@ namespace LuaTinker
 						if (propertyInfo.IsStatic)
 							continue;
 						CollectAutoTinkDependency(propertyInfo.Type, Flags, dependencies);
+						if (propertyInfo.GetterReturnsRef || propertyInfo.GetterIsMutating || propertyInfo.SetterTakesRef)
+						{
+							// TODO: Make this work through normal means.
+							code.AppendF($"AddClassProperty<T, const \"{name}\">();\n");
+							continue;
+						}
+						code.Append(type.IsStruct ? "AddStructProperty" : "AddClassProperty");
 						switch (propertyInfo.Methods)
 						{
 						case .GetSet:
-							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, (self, value) => self.{name} = value);\n");
+							code.AppendF($"<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, (self, value) => self.{name} = value);\n");
 						case .Get:
-							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, null);\n");
+							code.AppendF($"<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, null);\n");
 						case .Set:
-							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", null, (self, value) => self.{name} = value);\n");
+							code.AppendF($"<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", null, (self, value) => self.{name} = value);\n");
 						default:
 							Runtime.FatalError("Unexpected state");
 						}

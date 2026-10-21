@@ -412,7 +412,16 @@ namespace LuaTinker.Handlers
 				EmitConstruction<T>(parameters.GetRange(candidate.ParameterStart, candidate.ParameterCount), writer);
 			else
 			{
-				let target = method.IsStatic ? scope $"T.{method.Name}" : scope $"StackHelper.Pop!<T>(lua, 1).{method.Name}";
+				let target = scope String();
+				if (method.IsStatic)
+					target.AppendF($"T.{method.Name}");
+				else if (typeof(T).IsStruct && method.IsMutating)
+				{
+					writer.Line("var instance = ref StackHelper.PopRef<T>(lua, 1);");
+					target.AppendF($"instance.{method.Name}");
+				}
+				else
+					target.AppendF($"StackHelper.Pop!<T>(lua, 1).{method.Name}");
 				let thisCount = method.IsStatic ? 0 : 1;
 				EmitCallable(method, parameters.GetRange(candidate.ParameterStart + thisCount, candidate.ParameterCount - thisCount), false, writer, target);
 			}
