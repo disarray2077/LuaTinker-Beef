@@ -18,6 +18,13 @@ using internal LuaTinker.Handlers;
 
 namespace LuaTinker
 {
+	/// Selects storage for class instances created by a bound constructor.
+	public enum ClassAllocation
+	{
+		Userdata,
+		Heap
+	}
+
 	public class LuaTinker
 	{
 		private Lua mLua;
@@ -41,6 +48,8 @@ namespace LuaTinker
 			AddNumericHints();
 			mLua.PushCClosure(=> TakeOwnershipHandler, 0);
 			mLua.SetGlobal("take_ownership");
+			mLua.PushCClosure(=> GiveOwnershipHandler, 0);
+			mLua.SetGlobal("give_ownership");
 		}
 
 		public ~this()
@@ -277,15 +286,18 @@ namespace LuaTinker
 
 		/// Binds the constructors of a class, making the class table callable in Lua to create new instances.
 		/// This version dynamically finds a matching constructor at runtime.
-		public void AddClassCtor<T>()
+		/// @param allocation Heap instances can transfer ownership to Beef through give_ownership.
+		public void AddClassCtor<T>(ClassAllocation allocation = .Userdata)
 		{
+			Runtime.Assert(allocation == .Userdata || typeof(T).IsObject, "Heap allocation requires a class");
 			if (!EnsureClassRegistered<T>())
 				return;
 			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
-				mLua.PushCClosure(=> DynamicCreatorHandler<T>, 0);
+				mLua.PushBoolean(allocation == .Heap);
+				mLua.PushCClosure(=> DynamicCreatorHandler<T>, 1);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
 				mLua.PushString(scope $"<constructor for {typeof(T)}>");
@@ -298,15 +310,18 @@ namespace LuaTinker
 
 		/// Binds a specific constructor of a class, making the class table callable in Lua.
 		/// @where Args A single argument type or a tuple representing the constructor's argument types.
-		public void AddClassCtor<T, Args>()
+		/// @param allocation Heap instances can transfer ownership to Beef through give_ownership.
+		public void AddClassCtor<T, Args>(ClassAllocation allocation = .Userdata)
 		{
+			Runtime.Assert(allocation == .Userdata || typeof(T).IsObject, "Heap allocation requires a class");
 			if (!EnsureClassRegistered<T>())
 				return;
 			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
-				mLua.PushCClosure(=> CreatorLayer<T, Args>, 0);
+				mLua.PushBoolean(allocation == .Heap);
+				mLua.PushCClosure(=> CreatorLayer<T, Args>, 1);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
 				mLua.PushString(scope $"<constructor for {typeof(T)}>");

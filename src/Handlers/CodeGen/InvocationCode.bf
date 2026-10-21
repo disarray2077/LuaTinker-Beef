@@ -202,22 +202,24 @@ namespace LuaTinker.Handlers
 				bool isClass = typeof(T).IsObject;
 				if (!isClass)
 					body.Line("let wrapper = new:alloc ValueTypeWrapper<T>();");
-				let creation = scope String();
-				if (isClass)
-					creation.Append("let wrapper = new:alloc ClassTypeWrapper<T>(");
-				else
-					creation.Append("*wrapper.ValuePointer = .(");
+				let arguments = scope String();
 				for (let parameter in parameters)
 				{
 					if (variadic && @parameter.Index == parameters.Length - 1)
-						creation.Append("params extraArgs");
+						arguments.Append("params extraArgs");
 					else
-						creation.AppendF($"{(parameter.Mode == .Ref ? "ref " : "")}constructorArgument{@parameter.Index}");
+						arguments.AppendF($"{(parameter.Mode == .Ref ? "ref " : "")}constructorArgument{@parameter.Index}");
 					if (@parameter.Index != parameters.Length - 1)
-						creation.Append(", ");
+						arguments.Append(", ");
 				}
-				creation.Append(");");
-				body.Line(creation);
+				if (isClass)
+				{
+					body.Line("PointerWrapperBase wrapper;");
+					body.If("lua.ToBoolean(Lua.UpValueIndex(1))", scope $"wrapper = new:alloc ClassInstanceWrapper<T>(new T({arguments}), true);")
+						.Else(scope $"wrapper = new:alloc ClassTypeWrapper<T>({arguments});");
+				}
+				else
+					body.Line(scope $"*wrapper.ValuePointer = .({arguments});");
 				body.Line(scope $"""
 					lua.TinkerState.RegisterAliveObject(wrapper);
 					lua.TinkerState.PushClassMetatable<T>(lua);

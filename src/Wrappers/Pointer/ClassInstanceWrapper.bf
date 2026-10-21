@@ -144,7 +144,17 @@ namespace LuaTinker.Wrappers
 			if (OwnsPointer)
 				return true;
 			OwnsPointer = true;
-			tinkerState.RegisterAliveObject(this);
+			tinkerState.RegisterAliveObject(ClassInstance);
+			return true;
+		}
+
+		public override bool TryGiveOwnership(LuaTinkerState tinkerState)
+		{
+			if (OwnsPointer)
+			{
+				tinkerState.DeregisterAliveObject(ClassInstance);
+				OwnsPointer = false;
+			}
 			return true;
 		}
 

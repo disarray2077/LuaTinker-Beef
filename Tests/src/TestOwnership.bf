@@ -59,6 +59,37 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
+		public static void TestHeapConstructorOwnershipTransfer()
+		{
+			for (int mode < 2)
+			{
+				let counters = scope Counters();
+				let lua = scope Lua(true);
+				let tinker = scope LuaTinker(lua);
+				tinker.AddClass<Counters>();
+				tinker.AddClass<Item>();
+				if (mode == 0)
+					tinker.AddClassCtor<Item>(.Heap);
+				else
+					tinker.AddClassCtor<Item, (Counters, int32)>(.Heap);
+				tinker.SetValue("counters", counters);
+				if (lua.DoString("""
+					held = Item(counters, 7)
+					assert(rawequal(give_ownership(held), held))
+					"""))
+					Test.FatalError(lua.ToString(-1, .. scope .()));
+				let item = tinker.GetValue<Item>("held").Get();
+				if (lua.DoString("held = nil; collectgarbage('collect')"))
+					Test.FatalError(lua.ToString(-1, .. scope .()));
+				Test.Assert(counters.Disposed == 0 && counters.Destroyed == 0);
+				Test.Assert(item.Value == 7);
+				item.Dispose();
+				delete item;
+				Test.Assert(counters.Disposed == 1 && counters.Destroyed == 1);
+			}
+		}
+
+		[Test]
 		public static void TestAlreadyOwnedInlineClass()
 		{
 			let counters = scope Counters();
@@ -72,6 +103,7 @@ namespace LuaTinker.Tests
 				tinker.SetValue("counters", counters);
 				if (lua.DoString("""
 					local item = Item(counters, 5)
+					assert(not pcall(function() give_ownership(item) end))
 					assert(rawequal(take_ownership(item), item))
 					assert(rawequal(take_ownership(item), item))
 					item.Value = 8
@@ -115,6 +147,9 @@ namespace LuaTinker.Tests
 				assert(not pcall(function() take_ownership(reference) end))
 				assert(not pcall(function() take_ownership(ownedStruct) end))
 				assert(not pcall(function() take_ownership(ref.int32(3)) end))
+				assert(not pcall(function() give_ownership() end))
+				assert(not pcall(function() give_ownership(nil) end))
+				assert(not pcall(function() give_ownership(reference) end))
 				local file = assert(io.tmpfile())
 				assert(not pcall(function() take_ownership(file) end))
 				file:close()
