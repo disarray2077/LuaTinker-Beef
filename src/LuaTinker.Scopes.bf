@@ -29,7 +29,10 @@ namespace LuaTinker
 				type.GetName(path);
 				if (let specialized = type as System.Reflection.SpecializedGenericType)
 					for (int i < specialized.GenericParamCount)
+					{
+						path.Append('_');
 						specialized.GetGenericArg(i).GetName(path);
+					}
 			}
 			else
 				path.Append(name);

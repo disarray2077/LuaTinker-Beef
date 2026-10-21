@@ -25,7 +25,7 @@ namespace LuaTinker.Tests
 			let lua = scope Lua(true);
 			let tinker = scope LuaTinker(lua);
 			tinker.AutoTinkClass<GenericEnumDependencies>(.Deep);
-			if (lua.DoString("assert(type(Resultvoid) == 'table' and type(Resultint32) == 'table')"))
+			if (lua.DoString("assert(type(Result_void) == 'table' and type(Result_int32) == 'table')"))
 				Test.FatalError(lua.ToString(-1, .. scope .()));
 		}
 
