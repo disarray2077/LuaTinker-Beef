@@ -26,7 +26,7 @@ namespace LuaTinker.Wrappers
 	{
 		public new override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
-			obj = Internal.UnsafeCastToObject(Ptr);
+			obj = Reference;
 			return .Object;
 		}
 	}

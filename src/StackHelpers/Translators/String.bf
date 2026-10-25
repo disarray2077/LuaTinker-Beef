@@ -4,6 +4,7 @@ using KeraLua;
 using LuaTinker.Wrappers;
 
 using internal KeraLua;
+using internal LuaTinker;
 
 namespace LuaTinker.StackHelpers
 {
@@ -30,11 +31,8 @@ namespace LuaTinker.StackHelpers
 				let wrapper = User2Type.GetObject(lua, index) as PointerWrapperBase;
 				if (wrapper == null)
 					return default;
-				if (!wrapper.Type.IsValueType && (wrapper.ToObject(alloc, let obj) case .Object))
-				{
-					if (let str = obj as String)
-						return str;
-				}
+				if (let str = User2Type.TryGetClassInstance(wrapper) as String)
+					return str;
 				let luaTinker = lua.TinkerState;
 				luaTinker.SetLastError($"can't convert argument {index} to 'String'");
 				TryThrowError(lua, luaTinker);
@@ -63,61 +61,9 @@ namespace LuaTinker.StackHelpers
 			StackHelper.Push<StringBuilder>(lua, val);
 		}
 
+		[Inline]
 		public static StringBuilder Pop<T>(Lua lua, int32 index)
 			where T : class, StringBuilder where StringBuilder : T
-		{
-			if (lua.IsNil(index))
-				return null;
-
-			let result = EnsureValidMetaTable<StringBuilder>(lua, index);
-			if (result == .Error)
-				return null;
-
-			let stackObject = User2Type.GetObject(lua, index);
-			if (stackObject == null)
-				return null;
-
-			if (result != .OkUnregisteredType)
-			{
-				// We are sure that this conversion is valid, so let's just do it unsafely.
-				let ptr = ((PointerWrapperBase)stackObject).Ptr;
-
-				// This is necessary only because PointerWrapper<T> can contain a null pointer
-				if (ptr == null)
-				{
-					let tinkerState = lua.TinkerState;
-					tinkerState.SetLastError("null pointer dereference");
-					TryThrowError(lua, tinkerState);
-					return default;
-				}
-
-				return (StringBuilder)Internal.UnsafeCastToObject(ptr);
-			}
-
-			if (let valueWrapper = stackObject as ClassInstanceWrapper<StringBuilder>)
-				return valueWrapper.ClassInstance;
-			else if (let refPtrWrapper = stackObject as RefPointerWrapper<StringBuilder>)
-				return refPtrWrapper.Reference;
-			else if (let ptrWrapper = stackObject as PointerWrapper<StringBuilder>)
-			{
-				if (ptrWrapper.Ptr == null)
-				{
-					let tinkerState = lua.TinkerState;
-					tinkerState.SetLastError("null pointer dereference");
-					TryThrowError(lua, tinkerState);
-					return default;
-				}
-
-				return *ptrWrapper.Ptr;
-			}
-			else
-			{
-				// We want an unregistered class, the supplied value is also unregistered but it isn't a compatible wrapper.
-				let tinkerState = lua.TinkerState;
-				tinkerState.SetLastError($"can't convert argument {index} ({lua.TypeName(index)}) to '{GetBestLuaClassName<StringBuilder>(tinkerState)}'");
-				TryThrowError(lua, tinkerState);
-				return default;
-			}
-		}
+			=> PopClass<StringBuilder>(lua, index);
 	}
 }

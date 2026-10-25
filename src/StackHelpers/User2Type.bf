@@ -55,10 +55,28 @@ namespace LuaTinker.StackHelpers
 
 		public static bool IsObjectTypeCompatible(Lua lua, int32 index, Type expectedType)
 		{
+			if (expectedType.IsInterface)
+			{
+				let instance = TryGetClassInstance(lua, index);
+				return instance != null && instance.GetType().ImplementsInterface(expectedType);
+			}
 			if (lua.TinkerState.IsClassRegistered(expectedType))
 				return StackHelper.ValidateClassMetatable(lua, index, expectedType) != .Error;
 			let actualType = GetObjectType(lua, index);
 			return actualType != null && actualType.IsSubtypeOf(expectedType);
+		}
+
+		[Inline]
+		public static Object TryGetClassInstance(Lua lua, int32 index)
+			=> TryGetClassInstance(TryGetTypePtr<PointerWrapperBase>(lua, index));
+
+		public static Object TryGetClassInstance(PointerWrapperBase wrapper)
+		{
+			let type = wrapper?.Type;
+			if (type == null || (!type.IsObject && !type.IsInterface) || wrapper.Ptr == null)
+				return null;
+			// Class reference and pointer wrappers hold a reference slot; owned and borrowed instances hold the object.
+			return wrapper.CanPassByRef ? *(Object*)wrapper.Ptr : Internal.UnsafeCastToObject(wrapper.Ptr);
 		}
 
 		private static T TryGetTypePtr<T>(Lua lua, int32 index, LuaUserdataKind kind) where T : class

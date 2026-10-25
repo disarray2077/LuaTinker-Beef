@@ -285,6 +285,8 @@ namespace LuaTinker.StackHelpers
 		/// Filters GetValue inputs before the selected translator performs conversion.
 		internal static bool CanAttemptValueConversion<T>(Lua lua, int32 index)
 		{
+			if (typeof(T).IsInterface)
+				return lua.IsNil(index) || User2Type.IsObjectTypeCompatible(lua, index, typeof(T));
 			let type = lua.Type(index);
 			if (type == .UserData)
 				return CheckMetaTableValidity<T>(lua, index);
