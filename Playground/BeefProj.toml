@@ -12,9 +12,10 @@ SDL2 = "*"
 BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
 StbImageBeef = {Git = "https://github.com/StbBeef/StbImageBeef?path=/src/StbImageBeef"}
 BeefForms = "*"
+"BeefForms.SDL" = "*"
 
 [Configs.Debug.Win64]
-DebugCommandArguments = "dist/breakout/main.lua"
+DebugCommandArguments = "dist/forms/main.lua"
 
 [Configs.Debug.Linux64]
 OtherLinkFlags = "$(LinkFlags) -lSDL2_image -lSDL2_mixer -lSDL2_ttf"

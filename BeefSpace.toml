@@ -14,7 +14,8 @@ KeraLua = {Git = "https://github.com/disarray2077/KeraLua-Beef"}
 BeefGL = {Git = "https://github.com/disarray2077/BeefGL"}
 StbImageBeef = {Git = "https://github.com/StbBeef/StbImageBeef?path=/src/StbImageBeef"}
 SDL2 = "*"
-BeefForms = {Path = "../../BeefForms"}
+BeefForms = {Git = "https://github.com/disarray2077/BeefForms"}
+"BeefForms.SDL" = {Git = "https://github.com/disarray2077/BeefForms?path=/BeefForms.SDL"}
 
 [Configs.Debug.Win64]
 AllocStackTraceDepth = 5
