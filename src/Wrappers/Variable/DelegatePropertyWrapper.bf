@@ -11,7 +11,7 @@ namespace LuaTinker.Wrappers
 		where T : var
 		where TVar : var
 		where TGet : class, delegate TVar(T)
-		where TSet : class, delegate void(T, TVar)
+		where TSet : Delegate
 	{
 		TGet mGetFunc;
 		TSet mSetFunc;
@@ -63,7 +63,17 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
+			[Comptime]
+			void EmitSetter()
+			{
+				if (typeof(T).IsGenericParam || typeof(TSet).IsGenericParam)
+					return;
+				let receiver = typeof(T).IsStruct
+					? "ref StackHelper.PopRef<T>(lua, 1)"
+					: "StackHelper.Pop!<T>(lua, 1)";
+				Compiler.MixinRoot(scope $"mSetFunc({receiver}, StackHelper.Pop!<TVar>(lua, 3));");
+			}
+			EmitSetter();
 		}
 
 		public override void OnRemovedFromLua(LuaTinkerState tinkerState)

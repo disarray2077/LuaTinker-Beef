@@ -3,12 +3,11 @@ using System;
 
 namespace LuaTinker.Tests
 {
-	[Reflect(.All)]
 	class TestMultiReturn
 	{
 		public static (int, StringView) GetTuple()
 		{
-			return (1337, typeof(Self).GetMethod("GetTuple").Get().Name);
+			return (1337, nameof(GetTuple));
 		}
 
 		[Test]

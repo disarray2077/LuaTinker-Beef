@@ -20,16 +20,16 @@ class LuaScript
         mLua.Encoding = System.Text.Encoding.UTF8;
         mTinker = new LuaTinker(mLua);
 
-        mTinker.AutoTinkClass<Ball>();
+        mTinker.AutoTinkClass<Ball>(.Shallow);
 
-        mTinker.AutoTinkClass<Brick>();
-        mTinker.AutoTinkClass<List<Brick>>();
+        mTinker.AutoTinkClass<Brick>(.Shallow);
+        mTinker.AutoTinkClass<List<Brick>>(.Shallow);
 
         mTinker.AddEnum<PowerUpType>();
-        mTinker.AutoTinkClass<PowerUp>();
-        mTinker.AutoTinkClass<List<PowerUp>>();
+        mTinker.AutoTinkClass<PowerUp>(.Shallow);
+        mTinker.AutoTinkClass<List<PowerUp>>(.Shallow);
 
-        mTinker.AutoTinkClass<GameState>();
+        mTinker.AutoTinkClass<GameState>(.Shallow);
         mTinker.SetValue("game", mGameState);
 
 		mTinker.AddEnum<SDL.Keycode>();

@@ -1,6 +1,7 @@
 using System;
 using KeraLua;
 using LuaTinker.StackHelpers;
+using LuaTinker.Helpers;
 
 namespace LuaTinker.Wrappers
 {
@@ -16,7 +17,7 @@ namespace LuaTinker.Wrappers
 
 		public override void Get(Lua lua)
 		{
-			if (!typeof(T).IsPrimitive && typeof(T).IsStruct)
+			if (!typeof(T).IsPrimitive && typeof(T).IsStruct && !IsFunctionType(typeof(T)))
 				StackHelper.Push(lua, ref *mPtr);
 			else
 				StackHelper.Push(lua, *mPtr);

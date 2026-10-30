@@ -28,6 +28,10 @@ namespace LuaTinker.Wrappers
 		}
 
 		public virtual Type Type => null;
+		public virtual bool CanPassByRef => false;
+
+		public virtual bool TryTakeOwnership(LuaTinkerState tinkerState) => false;
+		public virtual bool TryGiveOwnership(LuaTinkerState tinkerState) => false;
 
 		public virtual ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{

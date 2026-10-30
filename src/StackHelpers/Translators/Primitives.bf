@@ -1,44 +1,36 @@
 using System;
 using System.Diagnostics;
 using KeraLua;
+using LuaTinker.Helpers;
+using LuaTinker.Handlers;
+using LuaTinker.Wrappers;
 
 using internal KeraLua;
+using internal LuaTinker.StackHelpers;
 
 namespace LuaTinker.StackHelpers
 {
-	extension StackHelper
+	internal static struct NumericDispatch<T> where T : var, struct, INumeric
 	{
 		[Inline]
-		public static void Push<T>(Lua lua, T val) where T : var, struct, INumeric
-		{
-			lua.PushInteger((int64)val);
-		}
+		public static void Push(Lua lua, T value) => lua.PushInteger((int64)value);
 
-		[Inline]
-		public static void Push<T>(Lua lua, T? val) where T : var, struct, INumeric
-		{
-			if (!val.HasValue)
-				lua.PushNil();
-			else
-				lua.PushInteger((int64)val);
-		}
-
-		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, INumeric
+		public static T Pop(Lua lua, int32 index)
 		{
 			let res = lua.ToIntegerX(index);
 			if (!res.HasValue)
 			{
 				let luaTinker = lua.TinkerState;
 				luaTinker.SetLastError($"can't convert '{lua.TypeName(index)}' to 'Number'");
-				TryThrowError(lua, luaTinker);
+				StackHelper.TryThrowError(lua, luaTinker);
 				return default;
 			}
 			let value = res.GetValueOrDefault();
-			if (value > (int64)(T)value)
+			if (!CanRepresentInteger(typeof(T), value))
 			{
 				let luaTinker = lua.TinkerState;
-				luaTinker.SetLastError($"number is out of range for the type '{typeof(T)}'");
-				TryThrowError(lua, luaTinker);
+				luaTinker.SetLastError($"number is out of range for the type '{StackHelper.GetBestLuaClassName<T>(luaTinker)}'");
+				StackHelper.TryThrowError(lua, luaTinker);
 				return default;
 			}
 			else
@@ -46,6 +38,26 @@ namespace LuaTinker.StackHelpers
 				return (T)value;
 			}
 		}
+	}
+
+	extension StackHelper
+	{
+		[Inline]
+		public static void Push<T>(Lua lua, T val) where T : var, struct, INumeric
+			=> NumericDispatch<T>.Push(lua, val);
+
+		[Inline]
+		public static void Push<T>(Lua lua, T? val) where T : var, struct, INumeric
+		{
+			if (!val.HasValue)
+				lua.PushNil();
+			else
+				NumericDispatch<T>.Push(lua, val.Value);
+		}
+
+		[Inline]
+		public static T Pop<T>(Lua lua, int32 index) where T : var, struct, INumeric
+			=> NumericDispatch<T>.Pop(lua, index);
 
 		[Inline]
 		public static void Push<T>(Lua lua, T val) where T : var, struct, IFloating
@@ -72,7 +84,15 @@ namespace LuaTinker.StackHelpers
 				TryThrowError(lua, luaTinker);
 				return default;
 			}
-			return (T)value.GetValueOrDefault();
+			let numericValue = value.GetValueOrDefault();
+			if (!CanRepresentFloating(typeof(T), numericValue))
+			{
+				let luaTinker = lua.TinkerState;
+				luaTinker.SetLastError($"number is out of range for the type '{StackHelper.GetBestLuaClassName<T>(luaTinker)}'");
+				TryThrowError(lua, luaTinker);
+				return default;
+			}
+			return (T)numericValue;
 		}
 
 		[Inline]

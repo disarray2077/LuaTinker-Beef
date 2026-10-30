@@ -19,7 +19,7 @@ class WindowManager
         mWindow = SDL.CreateWindow(title, .Undefined, .Undefined, width, height, .OpenGL | .Shown);
         mContext = SDL.GL_CreateContext(mWindow);
         SDL.GL_MakeCurrent(mWindow, (.)mContext);
-        GL.Init(scope (proc) => SDL.GL_GetProcAddress(proc));
+        GL.Init((proc) => SDL.GL_GetProcAddress(proc));
     }
 
     public ~this()

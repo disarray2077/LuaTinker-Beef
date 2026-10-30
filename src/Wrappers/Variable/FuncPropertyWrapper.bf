@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using KeraLua;
 using LuaTinker.StackHelpers;
 
@@ -7,27 +6,24 @@ using internal KeraLua;
 
 namespace LuaTinker.Wrappers
 {
-	public sealed class FuncPropertyWrapper<T, TVar> : VariableWrapperBase
+	public sealed class FuncPropertyWrapper<T, TVar, TGet, TSet> : VariableWrapperBase
 		where T : var
 		where TVar : var
+		where TGet : var, struct
+		where TSet : var, struct
 	{
-		function TVar(T this) mGetFunc;
-		function void(T this, TVar) mSetFunc;
+		TGet mGetFunc;
+		TSet mSetFunc;
 
-		public this(function TVar(T this) getFunc, function void(T this, TVar) setFunc)
+		public this(TGet getFunc, TSet setFunc)
 		{
 			mGetFunc = getFunc;
 			mSetFunc = setFunc;
 		}
 
-		public this(function TVar(T) getFunc, function void(T, TVar) setFunc)
-		{
-			mGetFunc = (.)(void*)getFunc;
-			mSetFunc = (.)(void*)setFunc;
-		}
-
 		public override void Get(Lua lua)
 		{
+#unwarn
 			if (mGetFunc == null)
 			{
 				let tinkerState = lua.TinkerState;
@@ -42,11 +38,19 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));
+			[Comptime]
+			void EmitGetter()
+			{
+				if (typeof(T).IsGenericParam || typeof(TGet).IsGenericParam)
+					return;
+				Compiler.MixinRoot("StackHelper.Push(lua, mGetFunc(StackHelper.Pop!<T>(lua, 1)));");
+			}
+			EmitGetter();
 		}
 
 		public override void Set(Lua lua)
 		{
+#unwarn
 			if (mSetFunc == null)
 			{
 				let tinkerState = lua.TinkerState;
@@ -61,7 +65,18 @@ namespace LuaTinker.Wrappers
 				StackHelper.ThrowError(lua, tinkerState);
 			}
 
-			mSetFunc(StackHelper.Pop!<T>(lua, 1), StackHelper.Pop!<TVar>(lua, 3));
+			[Comptime]
+			void EmitSetter()
+			{
+				if (typeof(T).IsGenericParam || typeof(TSet).IsGenericParam)
+					return;
+				let isInstance = typeof(TSet).GetMethod("Invoke").Get().GetParamName(0) == "this";
+				let receiver = typeof(T).IsStruct
+					? scope $"{(isInstance ? "" : "ref ")}StackHelper.PopRef<T>(lua, 1)"
+					: "StackHelper.Pop!<T>(lua, 1)";
+				Compiler.MixinRoot(scope $"mSetFunc({receiver}, StackHelper.Pop!<TVar>(lua, 3));");
+			}
+			EmitSetter();
 		}
 	}
 }

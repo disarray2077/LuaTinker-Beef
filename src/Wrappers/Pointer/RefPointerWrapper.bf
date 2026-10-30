@@ -13,6 +13,7 @@ namespace LuaTinker.Wrappers
 		}
 
 		public override Type Type => typeof(T);
+		public override bool CanPassByRef => true;
 
 		public override void ToString(String strBuffer)
 		{
@@ -25,7 +26,7 @@ namespace LuaTinker.Wrappers
 	{
 		public new override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{
-			obj = Internal.UnsafeCastToObject(Ptr);
+			obj = Reference;
 			return .Object;
 		}
 	}

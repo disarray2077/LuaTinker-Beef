@@ -12,13 +12,25 @@ using LuaTinker.StackHelpers;
 using KeraLua;
 
 using internal KeraLua;
+using internal LuaTinker;
+using internal LuaTinker.StackHelpers;
+using internal LuaTinker.Handlers;
 
 namespace LuaTinker
 {
+	/// Selects storage for class instances created by a bound constructor.
+	public enum ClassAllocation
+	{
+		Userdata,
+		Heap
+	}
+
 	public class LuaTinker
 	{
 		private Lua mLua;
-		private LuaUserdataAllocator mUserdataAllocator;
+		private LuaUserdataAllocator mPointerUserdataAllocator;
+		private LuaUserdataAllocator mVariableUserdataAllocator;
+		private LuaUserdataAllocator mIndexerUserdataAllocator;
 		private LuaTinkerState mTinkerState;
 
 		/// Initializes a new instance of the LuaTinker class.
@@ -26,10 +38,18 @@ namespace LuaTinker
 		public this(Lua lua)
 		{
 			mLua = lua;
-			mUserdataAllocator = .(lua);
-			Init();
+			mPointerUserdataAllocator = .(lua, .Pointer);
+			mVariableUserdataAllocator = .(lua, .Variable);
+			mIndexerUserdataAllocator = .(lua, .Indexer);
 
-			mTinkerState = lua.TinkerState;
+			mTinkerState = lua.GetOrCreateTinkerState();
+			AddCStringConversion();
+			StackHelper.RegisterArgumentHintMetatable(mLua);
+			AddNumericHints();
+			mLua.PushCClosure(=> TakeOwnershipHandler, 0);
+			mLua.SetGlobal("take_ownership");
+			mLua.PushCClosure(=> GiveOwnershipHandler, 0);
+			mLua.SetGlobal("give_ownership");
 		}
 
 		public ~this()
@@ -48,39 +68,114 @@ namespace LuaTinker
 		{
 			Debug.WriteLine(StackHelper.EnumStack(mLua, .. scope .()));
 		}
-
-		private void Init()
+		private void AddNumericHints()
 		{
-			// Add GC Mate
-			mLua.CreateTable(0, 2);
+			mLua.CreateTable(0, 12);
+			mLua.SetGlobal("ref");
+			mLua.CreateTable(0, 13);
+			mLua.PushString("void");
+			StackHelper.PushNullPointerArgumentHint(mLua);
+			mLua.RawSet(-3);
+			mLua.SetGlobal("nullptr");
+
+			AddNumericHints<int8>("int8");
+			AddNumericHints<uint8>("uint8");
+			AddNumericHints<int16>("int16");
+			AddNumericHints<uint16>("uint16");
+			AddNumericHints<int32>("int32");
+			AddNumericHints<uint32>("uint32");
+			AddNumericHints<int64>("int64");
+			AddNumericHints<uint64>("uint64");
+			AddNumericHints<int>("int");
+			AddNumericHints<uint>("uint");
+			AddNumericHints<float>("float");
+			AddNumericHints<double>("double");
+		}
+
+		private void AddNumericHints<T>(String name) where T : var, struct, INumeric
+		{
+			mLua.CreateTable(0, 1);
+			mLua.PushString("cast");
+			mLua.PushCClosure(=> NumericArgumentCastHandler<T>, 0);
+			mLua.RawSet(-3);
+			mLua.SetGlobal(name);
+
+			mLua.GetGlobal("ref");
+			AddOwnedValueConstructor<T>(name);
+			mLua.Pop(1);
+
+			mLua.GetGlobal("nullptr");
+			mLua.PushString(name);
+			StackHelper.PushNullPointerArgumentHint(mLua, typeof(T*));
+			mLua.RawSet(-3);
+			mLua.Pop(1);
+		}
+
+		private void AddCStringConversion()
+		{
+			if (mLua.GetGlobal("string") == .Table)
+			{
+				mLua.PushString("from_cstr");
+				mLua.PushCClosure(=> CStringFromPointerHandler, 0);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		private void AddOwnedValueConstructor<T>(StringView name) where T : var, struct, INumeric
+		{
+			mLua.CreateTable(0, 6);
+			UserdataMetatables.Mark(mLua, -1, .Pointer);
+			mLua.PushString("__index");
+			mLua.PushCClosure(=> IndexGetHandler, 0);
+			mLua.RawSet(-3);
+			mLua.PushString("__newindex");
+			mLua.PushCClosure(=> IndexSetHandler, 0);
+			mLua.RawSet(-3);
 			mLua.PushString("__gc");
 			mLua.PushCClosure(=> PointerDestructorHandler, 0);
 			mLua.RawSet(-3);
 			mLua.PushString("__tostring");
 			mLua.PushCClosure(=> PointerToStringHandler, 0);
 			mLua.RawSet(-3);
-			mLua.SetGlobal("__noreg_meta");
+			mLua.PushString("value");
+			new:mVariableUserdataAllocator ClassFieldWrapper<T>(0);
+			mLua.RawSet(-3);
+
+			mLua.PushString(name);
+			mLua.PushValue(-2);
+			mLua.PushCClosure(=> OwnedValueConstructorHandler<T>, 1);
+			mLua.RawSet(-4);
+			mLua.Pop(1);
+		}
+
+		private void PushEnumTable<E>(bool typed) where E : enum
+		{
+			mLua.CreateTable(0, typeof(E).FieldCount + 1);
+			for (let field in typeof(E).GetFields())
+			{
+				mLua.PushString(field.Name);
+				let value = field.[Friend]mFieldData.[Friend]mData;
+				if (typed)
+					StackHelper.PushNumericArgumentHint(mLua, typeof(E), value);
+				else
+					mLua.PushInteger(value);
+				mLua.RawSet(-3);
+			}
+			mLua.PushString("cast");
+			mLua.PushCClosure(=> NumericArgumentCastHandler<E>, 0);
+			mLua.RawSet(-3);
 		}
 
 		/// Registers an enumeration type in the Lua global scope.
-		/// Creates a Lua table where keys are the enum member names and values are their integer equivalents.
+		/// By default member values are Lua integers; typed members carry numeric cast hints.
 		/// @param name The name to use for the enum table in Lua. If empty, the type's name is used.
-		public void AddEnum<E>(String name = String.Empty)
-			where E : enum
+		public void AddEnum<E>(String name = String.Empty, bool typed = false) where E : enum
 		{
 			var name;
 			if (name.IsEmpty)
 				name = typeof(E).GetName(.. scope:: String());
-
-			mLua.CreateTable(0, typeof(E).FieldCount);
-
-			for (let field in typeof(E).GetFields())
-			{
-				mLua.PushString(field.Name);
-				mLua.PushInteger(field.[Friend]mFieldData.[Friend]mData);
-				mLua.SetTable(-3);
-			}
-
+			PushEnumTable<E>(typed);
 			mLua.SetGlobal(name);
 		}
 
@@ -102,254 +197,13 @@ namespace LuaTinker
 			Debug.AssertNotStack(func);
 			mTinkerState.RegisterAliveObject(func);
 
-			new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
-			// register destructor
-			{
-			    mLua.CreateTable(0, 2);
-			    mLua.PushString("__gc");
-			    mLua.PushCClosure(=> PointerDestructorHandler, 0);
-			    mLua.RawSet(-3);
-				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> PointerToStringHandler, 0);
-				mLua.RawSet(-3);
-			    mLua.SetMetaTable(-2);
-			}
+			new:mPointerUserdataAllocator ClassInstanceWrapper<F>(func, true);
 			mLua.PushCClosure(=> DelegateCallHandler<F>, 1);
 			mLua.SetGlobal(name);
 		}
 		
-		/// Automatically binds a Beef class to Lua using its type name.
-		[Inline]
-		public void AutoTinkClass<T>()
-			=> AutoTinkClass<T, const "">();
-
-		/// Automatically binds a Beef class to Lua using compile-time reflection.
-		/// This function generates bindings for public constructors, methods, fields, properties, and indexers.
-		/// @where Name A compile-time string specifying the class name in Lua. If empty, the type's name is used.
-		public void AutoTinkClass<T, Name>()
-			where Name : const String
-		{
-			[Comptime]
-			static void EmitAutoTinkClass<T, Name>()
-				where Name : const String
-			{
-				let type = typeof(T);
-				if (type.IsGenericParam)
-					return;
-
-				let code = scope String();
-
-				bool isConstructorEmitted = false;
-
-				if (!type.IsStatic)
-				{
-					code.AppendF($"AddClass<T>(\"{Name}\");\n");
-					code.Append("AddClassMethod<T, function T(T)>(\"self\", (self) => self);\n");
-				}
-
-				code.AppendF($"AddNamespace(\"{type.GetFullName(.. scope .())}\");\n");
-
-				Dictionary<StringView, int> overloads = scope .();
-				for (let method in type.GetMethods(.Public))
-				{
-					if (overloads.TryAdd(method.Name, let keyPtr, let valuePtr))
-						*valuePtr = 1;
-					else
-						*valuePtr += 1;
-				}
-
-				for (let (methodName, overloadCount) in overloads)
-				{
-					if (overloadCount <= 1)
-						@methodName.Remove();
-				}
-				
-				methodLoop: for (let method in type.GetMethods())
-				{
-					if (method.IsDestructor || method.Name.Contains("$") || method.IsMixin || !method.IsPublic)
-						continue;
-
-					// Ignore generics
-					if (method.GenericArgCount > 0)
-						continue;
-
-					// Ignore comptime/intrinsics.
-					if (method.HasCustomAttribute<ComptimeAttribute>() || method.HasCustomAttribute<IntrinsicAttribute>())
-						continue;
-
-					// Ignore unchecked methods.
-					if (method.HasCustomAttribute<UncheckedAttribute>())
-						continue;
-
-					// Ignore methods from base classes.
-					if (method.DeclaringType != type)
-						continue;
-
-					// Ignore operators.
-					if (method.Name.Length == 0)
-						continue;
-
-					// Properties/Indexers are handled later.
-					if (method.Name.StartsWith("get__") ||
-						method.Name.StartsWith("set__"))
-						continue;
-					
-					if (method.IsConstructor)
-					{
-						if (method.IsStatic || type.IsAbstract)
-							continue;
-
-						if (isConstructorEmitted)
-							continue;
-
-						code.Append("AddClassCtor<T>();\n");
-						isConstructorEmitted = true;
-						continue;
-					}
-
-					if (overloads.ContainsKey(method.Name))
-					{
-						if (overloads[method.Name] == -1)
-							continue;
-						overloads[method.Name] = -1;
-
-						if (method.IsStatic)
-							code.AppendF($"AddNamespaceMethod<T, const \"{method.Name}\">(\"{type.GetFullName(.. scope .())}\");\n");
-						else
-							code.AppendF($"AddClassMethod<T, const \"{method.Name}\">();\n");
-					}
-					else
-					{
-						String methodParams = scope .();
-
-						if (!method.IsStatic)
-							methodParams.AppendF($"T this");
-
-						for (int i < method.ParamCount)
-						{
-							if (!methodParams.IsEmpty)
-								methodParams.Append(", ");
-
-							if (method.GetParamFlags(i).HasFlag(.Params))
-								methodParams.AppendF("params ");
-
-							let paramType = method.GetParamType(i);
-
-							if (var retParamType = paramType as RefType)
-							{
-								switch (retParamType.RefKind)
-								{
-								case .Ref:
-									methodParams.Append("ref ");
-								case .Out:
-									// Let's just ignore this method for now...
-									// TODO: Maybe convert the Beef method with out parameter to a multi-return method in lua?
-									continue methodLoop;
-								default:
-									Runtime.FatalError(scope $"Not implemented {retParamType.RefKind}!");
-								}
-							}
-
-							methodParams.AppendF($"comptype({paramType.GetTypeId()})");
-						}
-
-						String retTypeCode = scope .();
-						retTypeCode.AppendF($"comptype({method.ReturnType.GetTypeId()})");
-
-						if (method.IsStatic)
-							code.AppendF($"AddNamespaceMethod<function {retTypeCode}({methodParams})>(\"{type.GetFullName(.. scope .())}\", \"{method.Name}\", => T.{method.Name});\n");
-						else
-							code.AppendF($"AddClassMethod<T, function {retTypeCode}({methodParams})>(\"{method.Name}\", => T.{method.Name});\n");
-					}
-				}
-
-				fieldLoop: for (let field in type.GetFields())
-				{
-					if (field.Name.Contains("$") || !field.IsPublic)
-						continue;
-
-					// Ignore fields from base classes.
-					if (field.DeclaringType != type)
-						continue;
-
-					if (field.IsStatic)
-						NOP!();//code.AppendF($"AddNamespaceVar(\"{type.GetFullName(.. scope .())}\");\n");
-					else
-						code.AppendF($"AddClassVar<T, const \"{field.Name}\">();\n");
-				}
-
-				Dictionary<StringView, PropertyBase> properties = scope .();
-				GetTypeProperties(type, properties);
-
-				for (let (name, info) in properties)
-				{
-					if (info.DeclaringType != type)
-						continue;
-
-					if (let indexerInfo = info as IndexerProperty)
-					{
-						if (indexerInfo.Parameters.IsEmpty || indexerInfo.Parameters.Count > 1)
-							continue;
-						code.AppendF($"AddClassIndexer<T, comptype({indexerInfo.Parameters[0].type.GetTypeId()})>();\n");
-					}
-					else if (let propertyInfo = info as NormalProperty)
-					{
-						// TODO: Static
-						if (propertyInfo.IsStatic)
-							continue;
-						switch (propertyInfo.Methods)
-						{
-						case .GetSet:
-							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, (self, value) => self.{name} = value);\n");
-						case .Get:
-							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", (self) => self.{name}, null);\n");
-						case .Set:
-							code.AppendF($"AddClassProperty<T, comptype({propertyInfo.Type.GetTypeId()})>(\"{name}\", null, (self, value) => self.{name} = value);\n");
-						default:
-							Runtime.FatalError("Unexpected state");
-						}
-					}
-				}
-
-				Compiler.MixinRoot(code);
-			}
-
-			/*
-			[Comptime]
-			static void Emit<T>()
-			{
-				if (typeof(T).IsGenericParam)
-					return;
-
-				String code = scope .();
-
-				List<Type> inheritanceChain = scope .();
-				for (var type = typeof(T); type != typeof(Object) && type != null; type = type.BaseType)
-					inheritanceChain.Add(type);
-
-				for (let type in inheritanceChain.Reversed)
-				{
-					if (type != typeof(T))
-					{
-						code.AppendF(
-							$"""
-							if (!mTinkerState.IsClassRegistered<comptype({type.GetTypeId()})>())
-								AutoTinkClass<comptype({type.GetTypeId()})>();\n
-							""");
-					}
-				}
-
-				code.Append("EmitAutoTinkClass<T, const Name>();");
-				Compiler.MixinRoot(code);
-			}
-			*/
-
-#unwarn
-			EmitAutoTinkClass<T, const Name>();
-		}
-
 		/// Registers a Beef class type in Lua.
-		/// This creates a global table that will serve as the metatable for instances of this class.
+		/// Stores the instance metatable in the registry and exposes it as a global class table.
 		/// @param name The name to use for the class in Lua. If empty, the type's name is used.
 		public void AddClass<T>(String name = String.Empty)
 		{
@@ -364,7 +218,18 @@ namespace LuaTinker
 				}
 			}
 
-			mTinkerState.SetClassName<T>(name);
+			if (CreateClass(typeof(T), name))
+				mLua.SetGlobal(name);
+		}
+
+		private bool CreateClass(Type type, String name)
+		{
+			if (!mTinkerState.TryRegisterClass(name, type))
+			{
+				Debug.Assert(false, mTinkerState.GetLastError());
+				StackHelper.TryThrowError(mLua, mTinkerState);
+				return false;
+			}
 
 			mLua.CreateTable(0, 5);
 
@@ -388,7 +253,19 @@ namespace LuaTinker
 			mLua.PushCClosure(=> PointerToStringHandler, 0);
 			mLua.RawSet(-3);
 
-			mLua.SetGlobal(name);
+			UserdataMetatables.Mark(mLua, -1, .Pointer);
+			mTinkerState.StoreClassMetatable(mLua, type);
+			return true;
+		}
+
+		private bool EnsureClassRegistered<T>()
+		{
+			if (mTinkerState.IsClassRegistered<T>())
+				return true;
+			mTinkerState.SetLastError($"can't bind class '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}' (class not registered.)");
+			Debug.Assert(false, mTinkerState.GetLastError());
+			StackHelper.TryThrowError(mLua, mTinkerState);
+			return false;
 		}
 
 		/// Establishes an inheritance relationship between two registered classes in Lua.
@@ -396,11 +273,12 @@ namespace LuaTinker
 		/// @where P The parent class type.
 		public void AddClassParent<T, P>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>() || !EnsureClassRegistered<P>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString("__parent");
-				mLua.GetGlobal(mTinkerState.GetClassName<P>());
+				mTinkerState.PushClassMetatable<P>(mLua);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -408,17 +286,22 @@ namespace LuaTinker
 
 		/// Binds the constructors of a class, making the class table callable in Lua to create new instances.
 		/// This version dynamically finds a matching constructor at runtime.
-		public void AddClassCtor<T>()
+		/// @param allocation Heap instances can transfer ownership to Beef through give_ownership.
+		public void AddClassCtor<T>(ClassAllocation allocation = .Userdata)
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			Runtime.Assert(allocation == .Userdata || typeof(T).IsObject, "Heap allocation requires a class");
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
-				mLua.PushCClosure(=> DynamicCreatorHandler<T>, 0);
+				mLua.PushBoolean(allocation == .Heap);
+				mLua.PushCClosure(=> DynamicCreatorHandler<T>, 1);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> ConstructorToStringHandler<T>, 0);
+				mLua.PushString(scope $"<constructor for {typeof(T)}>");
+				mLua.PushCClosure(=> ConstructorToStringHandler, 1);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -427,17 +310,22 @@ namespace LuaTinker
 
 		/// Binds a specific constructor of a class, making the class table callable in Lua.
 		/// @where Args A single argument type or a tuple representing the constructor's argument types.
-		public void AddClassCtor<T, Args>()
+		/// @param allocation Heap instances can transfer ownership to Beef through give_ownership.
+		public void AddClassCtor<T, Args>(ClassAllocation allocation = .Userdata)
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			Runtime.Assert(allocation == .Userdata || typeof(T).IsObject, "Heap allocation requires a class");
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.CreateTable(0, 2);
 				mLua.PushString("__call");
-				mLua.PushCClosure(=> CreatorLayer<T, Args>, 0);
+				mLua.PushBoolean(allocation == .Heap);
+				mLua.PushCClosure(=> CreatorLayer<T, Args>, 1);
 				mLua.RawSet(-3);
 				mLua.PushString("__tostring");
-				mLua.PushCClosure(=> ConstructorToStringHandler<T>, 0);
+				mLua.PushString(scope $"<constructor for {typeof(T)}>");
+				mLua.PushCClosure(=> ConstructorToStringHandler, 1);
 				mLua.RawSet(-3);
 				mLua.SetMetaTable(-2);
 			}
@@ -449,8 +337,9 @@ namespace LuaTinker
 		/// @where TKey The key type of the indexer.
 		public void AddClassIndexer<T, TKey>()
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (!mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) != .Table)
 			{
 				mLua.Pop(1);
 				return;
@@ -459,13 +348,13 @@ namespace LuaTinker
 			mLua.PushString("__bfindexer");
 			mLua.RawGet(-2);
 
-			let existingIndexer = User2Type.GetTypePtr<IndexerWrapperBase>(mLua, -1);
+			let existingIndexer = User2Type.TryGetTypePtr<IndexerWrapperBase>(mLua, -1);
 			mLua.Pop(1);
 
 			if (existingIndexer == null)
 			{
 				mLua.PushString("__bfindexer");
-				new:mUserdataAllocator IndexerWrapper<T, TKey>();
+				new:mIndexerUserdataAllocator IndexerWrapper<T, TKey>();
 				mLua.RawSet(-3);
 			}
 			else if (var aggregator = existingIndexer as IndexerAggregatorWrapper)
@@ -476,7 +365,7 @@ namespace LuaTinker
 			}
 			else
 			{
-				var newAggregator = new:mUserdataAllocator IndexerAggregatorWrapper();
+				var newAggregator = new:mIndexerUserdataAllocator IndexerAggregatorWrapper();
 
 				let existingIndexerClone = existingIndexer.CreateNew();
 				let newIndexer = new IndexerWrapper<T, TKey>();
@@ -488,14 +377,6 @@ namespace LuaTinker
 
 				mLua.PushString("__bfindexer");
 				mLua.PushValue(-2);
-				// register destructor
-				{
-				    mLua.CreateTable(0, 1);
-				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> IndexerDestructorHandler, 0);
-				    mLua.RawSet(-3);
-				    mLua.SetMetaTable(-2);
-				}
 				mLua.RawSet(-4);
 
 				mLua.Pop(1);
@@ -511,8 +392,9 @@ namespace LuaTinker
 		/// @param func The function pointer to bind.
 		public void AddClassMethod<T, F>(String name, F func) where F : var, struct
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
 				mLua.PushLightUserData(func);
@@ -528,8 +410,9 @@ namespace LuaTinker
 		public void AddClassMethod<T, Name>(String name = "")
 			where Name : const String
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
 				mLua.PushCClosure(=> DynamicCallHandler<T, const Name, false>, 0);
@@ -564,26 +447,28 @@ namespace LuaTinker
 			}
 			_Emit();
 
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				new:mUserdataAllocator ClassFieldWrapper<comptype(memberTypeId)>(memberOffset);
+				new:mVariableUserdataAllocator ClassFieldWrapper<comptype(memberTypeId)>(memberOffset);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
 		}
 
-		/// Binds a property by its name to a registered class.
+		/// Binds a property by its name to a registered class or struct.
 		/// @param name The name of the property in Lua.
 		public void AddClassProperty<T, Name>(String name = "")
 			where Name : const String
 		{
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name.IsEmpty ? Name : name);
-				new:mUserdataAllocator ClassPropertyWrapper<T, Name>();
+				new:mVariableUserdataAllocator ClassPropertyWrapper<T, Name>();
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -594,28 +479,48 @@ namespace LuaTinker
 		/// @param getter The getter delegate. Can be null for a write-only property.
 		/// @param setter The setter delegate. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar, TGet, TSet>(String name, TGet getter, TSet setter)
+			where T : class
 			where TGet : class, delegate TVar(T)
 			where TSet : class, delegate void(T, TVar)
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
 			Debug.AssertNotStack(getter);
 			Debug.AssertNotStack(setter);
+			if (!EnsureClassRegistered<T>())
+				return;
 			mTinkerState.RegisterAliveObject(getter);
 			mTinkerState.RegisterAliveObject(setter);
 
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator DelegatePropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
-				// register destructor
-				{
-				    mLua.CreateTable(0, 1);
-				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> VariableDestructorHandler, 0);
-				    mLua.RawSet(-3);
-				    mLua.SetMetaTable(-2);
-				}
+				new:mVariableUserdataAllocator DelegatePropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		/// Binds a property to a struct using explicit getter and setter delegates.
+		/// @param name The name of the property in Lua.
+		/// @param getter The getter delegate. Can be null for a write-only property.
+		/// @param setter The setter delegate. Can be null for a read-only property.
+		public void AddStructProperty<T, TVar, TGet, TSet>(String name, TGet getter, TSet setter)
+			where T : struct
+			where TGet : class, delegate TVar(T)
+			where TSet : class, delegate void(ref T, TVar)
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			Debug.AssertNotStack(getter);
+			Debug.AssertNotStack(setter);
+			if (!EnsureClassRegistered<T>())
+				return;
+			mTinkerState.RegisterAliveObject(getter);
+			mTinkerState.RegisterAliveObject(setter);
+
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
+			{
+				mLua.PushString(name);
+				new:mVariableUserdataAllocator DelegatePropertyWrapper<T, TVar, TGet, TSet>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -626,13 +531,34 @@ namespace LuaTinker
 		/// @param getter The getter function. Can be null for a write-only property.
 		/// @param setter The setter function. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar>(String name, function TVar(T) getter, function void(T, TVar) setter)
+			where T : class
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T), function void(T, TVar)>(getter, setter);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		/// Binds a property to a struct using explicit getter and setter function pointers.
+		// @param name The name of the property in Lua.
+		/// @param getter The getter function. Can be null for a write-only property.
+		/// @param setter The setter function. Can be null for a read-only property.
+		public void AddStructProperty<T, TVar>(String name, function TVar(T) getter, function void(ref T, TVar) setter)
+			where T : struct
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
+			{
+				mLua.PushString(name);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T), function void(ref T, TVar)>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -643,13 +569,34 @@ namespace LuaTinker
 		/// @param getter The getter function. Can be null for a write-only property.
 		/// @param setter The setter function. Can be null for a read-only property.
 		public void AddClassProperty<T, TVar>(String name, function TVar(T this) getter, function void(T this, TVar) setter)
+			where T : class
 		{
 			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
-			mLua.GetGlobal(mTinkerState.GetClassName<T>());
-			if (mLua.IsTable(-1))
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
 			{
 				mLua.PushString(name);
-				new:mUserdataAllocator FuncPropertyWrapper<T, TVar>(getter, setter);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T this), function void(T this, TVar)>(getter, setter);
+				mLua.RawSet(-3);
+			}
+			mLua.Pop(1);
+		}
+
+		/// Binds a property to a struct using explicit getter and setter function pointers (with 'this' syntax).
+		/// @param name The name of the property in Lua.
+		/// @param getter The getter function. Can be null for a write-only property.
+		/// @param setter The setter function. Can be null for a read-only property.
+		public void AddStructProperty<T, TVar>(String name, function TVar(T this) getter, function void(mut T this, TVar) setter)
+			where T : struct
+		{
+			Debug.Assert(getter != null || setter != null, "Properties must have at least a getter or a setter");
+			if (!EnsureClassRegistered<T>())
+				return;
+			if (mTinkerState.PushClassMetatable<T>(mLua) == .Table)
+			{
+				mLua.PushString(name);
+				new:mVariableUserdataAllocator FuncPropertyWrapper<T, TVar, function TVar(T this), function void(mut T this, TVar)>(getter, setter);
 				mLua.RawSet(-3);
 			}
 			mLua.Pop(1);
@@ -711,7 +658,7 @@ namespace LuaTinker
 		/// Ensures a namespace (a nested table structure) exists in Lua. Creates it if it doesn't.
 		/// @param path A dot-separated namespace path (e.g., "MyLib.Utils").
 		/// @return True if the table was created, otherwise false.
-		public bool AddNamespace(String path)
+		internal bool AddNamespace(String path)
 		{
 			bool parentExists = false;
 			bool first = true;
@@ -816,34 +763,24 @@ namespace LuaTinker
 
 		/// Creates a new nested table in Lua.
 		/// @param path A dot-separated path for the table.
+		[Inline]
 		public void NewTable(String path)
 			=> AddNamespace(path);
 
 		/// Registers an enumeration type within a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param enumName The name for the enum table in Lua. If empty, the type's name is used.
-		public void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty)
-			where E : enum
+		internal void AddNamespaceEnum<E>(String namespacePath, String enumName = String.Empty, bool typed = false) where E : enum
 		{
 			if (FindNamespaceTable(namespacePath))
 			{
 				var enumName;
 				if (enumName.IsEmpty)
 					enumName = typeof(E).GetName(.. scope:: String());
-
 				mLua.PushString(enumName);
-				mLua.CreateTable(0, typeof(E).FieldCount);
-	
-				for (let field in typeof(E).GetFields())
-				{
-					mLua.PushString(field.Name);
-					mLua.PushInteger(field.[Friend]mFieldData.[Friend]mData);
-					mLua.SetTable(-3);
-				}
-
+				PushEnumTable<E>(typed);
 				mLua.RawSet(-3);
 			}
-
 			mLua.Pop(1);
 		}
 
@@ -851,7 +788,7 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param methodName The name of the function in the namespace.
 		/// @param func The function to bind.
-		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, struct
+		internal void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, struct
 		{
 			if (FindNamespaceTable(namespacePath))
 			{
@@ -867,25 +804,14 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param methodName The name of the function in the namespace.
 		/// @param func The delegate to bind.
-		public void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
+		internal void AddNamespaceMethod<F>(String namespacePath, String methodName, F func) where F : var, class
 		{
 			mTinkerState.RegisterAliveObject(func);
 
 			if (FindNamespaceTable(namespacePath))
 			{
 				mLua.PushString(methodName);
-				new:mUserdataAllocator ClassInstanceWrapper<F>(func, true);
-				// register destructor
-				{
-				    mLua.CreateTable(0, 2);
-				    mLua.PushString("__gc");
-				    mLua.PushCClosure(=> PointerDestructorHandler, 0);
-				    mLua.RawSet(-3);
-					mLua.PushString("__tostring");
-					mLua.PushCClosure(=> PointerToStringHandler, 0);
-					mLua.RawSet(-3);
-				    mLua.SetMetaTable(-2);
-				}
+				new:mPointerUserdataAllocator ClassInstanceWrapper<F>(func, true);
 				mLua.PushCClosure(=> DelegateCallHandler<F>, 1);
 				mLua.RawSet(-3);
 			}
@@ -895,7 +821,7 @@ namespace LuaTinker
 		/// Binds a static method by its name into a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param name The name of the method in Lua.
-		public void AddNamespaceMethod<T, Name>(String namespacePath, String name = "")
+		internal void AddNamespaceMethod<T, Name>(String namespacePath, String name = "")
 			where Name : const String
 		{
 			if (FindNamespaceTable(namespacePath))
@@ -907,11 +833,49 @@ namespace LuaTinker
 			mLua.Pop(1);
 		}
 
+		/// Binds a mutable static field of T to a Lua namespace.
+		/// @param namespacePath The dot-separated path to the target namespace table.
+		/// @param name The name of the variable.
+		internal void AddNamespaceVar<T, Name>(String namespacePath, String name = "")
+			where Name : const String
+		{
+			[Comptime]
+			static void EmitField()
+			{
+				let type = typeof(T);
+				if (type.IsGenericParam)
+				{
+					Compiler.MixinRoot("mLua.PushNil();");
+					return;
+				}
+				let field = type.GetField(Name).Get();
+				if (!field.IsStatic || field.IsConst || field.IsReadOnly)
+					Runtime.FatalError(scope $"AddNamespaceVar requires a mutable static field: {type}.{Name}");
+				Compiler.MixinRoot(scope $"new:mVariableUserdataAllocator VariableWrapper<comptype({field.FieldType.GetTypeId()})>(&T.{Name});");
+			}
+
+			let top = mLua.GetTop();
+			defer mLua.SetTop(top);
+			if (FindNamespaceTable(namespacePath))
+			{
+				StackHelper.PushNamespaceBindings(mLua);
+				let luaName = name.IsEmpty ? Name : name;
+				mLua.PushString(luaName);
+				EmitField();
+				mLua.RawSet(-3);
+				mLua.Pop(1);
+				mLua.PushString(luaName);
+				mLua.PushNil();
+				mLua.RawSet(-4);
+				mLua.SetMetaTable(-2);
+			}
+		}
+
 		/// Adds a variable by value to a specified Lua namespace.
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param varName The name of the variable.
 		/// @param value The value to set.
-		public void AddNamespaceVar<TVar>(String namespacePath, String varName, TVar value)
+		internal void AddNamespaceVar<TVar>(String namespacePath, String varName, TVar value)
 			where TVar : var
 		{
 			if (FindNamespaceTable(namespacePath))
@@ -927,7 +891,7 @@ namespace LuaTinker
 		/// @param namespacePath The dot-separated path to the target namespace table.
 		/// @param varName The name of the variable.
 		/// @param value A reference to the value to set.
-		public void AddNamespaceVar<TVar>(String namespacePath, String varName, ref TVar value)
+		internal void AddNamespaceVar<TVar>(String namespacePath, String varName, ref TVar value)
 			where TVar : var
 		{
 			if (FindNamespaceTable(namespacePath))
@@ -947,6 +911,23 @@ namespace LuaTinker
 			if (mTinkerState.HasError)
 				return .Err(mTinkerState.GetLastError());
 			val
+		}
+
+		[Comptime]
+		private static void EmitRValPops<RVal>() where RVal : var
+		{
+			let type = typeof(RVal);
+			let code = scope String();
+
+			if (type.IsTuple)
+			{
+				for (let field in type.GetFields(.DeclaredOnly))
+					code.AppendF($"result.{field.Name} = TryTinker!(StackHelper.Pop<comptype({field.FieldType.GetTypeId()})>(mLua, {@field.Index - type.FieldCount}));\n");
+			}
+			else if (type != typeof(void))
+				code.Append("result = TryTinker!(StackHelper.Pop<RVal>(mLua, -1));\n");
+
+			Compiler.MixinRoot(code);
 		}
 		
 		/// Calls a global Lua function with no arguments and expects no return value.
@@ -998,14 +979,16 @@ namespace LuaTinker
 			}
 
 			Debug.Assert(mLua.GetTop() == 0);
-			const int32 results = typeof(RVal) == typeof(void) ? 0 : 1;
+			defer mLua.SetTop(0);
 			mTinkerState.ClearError();
 			
 			mLua.GetGlobal(name);
 			if (mLua.IsFunction(-1))
 			{
+				let resultCount = typeof(RVal) == typeof(void) ? 0 : typeof(RVal).IsTuple ? typeof(RVal).FieldCount : 1;
+
 				int argc = EmitCallPushes<Args>();
-				if (mLua.PCall((.)argc, results, 0) != .OK)
+				if (mLua.PCall((.)argc, (.)resultCount, 0) != .OK)
 				{
 					mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
 					return .Err(mTinkerState.GetLastError());
@@ -1017,17 +1000,47 @@ namespace LuaTinker
 				return .Err(mTinkerState.GetLastError());
 			}
 
-			if (results == 1)
+			RVal result = default;
+			EmitRValPops<RVal>();
+			return .Ok(result);
+		}
+
+		/// Evaluates a Lua chunk and expects no return values.
+		/// @param chunk The Lua source to evaluate.
+		/// @return A result indicating success or an error message.
+		[Inline]
+		public Result<void, StringView> Eval(StringView chunk)
+			=> Eval<void>(chunk);
+
+		/// Evaluates a Lua chunk and converts its return values to the requested type.
+		/// @where RVal The expected return type. Use `void` for no return values or a tuple for multiple values.
+		/// @param chunk The Lua source to evaluate.
+		/// @return A result containing the converted return value(s) or an error message.
+		public Result<RVal, StringView> Eval<RVal>(StringView chunk)
+			where RVal : var
+		{
+			RequireGetValueResultType<RVal>();
+
+			Debug.Assert(mLua.GetTop() == 0);
+			defer mLua.SetTop(0);
+			mTinkerState.ClearError();
+
+			if (mLua.LoadString(chunk) != .OK)
 			{
-				defer mLua.Pop(1);
-				return .Ok(TryTinker!(StackHelper.Pop<RVal>(mLua, -1)));
+				mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
+				return .Err(mTinkerState.GetLastError());
 			}
 
-			// TODO: Support for tuples
+			let resultCount = typeof(RVal) == typeof(void) ? 0 : typeof(RVal).IsTuple ? typeof(RVal).FieldCount : 1;
+			if (mLua.PCall(0, (.)resultCount, 0) != .OK)
+			{
+				mTinkerState.SetLastError(StackHelper.Pop!<StringView>(mLua, -1));
+				return .Err(mTinkerState.GetLastError());
+			}
 
-			// TODO: Remove the #unwarn when the compiler bug is solved.
-#unwarn // COMPILER-BUG: The compiler thinks that this return is unreachable.
-			return .Ok(default);
+			RVal result = default;
+			EmitRValPops<RVal>();
+			return .Ok(result);
 		}
 
 		/// Finds and pushes the parent table of a dot-separated path onto the Lua stack.
@@ -1071,20 +1084,28 @@ namespace LuaTinker
 			return true;
 		}
 
+		[Comptime]
+		private static void RequireGetValueResultType<T>() where T : var
+		{
+			if (GetSpanElement(typeof(T)) != null)
+				Runtime.FatalError("GetValue cannot return a caller-scoped Span; use the GetSpan mixin");
+		}
+
 		/// Gets the value of a global Lua variable.
 		/// @param name The name of the global variable.
 		/// @return A result containing the value or an error message.
 		public Result<T, StringView> GetValue<T>(StringView name) where T : var
 		{
+			RequireGetValueResultType<T>();
 			Debug.Assert(mLua.GetTop() == 0);
 			mTinkerState.ClearError();
 
 			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 
-			if (mLua.IsNil(-1) || !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			if (mLua.IsNil(-1) || !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}'");
 				return .Err(mTinkerState.GetLastError());
 			}
 
@@ -1102,9 +1123,9 @@ namespace LuaTinker
 			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 
-			if (!mLua.IsNil(-1) && !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			if (!mLua.IsNil(-1) && !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}'");
 				return .Err(mTinkerState.GetLastError());
 			}
 
@@ -1122,9 +1143,9 @@ namespace LuaTinker
 			mLua.GetGlobal(name);
 			defer mLua.Pop(1);
 
-			if (!mLua.IsNil(-1) && !StackHelper.CheckMetaTableValidity<T>(mLua, -1))
+			if (!mLua.IsNil(-1) && !StackHelper.CanAttemptValueConversion<T>(mLua, -1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{typeof(T)}'");
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.GetBestLuaClassName<T>(mTinkerState)}'");
 				return .Err(mTinkerState.GetLastError());
 			}
 
@@ -1151,7 +1172,8 @@ namespace LuaTinker
 
 			if (mLua.IsNil(-1))
 			{
-				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to 'System.String'");
+				// Allow this public mixin to use the internal helper in the caller's scope.
+				mTinkerState.SetLastError($"can't convert global '{name}' ({mLua.TypeName(-1)}) to '{StackHelper.[Friend]GetBestLuaClassName<String>(mTinkerState)}'");
 				result = .Err(mTinkerState.GetLastError());
 			}
 			else
@@ -1161,6 +1183,22 @@ namespace LuaTinker
 					result = .Err(mTinkerState.GetLastError());
 			}
 
+			result
+		}
+
+		/// Gets a global Lua variable as a Span.
+		/// This mixin will allocate a Array in the stack if necessary, and returns a `Result<String, Span<T>>`.
+		/// @param name The name of the global variable.
+		public mixin GetSpan<T>(StringView name) where T : var
+		{
+			Debug.Assert(mLua.GetTop() == 0);
+			mTinkerState.ClearError();
+			mLua.GetGlobal(name);
+			defer mLua.Pop(1);
+			// Friend lets this public mixin use the internal dispatch type in the caller's scope.
+#unwarn
+			let values = [Friend]PopDispatch<Span<T>>.Pop!:mixin(mLua, -1);
+			Result<Span<T>, StringView> result = mTinkerState.HasError ? .Err(mTinkerState.GetLastError()) : .Ok(values);
 			result
 		}
 
@@ -1220,5 +1258,19 @@ namespace LuaTinker
 		[Inline]
 		public void SetNumber(StringView name, double number)
 			=> SetValue(name, number);
+
+		/// Allows Lua functions to be passed as delegates of this signature.
+		/// @param lifetime How long the delegate will live after being passed to Beef.
+		public void RegisterDelegate<D>(DelegateLifetime lifetime = .CallScoped) where D : Delegate
+		{
+			LuaDelegateAdapter<D>.ValidateSignature();
+			switch (lifetime)
+			{
+			case .CallScoped:
+				mTinkerState.RegisterDelegate(typeof(D), => LuaDelegateAdapter<D>.Create, LuaDelegateAdapter<D>.StorageSize);
+			case .Persistent:
+				mTinkerState.RegisterDelegate(typeof(D), => LuaDelegateAdapter<D>.CreatePersistent, 0);
+			}
+		}
 	}
 }

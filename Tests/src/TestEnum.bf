@@ -40,14 +40,45 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
+		public static void TestTypedEnumViews()
+		{
+			let lua = scope Lua(true);
+			let tinker = scope LuaTinker(lua);
+			tinker.AddEnum<TestNumericArguments.SignedChoice>("NumericChoice");
+			tinker.AddEnum<TestNumericArguments.SignedChoice>("TypedChoice", true);
+			using (let ns = tinker.BeginNamespace("Choices"))
+			{
+				ns.AddEnum<TestNumericArguments.UnsignedChoice>("NumericChoice");
+				ns.AddEnum<TestNumericArguments.UnsignedChoice>("TypedChoice", true);
+			}
+			tinker.AutoTinkClass<TestNumericArguments.NumericOverloads>(.Shallow);
+
+			if (lua.DoString(
+				"""
+				local api = NumericOverloads
+				assert(api.Mixed(TypedChoice.One) == 101)
+				assert(api.Mixed(NumericChoice.cast(NumericChoice.One)) == 101)
+				assert(api.Mixed(int32.cast(NumericChoice.One)) == 32)
+				assert(api.PickEnum(Choices.TypedChoice.One) == 2)
+				assert(not pcall(function() api.Mixed(NumericChoice.One) end))
+				assert(not pcall(function() api.PickEnum(Choices.NumericChoice.One) end))
+				"""
+			))
+				Test.FatalError(lua.ToString(-1, .. scope .()));
+		}
+
+		[Test]
 		public static void TestNamespace()
 		{
 			let lua = scope Lua(true);
 			lua.Encoding = System.Text.Encoding.UTF8;
 
 			LuaTinker tinker = scope .(lua);
-			tinker.AddNamespace("System");
-			tinker.AddNamespaceEnum<StringSplitOptions>("System");
+
+			using (let ns = tinker.BeginNamespace("System"))
+			{
+				ns.AddEnum<StringSplitOptions>();
+			}
 			tinker.AddMethod("GetSSO", (function StringSplitOptions()) => GetSSO);
 			tinker.AddMethod("SetSSO", (function void(StringSplitOptions)) => SetSSO);
 

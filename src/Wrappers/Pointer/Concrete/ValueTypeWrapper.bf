@@ -3,6 +3,7 @@ using System.Diagnostics;
 
 namespace LuaTinker.Wrappers
 {
+	/// Owns a struct stored inline in its Lua userdata allocation.
 	public sealed class ValueTypeWrapper<T> : PointerWrapperBase
 		where T : var, struct
 	{
@@ -15,24 +16,31 @@ namespace LuaTinker.Wrappers
 			mReadOnlyPtr = true;
 		}
 
+		[Inline]
 		public T* ValuePointer => &mData;
 
+	    [Inline]
 	    public void Create()
 			=> mData = .();
 
+	    [Inline]
 	    public void Create<T1>(T1 t1) where T1 : var
 			=> mData = .(t1);
 
+	    [Inline]
 	    public void Create<T1, T2>(T1 t1, T2 t2) where T1 : var where T2 : var
 			=> mData = .(t1, t2);
 
+	    [Inline]
 	    public void Create<T1, T2, T3>(T1 t1, T2 t2, T3 t3) where T1 : var where T2 : var where T3 : var
 			=> mData = .(t1, t2, t3);
 
+	    [Inline]
 	    public void Create<T1, T2, T3, T4>(T1 t1, T2 t2, T3 t3, T4 t4) where T1 : var where T2 : var where T3 : var where T4 : var
 			=> mData = .(t1, t2, t3, t4);
 
 		public override Type Type => typeof(T);
+		public override bool CanPassByRef => true;
 
 		public override ToObjectResult ToObject(ITypedAllocator allocator, out Object obj)
 		{

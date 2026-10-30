@@ -7,8 +7,60 @@ namespace LuaTinker.Helpers
 {
 	static
 	{
+		typealias FirstGenericArg<T> = GetGenericArg<T, const 0>.Result;
+
+		public static Type GetSpanElement(Type type)
+		{
+			if (let specialized = type as SpecializedGenericType)
+				if (specialized.UnspecializedType == typeof(Span<>) && specialized.GenericParamCount == 1)
+					return specialized.GetGenericArg(0);
+			return null;
+		}
+
 		struct Yes;
 		struct No;
+
+		struct IsNumericPointer<T> where T : var
+		{
+			public typealias Result = comptype(GetResult(typeof(T)));
+
+			[Comptime]
+			private static Type GetResult(Type type)
+				=> type.IsPointer && IsNumericType(RemovePtr(type)) ? typeof(Yes) : typeof(No);
+		}
+
+		// Type has no public function-kind query; inspect its flag without relaxing corlib visibility.
+		[Inline]
+		public static bool IsFunctionType(Type type)
+			=> !type.IsGenericParam && type.[Friend]mTypeFlags.HasFlag(.Function);
+
+		struct IsFunction<T> where T : var
+		{
+			public typealias Result = comptype(IsFunctionType(typeof(T)) ? typeof(Yes) : typeof(No));
+		}
+
+		// Corlib exposes no public delegate-kind query; use its flag without changing visibility.
+		[Inline]
+		public static bool IsDelegateType(Type type)
+			=> !type.IsGenericParam && type.[Friend]mTypeFlags.HasFlag(.Delegate);
+
+		struct IsDelegate<T> where T : var
+		{
+			public typealias Result = comptype(IsDelegateType(typeof(T)) ? typeof(Yes) : typeof(No));
+		}
+
+		struct IsInputSpan<T> where T : var
+		{
+			public typealias Result = comptype(_isInputSpan(typeof(T)));
+
+			[Comptime]
+			private static Type _isInputSpan(Type type)
+			{
+				if (let specialized = type as SpecializedGenericType)
+					return specialized.UnspecializedType == typeof(Span<>) ? typeof(Yes) : typeof(No);
+				return typeof(No);
+			}
+		}
 
 		struct IsIndexable<T, TKey>
 		{
