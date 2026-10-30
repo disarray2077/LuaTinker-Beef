@@ -27,12 +27,13 @@ jobs:
           cache: npm
           cache-dependency-path: Playground/web/package-lock.json
 
-      - name: Set up Beef nightly
+      - name: Set up pinned Beef compiler
         run: |
           $ErrorActionPreference = 'Stop'
           $setup = Join-Path $env:RUNNER_TEMP 'BeefSetup.exe'
           $beefRoot = Join-Path $env:RUNNER_TEMP 'Beef'
-          Invoke-WebRequest 'https://nightly.beeflang.org/BeefSetup.exe' -OutFile $setup
+          # Beef commit 301192e1fc518bbd36bf9c114f89e0525e04e7d1.
+          Invoke-WebRequest 'https://nightly.beeflang.org/BeefSetup_0_43_6__10_23_2026.exe' -OutFile $setup
           & 7z x $setup "-o$beefRoot" -y
           if ($LASTEXITCODE) { throw 'Cannot extract Beef nightly.' }
           Copy-Item "$beefRoot/__user/*" $beefRoot -Recurse -Force
