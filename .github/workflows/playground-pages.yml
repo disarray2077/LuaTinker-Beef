@@ -34,6 +34,16 @@ jobs:
           TEMPLATE_BASE: ${{ github.event.before }}
         run: |
           $base = $env:TEMPLATE_BASE
+          if ($base -and $base -notmatch '^0+$') {
+            git cat-file -e "$base^{commit}" 2>$null
+            if ($LASTEXITCODE) {
+              git fetch --no-tags --depth=1 origin $base
+              if ($LASTEXITCODE) {
+                Write-Output "::warning::Previous push commit $base is unavailable; checking the latest commit instead."
+                $base = $null
+              }
+            }
+          }
           if (!$base -or $base -match '^0+$') {
             git rev-parse --verify HEAD^ >$null 2>&1
             if ($LASTEXITCODE) { exit 0 }
