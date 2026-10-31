@@ -37,6 +37,7 @@ local function run()
     list.Anchor = Forms.AnchorStyles.Top | Forms.AnchorStyles.Bottom | Forms.AnchorStyles.Left | Forms.AnchorStyles.Right
     list.BorderStyle = Forms.BorderStyle.FixedSingle
     list.AutoScroll = true
+    list.Padding = Forms.Padding(12, 10, 28, 10)
     list.ColumnCount = 1
     list.ColumnStyles:Add(Forms.ColumnStyle(Forms.SizeType.Percent, 100))
     form.Controls:Add(give_ownership(list))
@@ -68,7 +69,8 @@ local function run()
     local function addTask(text)
         local task = Forms.CheckBox()
         task.Text = text
-        task.Size = Forms.Size(0, 34)
+        task.Size = Forms.Size(0, 30)
+        task.Margin = Forms.Padding(0, 0, 0, 4)
         task.Anchor = Forms.AnchorStyles.Top | Forms.AnchorStyles.Left | Forms.AnchorStyles.Right
         list.Controls:Add(give_ownership(task))
         task.CheckedChanged:Add(function() refresh() end)
