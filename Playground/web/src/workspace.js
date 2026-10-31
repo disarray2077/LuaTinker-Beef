@@ -14,6 +14,7 @@ import {
   openDb,
   setMeta,
 } from "./storage.js";
+import { findTemplateUpdates } from "./template-updates.js";
 
 export function createWorkspace(runtime) {
   const state = {
@@ -210,6 +211,7 @@ export function createWorkspace(runtime) {
     const existing = new Map(
       (await getAll("files")).map((record) => [record.path, record]),
     );
+    const updates = await findTemplateUpdates(seeds, existing);
     // Earlier workspaces did not record which templates had already been offered.
     const packagedFiles = new Set(
       values.packagedFiles ||
@@ -224,6 +226,7 @@ export function createWorkspace(runtime) {
     );
     await tx(["files", "meta"], "readwrite", (transaction) => {
       const files = transaction.objectStore("files");
+      for (const record of updates) files.put(record);
       for (const record of seeds) {
         if (packagedFiles.has(record.path) || existing.has(record.path))
           continue;
