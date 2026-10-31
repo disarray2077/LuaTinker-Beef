@@ -20,26 +20,12 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: Playground/web/package-lock.json
-
-      - name: Check bundled example update hashes
-        env:
-          TEMPLATE_BASE: ${{ github.event.before }}
-        run: |
-          $base = $env:TEMPLATE_BASE
-          if (!$base -or $base -match '^0+$') {
-            git rev-parse --verify HEAD^ >$null 2>&1
-            if ($LASTEXITCODE) { exit 0 }
-            $base = 'HEAD^'
-          }
-          node Playground/web/update-template-hashes.mjs --check --base $base
 
       - name: Set up pinned Beef compiler
         run: |

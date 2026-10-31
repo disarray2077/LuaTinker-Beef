@@ -31,14 +31,12 @@ local function run()
     add.Enabled = false
     form.Controls:Add(give_ownership(add))
 
-    local list = Forms.TableLayoutPanel()
+    local list = Forms.Panel()
     list.Location = Forms.Point(20, 96)
     list.Size = Forms.Size(600, 304)
     list.Anchor = Forms.AnchorStyles.Top | Forms.AnchorStyles.Bottom | Forms.AnchorStyles.Left | Forms.AnchorStyles.Right
     list.BorderStyle = Forms.BorderStyle.FixedSingle
     list.AutoScroll = true
-    list.ColumnCount = 1
-    list.ColumnStyles:Add(Forms.ColumnStyle(Forms.SizeType.Percent, 100))
     form.Controls:Add(give_ownership(list))
 
     local summary = Forms.Label()
@@ -56,10 +54,11 @@ local function run()
 
     local function refresh()
         local completed = 0
-        for _, task in ipairs(tasks) do
+        for index, task in ipairs(tasks) do
             if task.Checked then
                 completed = completed + 1
             end
+            task.Location = Forms.Point(12, 10 + (index - 1) * 34)
         end
         summary.Text = string.format("%d of %d tasks complete", completed, #tasks)
         clear.Enabled = completed > 0
@@ -68,7 +67,8 @@ local function run()
     local function addTask(text)
         local task = Forms.CheckBox()
         task.Text = text
-        task.Size = Forms.Size(0, 34)
+        task.Location = Forms.Point(12, 10 + #tasks * 34)
+        task.Size = Forms.Size(list.ClientSize.width - 40, 30)
         task.Anchor = Forms.AnchorStyles.Top | Forms.AnchorStyles.Left | Forms.AnchorStyles.Right
         list.Controls:Add(give_ownership(task))
         task.CheckedChanged:Add(function() refresh() end)
