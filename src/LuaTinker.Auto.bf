@@ -255,7 +255,7 @@ namespace LuaTinker
 			}
 			if (type.IsEnum)
 			{
-				if (flags.HasFlag(.IncludeEnums))
+				if (!type.IsUnion && flags.HasFlag(.IncludeEnums))
 					dependencies.Add(type);
 				return;
 			}
@@ -499,7 +499,7 @@ namespace LuaTinker
 				{
 					if (dependency == type)
 						continue;
-					if (dependency.IsEnum)
+					if (dependency.IsEnum && !dependency.IsUnion)
 					{
 						let typed = Flags.HasFlag(.TypedEnums) ? "true" : "false";
 						code.AppendF($"AutoTinkEnumDependency<comptype({dependency.GetTypeId()})>(scopePath, visited, names, {typed});\n");

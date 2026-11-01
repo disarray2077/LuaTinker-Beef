@@ -85,9 +85,9 @@ namespace LuaTinker.StackHelpers
 			if (!lua.IsNumber(index) || lua.IsString(index))
 				return false;
 			var resolvedType = type;
-			if (resolvedType.IsEnum || resolvedType.IsTypedPrimitive)
+			if (IsTypedNumericType(resolvedType))
 				resolvedType = resolvedType.UnderlyingType;
-			if (resolvedType.IsInteger || resolvedType.IsChar)
+			if (resolvedType.IsInteger)
 			{
 				if (let value = lua.ToIntegerX(index))
 					return CanRepresentInteger(resolvedType, value);

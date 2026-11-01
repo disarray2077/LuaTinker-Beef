@@ -41,7 +41,7 @@ namespace LuaTinker.StackHelpers
 					}
 					if (type == typeof(int32))
 						int32Index = @field.Index;
-					let isEnumLike = type.IsEnum || type.IsTypedPrimitive;
+					let isEnumLike = IsTypedNumericType(type);
 					candidates.AppendF($".(typeof(comptype({type.GetTypeId()})), {isEnumLike ? "true" : "false"})");
 				}
 				Compiler.MixinRoot(scope $"""

@@ -20,13 +20,13 @@ namespace LuaTinker.Tests
 		}
 
 		[Test]
-		public static void TestGenericEnumDependencyNames()
+		public static void TestUnionEnumDependenciesAreSkipped()
 		{
-			let lua = scope Lua(true);
-			let tinker = scope LuaTinker(lua);
-			tinker.AutoTinkClass<GenericEnumDependencies>(.Deep);
-			if (lua.DoString("assert(type(Result_void) == 'table' and type(Result_int32) == 'table')"))
-				Test.FatalError(lua.ToString(-1, .. scope .()));
+		    let lua = scope Lua(true);
+		    let tinker = scope LuaTinker(lua);
+		    tinker.AutoTinkClass<GenericEnumDependencies>(.Deep);
+		    if (lua.DoString("assert(Result_void == nil and Result_int32 == nil)"))
+		        Test.FatalError(lua.ToString(-1, .. scope .()));
 		}
 
 		public static class CollisionA

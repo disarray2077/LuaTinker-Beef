@@ -5,16 +5,24 @@ namespace LuaTinker.Helpers
 	static
 	{
 		[Inline]
+		public static bool IsPrimitiveNumericType(Type type)
+		    => !IsFunctionType(type) && (type.IsInteger || type.IsFloatingPoint);
+
+		[Inline]
+		public static bool IsTypedNumericType(Type type)
+		    => (type.IsEnum && !type.IsUnion) ||
+		       (type.IsTypedPrimitive && IsPrimitiveNumericType(type.UnderlyingType));
+
+		[Inline]
 		public static bool IsNumericType(Type type)
-			=> !IsFunctionType(type) && (type.IsInteger || type.IsEnum || type.IsFloatingPoint ||
-				(type.IsTypedPrimitive && (type.UnderlyingType.IsInteger || type.UnderlyingType.IsFloatingPoint)));
+		    => IsPrimitiveNumericType(type) || IsTypedNumericType(type);
 
 		public static bool CanRepresentInteger(Type type, int64 value)
 		{
 			var resolvedType = type;
-			if (resolvedType.IsEnum || resolvedType.IsTypedPrimitive)
+			if (IsTypedNumericType(resolvedType))
 				resolvedType = resolvedType.UnderlyingType;
-			if (!resolvedType.IsInteger && !resolvedType.IsChar)
+			if (!resolvedType.IsInteger)
 				return false;
 			if (resolvedType.IsSigned)
 			{
